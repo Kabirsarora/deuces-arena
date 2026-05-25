@@ -9,6 +9,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  PublicChatMessage,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -29,13 +30,14 @@ import {
   Gauge,
   History,
   ListOrdered,
+  MessageCircle,
   Play,
   Send,
   Sparkles,
   Trophy,
   Users
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { io, type Socket } from "socket.io-client";
 
 import { Button } from "@/components/ui/button";
@@ -121,6 +123,16 @@ export function OnlineRoomPanel() {
     });
     socket.on("lobby:state", (state) => {
       setLobby(state);
+    });
+    socket.on("chat:message", (chatMessage) => {
+      setRoom((currentRoom) =>
+        currentRoom === null
+          ? currentRoom
+          : {
+              ...currentRoom,
+              recentChat: [...currentRoom.recentChat, chatMessage].slice(-20)
+            }
+      );
     });
     socket.on("game:error", (payload) => {
       setMessage(payload.message);
@@ -269,6 +281,18 @@ export function OnlineRoomPanel() {
     );
   }
 
+  function sendChat(body: string) {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit("chat:send", { roomCode: room.roomCode, body }, (ack) => {
+      if (!ack.ok) {
+        setMessage(ack.error);
+      }
+    });
+  }
+
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
     setSelectedCardIds((current) =>
@@ -387,7 +411,7 @@ export function OnlineRoomPanel() {
         <section className="grid gap-3">
           <div className="grid gap-3 xl:grid-cols-[1fr_18rem]">
             <OnlineTable room={room} />
-            <OnlineMoveTracker room={room} />
+            <OnlineMoveTracker room={room} onSendChat={sendChat} />
           </div>
 
           <section className="rounded-md border border-white/10 bg-black/28 p-3 shadow-2xl backdrop-blur">
@@ -723,7 +747,13 @@ function ProfileMetric({
   );
 }
 
-function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) {
+function OnlineMoveTracker({
+  room,
+  onSendChat
+}: {
+  readonly room: PublicRoomState | null;
+  readonly onSendChat: (body: string) => void;
+}) {
   const recentEvents = createReplayTimeline(room?.recentEvents ?? [])
     .slice(-6)
     .reverse();
@@ -785,7 +815,73 @@ function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) 
           </ol>
         )}
       </div>
+
+      <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
     </aside>
+  );
+}
+
+function RoomChat({
+  messages,
+  disabled,
+  onSend
+}: {
+  readonly messages: readonly PublicChatMessage[];
+  readonly disabled: boolean;
+  readonly onSend: (body: string) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function submitChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (draft.trim() === "") {
+      return;
+    }
+
+    onSend(draft);
+    setDraft("");
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-white/10 bg-black/20 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-xs font-bold">
+          <MessageCircle className="size-3.5 text-[var(--gold)]" />
+          Table Chat
+        </p>
+        <span className="text-[10px] text-zinc-500">{messages.length} recent</span>
+      </div>
+
+      <div className="max-h-28 overflow-y-auto pr-1">
+        {messages.length === 0 ? (
+          <p className="py-3 text-center text-xs text-zinc-500">No messages yet.</p>
+        ) : (
+          messages.slice(-4).map((chatMessage) => (
+            <div key={chatMessage.id} className="mb-2 last:mb-0">
+              <p className="truncate text-[11px] font-bold text-zinc-300">
+                {chatMessage.playerName}
+              </p>
+              <p className="break-words text-xs text-zinc-400">{chatMessage.body}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form className="mt-2 flex gap-2" onSubmit={submitChat}>
+        <input
+          className="h-9 min-w-0 flex-1 rounded-md border border-white/10 bg-white/7 px-2 text-xs text-white outline-none focus:border-[var(--gold)]"
+          maxLength={240}
+          placeholder={disabled ? "Join a room to chat" : "Message"}
+          value={draft}
+          disabled={disabled}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <Button size="sm" disabled={disabled || draft.trim() === ""}>
+          <Send className="size-4" />
+        </Button>
+      </form>
+    </div>
   );
 }
 

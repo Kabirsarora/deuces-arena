@@ -14,6 +14,7 @@ import {
 import type {
   ClientToServerEvents,
   InterServerEvents,
+  PublicChatMessage,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -59,6 +60,7 @@ type Room = {
   readonly code: string;
   readonly createdAt: Date;
   players: RoomPlayer[];
+  chatMessages: PublicChatMessage[];
   game: GameState | null;
   persistedMatch: PersistedMatch | null;
   statsApplied: boolean;
@@ -67,6 +69,8 @@ type Room = {
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 const MAX_PLAYERS_PER_ROOM = 4;
+const MAX_CHAT_MESSAGES_PER_ROOM = 50;
+const MAX_CHAT_MESSAGE_LENGTH = 240;
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 
@@ -290,6 +294,41 @@ io.on("connection", (socket) => {
     scheduleBotTurn(room);
   });
 
+  socket.on("chat:send", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    const body = sanitizeChatMessage(payload.body);
+
+    if (body === null) {
+      callback(fail("Message is empty."));
+      return;
+    }
+
+    const message: PublicChatMessage = {
+      id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      playerId: player.id,
+      playerName: player.name,
+      body,
+      createdAt: new Date().toISOString()
+    };
+
+    room.chatMessages = [...room.chatMessages, message].slice(-MAX_CHAT_MESSAGES_PER_ROOM);
+    callback(ok(message));
+    io.to(room.code).emit("chat:message", message);
+  });
+
   socket.on("disconnect", () => {
     const roomCode = socket.data.roomCode;
     const playerId = socket.data.playerId;
@@ -335,6 +374,7 @@ function createRoom(playerName: string, socketId: string, guestId: string | unde
     code,
     createdAt: new Date(),
     players: [createHumanPlayer(playerName, socketId, 0, guestId)],
+    chatMessages: [],
     game: null,
     persistedMatch: null,
     statsApplied: false
@@ -493,6 +533,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     turnNumber: room.game?.turnNumber ?? 0,
     placements: room.game?.placements ?? [],
     recentEvents: room.game?.events.slice(-12) ?? [],
+    recentChat: room.chatMessages.slice(-20),
     yourPlayerId: player?.id ?? null,
     yourHand: hand
   };
@@ -623,6 +664,20 @@ function isPlayerInRoom(room: Room, socketId: string): boolean {
 function normalizeGuestId(guestId: string | undefined): string | null {
   const normalized = guestId?.trim();
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 80);
+}
+
+function sanitizeChatMessage(body: string): string | null {
+  const trimmed = body.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
+
+  if (trimmed === "") {
+    return null;
+  }
+
+  const blockedWords = ["fuck", "shit", "bitch", "asshole", "slur"];
+  return blockedWords.reduce(
+    (message, word) => message.replace(new RegExp(`\\b${word}\\b`, "gi"), "****"),
+    trimmed
+  );
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {

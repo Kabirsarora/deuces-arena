@@ -74,6 +74,14 @@ export type PublicRoomPlayer = {
   readonly stats: PublicPlayerStats | null;
 };
 
+export type PublicChatMessage = {
+  readonly id: string;
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly body: string;
+  readonly createdAt: string;
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly status: RoomStatus;
@@ -83,6 +91,7 @@ export type PublicRoomState = {
   readonly turnNumber: number;
   readonly placements: readonly string[];
   readonly recentEvents: readonly GameEvent[];
+  readonly recentChat: readonly PublicChatMessage[];
   readonly yourPlayerId: string | null;
   readonly yourHand: readonly Card[];
 };
@@ -115,6 +124,11 @@ export type ReconnectRoomPayload = {
 export type MovePayload = {
   readonly roomCode: string;
   readonly move: Move;
+};
+
+export type ChatPayload = {
+  readonly roomCode: string;
+  readonly body: string;
 };
 
 export type ServerAck<T = undefined> =
@@ -162,11 +176,16 @@ export type ClientToServerEvents = {
   ) => void;
   "lobby:get": (callback: (ack: ServerAck<PublicLobbyState>) => void) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
+  "chat:send": (
+    payload: ChatPayload,
+    callback: (ack: ServerAck<PublicChatMessage>) => void
+  ) => void;
 };
 
 export type ServerToClientEvents = {
   "room:state": (state: PublicRoomState) => void;
   "lobby:state": (state: PublicLobbyState) => void;
+  "chat:message": (message: PublicChatMessage) => void;
   "game:error": (payload: { readonly message: string }) => void;
 };
 
