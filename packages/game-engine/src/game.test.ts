@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { applyMove, createCard, createDeck, createInitialGame, type GameState } from "./index.js";
+import {
+  applyMove,
+  createCard,
+  createDeck,
+  createInitialGame,
+  summarizeGame,
+  type GameState
+} from "./index.js";
 
 const playerIds = ["player-1", "player-2", "player-3", "player-4"] as const;
 
@@ -169,6 +176,42 @@ describe("game state", () => {
         "player-3": 13,
         "player-4": 13
       }
+    });
+  });
+
+  it("summarizes move, pass, and remaining-card stats", () => {
+    const firstMove = applyMove(testGame(), "player-1", {
+      type: "play",
+      cards: [createCard("3", "diamonds")]
+    });
+    expect(firstMove.ok).toBe(true);
+
+    if (!firstMove.ok) {
+      return;
+    }
+
+    const pass = applyMove(firstMove.state, "player-2", {
+      type: "pass"
+    });
+    expect(pass.ok).toBe(true);
+
+    if (!pass.ok) {
+      return;
+    }
+
+    expect(summarizeGame(pass.state)).toContainEqual({
+      playerId: "player-1",
+      cardsRemaining: 12,
+      movesPlayed: 1,
+      passes: 0,
+      bombsPlayed: 0
+    });
+    expect(summarizeGame(pass.state)).toContainEqual({
+      playerId: "player-2",
+      cardsRemaining: 13,
+      movesPlayed: 0,
+      passes: 1,
+      bombsPlayed: 0
     });
   });
 });

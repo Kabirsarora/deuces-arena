@@ -7,13 +7,16 @@ import {
   createInitialGame,
   generateLegalMoves,
   getCardId,
+  summarizeGame,
   type Card,
+  type GameEvent,
   type GameState,
   type Move,
+  type PlayerGameSummary,
   type PlayerState
 } from "@deuces-arena/game-engine";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Crown, RotateCcw, Send, Sparkles } from "lucide-react";
+import { Activity, Bot, Crown, History, RotateCcw, Send, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -144,7 +147,10 @@ export function LocalGameTable() {
             activePlayerId={game.activePlayerId}
             className="hidden lg:col-start-1 lg:row-start-2 lg:flex"
           />
-          <TableCenter game={game} message={message} className="lg:col-start-2 lg:row-start-2" />
+          <div className="grid gap-3 lg:col-start-2 lg:row-start-2 xl:grid-cols-[1fr_18rem]">
+            <TableCenter game={game} message={message} />
+            <MoveTracker game={game} />
+          </div>
           <OpponentPanel
             player={getPlayer(game, "bot-right")}
             activePlayerId={game.activePlayerId}
@@ -179,6 +185,88 @@ export function LocalGameTable() {
         </div>
       </section>
     </main>
+  );
+}
+
+function MoveTracker({ game }: { readonly game: GameState }) {
+  const summaries = summarizeGame(game);
+  const recentEvents = game.events.slice(-6).reverse();
+
+  return (
+    <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-bold">
+            <History className="size-4 text-[var(--aqua)]" />
+            Move Tracker
+          </p>
+          <p className="text-xs text-zinc-400">{game.events.length} recorded events</p>
+        </div>
+        <div className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          {game.status}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {summaries.map((summary) => (
+          <PlayerStat key={summary.playerId} summary={summary} />
+        ))}
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/20">
+        {recentEvents.length === 0 ? (
+          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
+            Moves will appear here as the table develops.
+          </div>
+        ) : (
+          <ol className="max-h-52 overflow-y-auto p-2">
+            {recentEvents.map((event) => (
+              <MoveEventRow key={`${event.turnNumber}-${event.playerId}`} event={event} />
+            ))}
+          </ol>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function PlayerStat({ summary }: { readonly summary: PlayerGameSummary }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/7 p-2">
+      <p className="truncate text-xs font-bold">{PLAYER_NAMES[summary.playerId]}</p>
+      <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-zinc-400">
+        <span>{summary.cardsRemaining} cards</span>
+        <span>{summary.movesPlayed} plays</span>
+        <span>{summary.passes} passes</span>
+        <span>{summary.bombsPlayed} bombs</span>
+      </div>
+    </div>
+  );
+}
+
+function MoveEventRow({ event }: { readonly event: GameEvent }) {
+  return (
+    <li className="mb-2 rounded-md border border-white/10 bg-white/6 px-2 py-2 last:mb-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-bold">{PLAYER_NAMES[event.playerId]}</p>
+          <p className="mt-1 text-xs text-zinc-300">
+            {event.wasPass
+              ? "Passed"
+              : event.move.type === "play"
+                ? event.move.cards.map(formatCard).join(" ")
+                : ""}
+          </p>
+        </div>
+        <span className="rounded-sm bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
+          #{event.turnNumber + 1}
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
+        <Activity className="size-3" />
+        {event.legalMoveCount} legal · {event.cardsRemainingAfter[event.playerId]} left
+      </div>
+    </li>
   );
 }
 

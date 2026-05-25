@@ -32,6 +32,14 @@ export type GameEvent = {
   readonly legalMoveCount: number;
 };
 
+export type PlayerGameSummary = {
+  readonly playerId: string;
+  readonly cardsRemaining: number;
+  readonly movesPlayed: number;
+  readonly passes: number;
+  readonly bombsPlayed: number;
+};
+
 export type GameActionResult =
   | {
       readonly ok: true;
@@ -168,6 +176,22 @@ export function applyMove(state: GameState, playerId: string, move: Move): GameA
       legalMoveCount
     })
   };
+}
+
+export function summarizeGame(state: GameState): readonly PlayerGameSummary[] {
+  return state.players.map((player) => {
+    const playerEvents = state.events.filter((event) => event.playerId === player.id);
+
+    return {
+      playerId: player.id,
+      cardsRemaining: player.hand.length,
+      movesPlayed: playerEvents.filter((event) => !event.wasPass).length,
+      passes: playerEvents.filter((event) => event.wasPass).length,
+      bombsPlayed: playerEvents.filter(
+        (event) => event.move.type === "play" && event.move.cards.length === 5
+      ).length
+    };
+  });
 }
 
 function applyPlay(
