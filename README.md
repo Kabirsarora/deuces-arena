@@ -6,7 +6,7 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 
 - Pure TypeScript game engine with validation, legal move generation, bots, replays, ratings, and simulation utilities.
 - Mobile-first Next.js table for local human vs bot play.
-- Socket.IO rooms with server-authoritative move validation, reconnect support, bot fill, guest stats, and replay export.
+- Socket.IO rooms with server-authoritative move validation, reconnect support, bot fill, guest stats, live lobby discovery, activity counts, and replay export.
 - Prisma/PostgreSQL schema for users, matches, match players, move history, replay labels, and future AI scores.
 - Early ML package for random self-play sample generation without pretending baseline bots are trained AI.
 

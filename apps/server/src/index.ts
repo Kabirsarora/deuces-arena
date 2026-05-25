@@ -78,8 +78,13 @@ app.get("/health", (_request, response) => {
   response.json({
     ok: true,
     service: "@deuces-arena/server",
-    rooms: rooms.size
+    rooms: rooms.size,
+    activity: publicLobbyState().activity
   });
+});
+
+app.get("/lobby", (_request, response) => {
+  response.json(publicLobbyState());
 });
 
 const httpServer = createServer(app);
