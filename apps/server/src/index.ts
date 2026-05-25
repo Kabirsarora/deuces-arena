@@ -15,6 +15,7 @@ import type {
   InterServerEvents,
   PublicRoomPlayer,
   PublicRoomState,
+  RoomReplayExport,
   ServerAck,
   ServerToClientEvents,
   SocketData
@@ -192,6 +193,22 @@ io.on("connection", (socket) => {
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     scheduleBotTurn(room);
+  });
+
+  socket.on("room:replay", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    if (!isPlayerInRoom(room, socket.id)) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    callback(ok(replayExportForRoom(room)));
   });
 
   socket.on("game:move", (payload, callback) => {
@@ -419,6 +436,17 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     recentEvents: room.game?.events.slice(-12) ?? [],
     yourPlayerId: player?.id ?? null,
     yourHand: hand
+  };
+}
+
+function replayExportForRoom(room: Room): RoomReplayExport {
+  return {
+    roomCode: room.code,
+    status: room.game?.status ?? "waiting",
+    players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
+    placements: room.game?.placements ?? [],
+    turnNumber: room.game?.turnNumber ?? 0,
+    events: room.game?.events ?? []
   };
 }
 

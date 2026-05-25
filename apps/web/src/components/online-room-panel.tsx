@@ -15,7 +15,7 @@ import type {
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Copy, History, Play, Send, Sparkles, Users } from "lucide-react";
+import { Activity, Copy, Download, History, Play, Send, Sparkles, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -131,6 +131,37 @@ export function OnlineRoomPanel() {
       { roomCode: room.roomCode },
       handleRoomAck("Game started.")
     );
+  }
+
+  function exportReplay() {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit("room:replay", { roomCode: room.roomCode }, (ack) => {
+      if (!ack.ok) {
+        setMessage(ack.error);
+        return;
+      }
+
+      const replay = {
+        exportedAt: new Date().toISOString(),
+        mode: "online-room",
+        ...ack.data,
+        timeline: createReplayTimeline(ack.data.events)
+      };
+      const blob = new Blob([JSON.stringify(replay, null, 2)], {
+        type: "application/json"
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = `deuces-arena-room-${ack.data.roomCode}-replay-${Date.now()}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMessage("Replay exported.");
+    });
   }
 
   function playSelected() {
@@ -265,6 +296,10 @@ export function OnlineRoomPanel() {
               >
                 <Play className="size-4" />
                 Start With Bots
+              </Button>
+              <Button className="mt-2 w-full" variant="secondary" onClick={exportReplay}>
+                <Download className="size-4" />
+                Export Replay
               </Button>
             </div>
           ) : null}

@@ -32,6 +32,15 @@ export type PublicRoomState = {
   readonly yourHand: readonly Card[];
 };
 
+export type RoomReplayExport = {
+  readonly roomCode: string;
+  readonly status: RoomStatus;
+  readonly players: readonly PublicRoomPlayer[];
+  readonly placements: readonly string[];
+  readonly turnNumber: number;
+  readonly events: readonly GameEvent[];
+};
+
 export type CreateRoomPayload = {
   readonly playerName: string;
   readonly guestId?: string;
@@ -79,6 +88,10 @@ export type ClientToServerEvents = {
   "room:start": (
     payload: { readonly roomCode: string },
     callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "room:replay": (
+    payload: { readonly roomCode: string },
+    callback: (ack: ServerAck<RoomReplayExport>) => void
   ) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
 };
