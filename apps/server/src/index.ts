@@ -111,6 +111,39 @@ io.on("connection", (socket) => {
     emitRoomState(room);
   });
 
+  socket.on("room:reconnect", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.id === payload.playerId);
+
+    if (player === undefined || player.kind !== "human") {
+      callback(fail("Seat not found."));
+      return;
+    }
+
+    room.players = room.players.map((candidate) =>
+      candidate.id === player.id
+        ? {
+            ...candidate,
+            socketId: socket.id
+          }
+        : candidate
+    );
+    socket.data = {
+      playerId: player.id,
+      roomCode: room.code
+    };
+    socket.join(room.code);
+
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+  });
+
   socket.on("room:start", (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 

@@ -32,6 +32,11 @@ export type JoinRoomPayload = {
   readonly playerName: string;
 };
 
+export type ReconnectRoomPayload = {
+  readonly roomCode: string;
+  readonly playerId: string;
+};
+
 export type MovePayload = {
   readonly roomCode: string;
   readonly move: Move;
@@ -54,6 +59,10 @@ export type ClientToServerEvents = {
   ) => void;
   "room:join": (
     payload: JoinRoomPayload,
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "room:reconnect": (
+    payload: ReconnectRoomPayload,
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
   "room:start": (

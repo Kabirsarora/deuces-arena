@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
+const ROOM_SESSION_KEY = "deuces-arena-room-session";
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -49,7 +50,8 @@ export function OnlineRoomPanel() {
         move.cards.length === selectedCards.length &&
         move.cards.every((card) => selectedCardIds.includes(getCardId(card)))
     );
-  const isYourTurn = room?.yourPlayerId !== null && room?.activePlayerId === room?.yourPlayerId;
+  const isYourTurn =
+    room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
 
   useEffect(() => {
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
@@ -60,6 +62,16 @@ export function OnlineRoomPanel() {
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
+      const session = loadRoomSession();
+
+      if (session !== null) {
+        socket.emit("room:reconnect", session, (ack) => {
+          if (ack.ok) {
+            setRoom(ack.data);
+            setMessage("Reconnected to room.");
+          }
+        });
+      }
     });
     socket.on("disconnect", () => {
       setConnected(false);
@@ -157,6 +169,7 @@ export function OnlineRoomPanel() {
       if (ack.ok) {
         setRoom(ack.data);
         setSelectedCardIds([]);
+        saveRoomSession(ack.data);
         setMessage(successMessage);
       } else {
         setMessage(ack.error);
@@ -294,6 +307,46 @@ export function OnlineRoomPanel() {
       </section>
     </main>
   );
+}
+
+function saveRoomSession(room: PublicRoomState): void {
+  if (room.yourPlayerId === null) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    ROOM_SESSION_KEY,
+    JSON.stringify({
+      roomCode: room.roomCode,
+      playerId: room.yourPlayerId
+    })
+  );
+}
+
+function loadRoomSession(): { readonly roomCode: string; readonly playerId: string } | null {
+  const rawSession = window.localStorage.getItem(ROOM_SESSION_KEY);
+
+  if (rawSession === null) {
+    return null;
+  }
+
+  try {
+    const parsedSession = JSON.parse(rawSession) as {
+      roomCode?: unknown;
+      playerId?: unknown;
+    };
+
+    if (typeof parsedSession.roomCode === "string" && typeof parsedSession.playerId === "string") {
+      return {
+        roomCode: parsedSession.roomCode,
+        playerId: parsedSession.playerId
+      };
+    }
+  } catch {
+    window.localStorage.removeItem(ROOM_SESSION_KEY);
+  }
+
+  return null;
 }
 
 function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
