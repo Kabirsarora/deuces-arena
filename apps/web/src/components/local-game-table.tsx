@@ -17,7 +17,7 @@ import {
   type ReplayTimelineItem
 } from "@deuces-arena/game-engine";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Bot, Crown, History, RotateCcw, Send, Sparkles } from "lucide-react";
+import { Activity, Bot, Crown, Download, History, RotateCcw, Send, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -132,10 +132,36 @@ export function LocalGameTable() {
     setMessage("New table. Find the tempo, then get out first.");
   }
 
+  function exportReplay() {
+    const replay = {
+      exportedAt: new Date().toISOString(),
+      mode: "local-demo",
+      players: PLAYER_IDS.map((id) => ({
+        id,
+        name: PLAYER_NAMES[id]
+      })),
+      status: game.status,
+      placements: game.placements,
+      turnNumber: game.turnNumber,
+      timeline: createReplayTimeline(game.events),
+      events: game.events
+    };
+    const blob = new Blob([JSON.stringify(replay, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.href = url;
+    anchor.download = `deuces-arena-replay-${Date.now()}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="min-h-screen overflow-hidden px-3 py-4 text-white sm:px-5 lg:px-8">
       <section className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-3">
-        <TopBar game={game} onReset={resetGame} />
+        <TopBar game={game} onExportReplay={exportReplay} onReset={resetGame} />
 
         <div className="grid flex-1 grid-rows-[auto_1fr_auto] gap-3 lg:grid-cols-[14rem_1fr_14rem] lg:grid-rows-[auto_1fr_auto]">
           <OpponentPanel
@@ -269,7 +295,15 @@ function MoveEventRow({ event }: { readonly event: ReplayTimelineItem }) {
   );
 }
 
-function TopBar({ game, onReset }: { readonly game: GameState; readonly onReset: () => void }) {
+function TopBar({
+  game,
+  onExportReplay,
+  onReset
+}: {
+  readonly game: GameState;
+  readonly onExportReplay: () => void;
+  readonly onReset: () => void;
+}) {
   return (
     <header className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/28 px-3 py-3 shadow-2xl backdrop-blur">
       <div className="min-w-0">
@@ -284,6 +318,10 @@ function TopBar({ game, onReset }: { readonly game: GameState; readonly onReset:
         <div className="hidden rounded-md border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 md:block">
           {PLAYER_NAMES[game.activePlayerId]} to move
         </div>
+        <Button variant="secondary" size="sm" onClick={onExportReplay}>
+          <Download className="size-4" />
+          Replay
+        </Button>
         <Button variant="secondary" size="sm" onClick={onReset}>
           <RotateCcw className="size-4" />
           Reset
