@@ -214,4 +214,85 @@ describe("game state", () => {
       bombsPlayed: 0
     });
   });
+
+  it("counts only detected bombs as bombs in game summaries", () => {
+    const fullHouseGame = createSummaryGame([
+      createCard("3", "diamonds"),
+      createCard("3", "clubs"),
+      createCard("3", "hearts"),
+      createCard("4", "diamonds"),
+      createCard("4", "clubs")
+    ]);
+    const fullHouseResult = applyMove(fullHouseGame, "player-1", {
+      type: "play",
+      cards: fullHouseGame.players[0]?.hand ?? []
+    });
+    expect(fullHouseResult.ok).toBe(true);
+
+    if (!fullHouseResult.ok) {
+      return;
+    }
+
+    expect(summarizeGame(fullHouseResult.state)).toContainEqual({
+      playerId: "player-1",
+      cardsRemaining: 0,
+      movesPlayed: 1,
+      passes: 0,
+      bombsPlayed: 0
+    });
+
+    const bombGame = createSummaryGame([
+      createCard("3", "diamonds"),
+      createCard("3", "clubs"),
+      createCard("3", "hearts"),
+      createCard("3", "spades"),
+      createCard("4", "diamonds")
+    ]);
+    const bombResult = applyMove(bombGame, "player-1", {
+      type: "play",
+      cards: bombGame.players[0]?.hand ?? []
+    });
+    expect(bombResult.ok).toBe(true);
+
+    if (!bombResult.ok) {
+      return;
+    }
+
+    expect(summarizeGame(bombResult.state)).toContainEqual({
+      playerId: "player-1",
+      cardsRemaining: 0,
+      movesPlayed: 1,
+      passes: 0,
+      bombsPlayed: 1
+    });
+  });
 });
+
+function createSummaryGame(playerOneHand: GameState["players"][number]["hand"]): GameState {
+  return {
+    players: [
+      {
+        id: "player-1",
+        hand: playerOneHand
+      },
+      {
+        id: "player-2",
+        hand: [createCard("5", "diamonds")]
+      },
+      {
+        id: "player-3",
+        hand: [createCard("6", "diamonds")]
+      },
+      {
+        id: "player-4",
+        hand: [createCard("7", "diamonds")]
+      }
+    ],
+    activePlayerId: "player-1",
+    currentTrick: null,
+    turnNumber: 0,
+    placements: [],
+    status: "in-progress",
+    events: []
+  };
+}

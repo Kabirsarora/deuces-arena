@@ -1,5 +1,5 @@
 import { LOWEST_CARD, createDeck, isSameCard, sortCards, type Card } from "./cards.js";
-import type { HandAnalysis } from "./hands.js";
+import { detectHand, type HandAnalysis } from "./hands.js";
 import { generateLegalMoves } from "./legal-moves.js";
 import { validateMove, type CurrentTrick, type Move } from "./moves.js";
 
@@ -188,10 +188,19 @@ export function summarizeGame(state: GameState): readonly PlayerGameSummary[] {
       movesPlayed: playerEvents.filter((event) => !event.wasPass).length,
       passes: playerEvents.filter((event) => event.wasPass).length,
       bombsPlayed: playerEvents.filter(
-        (event) => event.move.type === "play" && event.move.cards.length === 5
+        (event) => event.move.type === "play" && detectEventHandType(event) === "bomb"
       ).length
     };
   });
+}
+
+function detectEventHandType(event: GameEvent): HandAnalysis["type"] | null {
+  if (event.move.type === "pass") {
+    return null;
+  }
+
+  const hand = detectHand(event.move.cards);
+  return hand.type === "invalid" ? null : hand.type;
 }
 
 function applyPlay(
