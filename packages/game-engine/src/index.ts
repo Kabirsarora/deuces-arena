@@ -47,6 +47,10 @@ export type {
 
 export { generateLegalMoves } from "./legal-moves.js";
 
+export { calculatePlacementRatingChanges } from "./rating.js";
+
+export type { RatedPlayerResult, RatingChange } from "./rating.js";
+
 export { validateMove } from "./moves.js";
 
 export type {
