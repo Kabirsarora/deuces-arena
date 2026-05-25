@@ -1,6 +1,12 @@
 "use client";
 
-import { generateLegalMoves, getCardId, type Card, type Move } from "@deuces-arena/game-engine";
+import {
+  createReplayTimeline,
+  generateLegalMoves,
+  getCardId,
+  type Card,
+  type Move
+} from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
   PublicRoomPlayer,
@@ -354,7 +360,9 @@ function loadRoomSession(): { readonly roomCode: string; readonly playerId: stri
 }
 
 function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) {
-  const recentEvents = room?.recentEvents.slice(-6).reverse() ?? [];
+  const recentEvents = createReplayTimeline(room?.recentEvents ?? [])
+    .slice(-6)
+    .reverse();
 
   return (
     <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
@@ -395,11 +403,9 @@ function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) 
                       {getRoomPlayerName(room, event.playerId)}
                     </p>
                     <p className="mt-1 text-xs text-zinc-300">
-                      {event.wasPass
+                      {event.kind === "pass"
                         ? "Passed"
-                        : event.move.type === "play"
-                          ? event.move.cards.map(formatCard).join(" ")
-                          : ""}
+                        : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
                     </p>
                   </div>
                   <span className="rounded-sm bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
@@ -408,7 +414,7 @@ function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) 
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
                   <Activity className="size-3" />
-                  {event.legalMoveCount} legal · {event.cardsRemainingAfter[event.playerId]} left
+                  {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
                 </div>
               </li>
             ))}
@@ -530,6 +536,13 @@ function OnlineCard({
 
 function formatCard(card: Card): string {
   return `${card.rank}${suitSymbol(card.suit)}`;
+}
+
+function formatHandType(type: string): string {
+  return type
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function getRoomPlayerName(room: PublicRoomState | null, playerId: string): string {

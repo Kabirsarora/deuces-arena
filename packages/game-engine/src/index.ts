@@ -51,6 +51,10 @@ export { calculatePlacementRatingChanges } from "./rating.js";
 
 export type { RatedPlayerResult, RatingChange } from "./rating.js";
 
+export { createReplayTimeline } from "./replay.js";
+
+export type { ReplayTimelineItem } from "./replay.js";
+
 export { evaluateMoveByRandomRollouts, simulateRandomPlayout } from "./simulation.js";
 
 export type {

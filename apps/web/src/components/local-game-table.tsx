@@ -5,15 +5,16 @@ import {
   chooseBotMove,
   createDeck,
   createInitialGame,
+  createReplayTimeline,
   generateLegalMoves,
   getCardId,
   summarizeGame,
   type Card,
-  type GameEvent,
   type GameState,
   type Move,
   type PlayerGameSummary,
-  type PlayerState
+  type PlayerState,
+  type ReplayTimelineItem
 } from "@deuces-arena/game-engine";
 import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Bot, Crown, History, RotateCcw, Send, Sparkles } from "lucide-react";
@@ -190,7 +191,7 @@ export function LocalGameTable() {
 
 function MoveTracker({ game }: { readonly game: GameState }) {
   const summaries = summarizeGame(game);
-  const recentEvents = game.events.slice(-6).reverse();
+  const recentEvents = createReplayTimeline(game.events).slice(-6).reverse();
 
   return (
     <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
@@ -244,18 +245,16 @@ function PlayerStat({ summary }: { readonly summary: PlayerGameSummary }) {
   );
 }
 
-function MoveEventRow({ event }: { readonly event: GameEvent }) {
+function MoveEventRow({ event }: { readonly event: ReplayTimelineItem }) {
   return (
     <li className="mb-2 rounded-md border border-white/10 bg-white/6 px-2 py-2 last:mb-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-bold">{PLAYER_NAMES[event.playerId]}</p>
           <p className="mt-1 text-xs text-zinc-300">
-            {event.wasPass
+            {event.kind === "pass"
               ? "Passed"
-              : event.move.type === "play"
-                ? event.move.cards.map(formatCard).join(" ")
-                : ""}
+              : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
           </p>
         </div>
         <span className="rounded-sm bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
@@ -264,7 +263,7 @@ function MoveEventRow({ event }: { readonly event: GameEvent }) {
       </div>
       <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
         <Activity className="size-3" />
-        {event.legalMoveCount} legal · {event.cardsRemainingAfter[event.playerId]} left
+        {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
       </div>
     </li>
   );
