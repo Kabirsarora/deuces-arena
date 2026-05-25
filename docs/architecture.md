@@ -33,3 +33,12 @@ The AI system should grow in stages:
 8. AI coach grounded in legal moves, simulations, replay data, and model outputs.
 
 The app should never hardcode "perfect strategy" and call it AI.
+
+## Initial Rule Choices
+
+- Bombs are four of a kind plus one extra kicker card.
+- A bomb beats any non-bomb hand during a trick.
+- Once a bomb is active, it can only be beaten by a stronger bomb.
+- Bomb strength is currently determined by the rank of the four of a kind. The kicker is ignored.
+- Straights must be at least five cards and must match exact length when answered.
+- The default straight rules do not allow `2` inside a straight. This is documented as a variant point for later.
