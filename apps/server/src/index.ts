@@ -22,6 +22,13 @@ import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
 
+import {
+  completePersistedMatch,
+  createPersistedMatch,
+  persistMoveEvent,
+  type PersistedMatch
+} from "./persistence.js";
+
 type RoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -34,6 +41,7 @@ type Room = {
   readonly createdAt: Date;
   players: RoomPlayer[];
   game: GameState | null;
+  persistedMatch: PersistedMatch | null;
 };
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -144,7 +152,7 @@ io.on("connection", (socket) => {
     emitRoomState(room);
   });
 
-  socket.on("room:start", (payload, callback) => {
+  socket.on("room:start", async (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
     if (room === undefined) {
@@ -167,6 +175,7 @@ io.on("connection", (socket) => {
       room.players.map((player) => player.id),
       shuffleDeck()
     );
+    room.persistedMatch = await createPersistedMatch(room.code, room.players);
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
@@ -197,6 +206,7 @@ io.on("connection", (socket) => {
     }
 
     room.game = result.state;
+    persistLastMove(room);
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     scheduleBotTurn(room);
@@ -238,7 +248,8 @@ function createRoom(playerName: string, socketId: string): Room {
     code,
     createdAt: new Date(),
     players: [createHumanPlayer(playerName, socketId, 0)],
-    game: null
+    game: null,
+    persistedMatch: null
   };
   rooms.set(code, room);
   return room;
@@ -303,10 +314,26 @@ function scheduleBotTurn(room: Room): void {
 
     if (result.ok) {
       room.game = result.state;
+      persistLastMove(room);
       emitRoomState(room);
       scheduleBotTurn(room);
     }
   }, 700);
+}
+
+function persistLastMove(room: Room): void {
+  const game = room.game;
+  const event = game?.events.at(-1);
+
+  if (game === null || event === undefined) {
+    return;
+  }
+
+  void persistMoveEvent(room.persistedMatch, event);
+
+  if (game.status === "complete") {
+    void completePersistedMatch(room.persistedMatch, game);
+  }
 }
 
 function publicStateForSocket(room: Room, socketId: string): PublicRoomState {

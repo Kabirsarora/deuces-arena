@@ -7,13 +7,14 @@
     "build": "tsc --project tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint .",
-    "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
-    "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
-    "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
+    "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@deuces-arena/db": "^0.1.0",
     "@deuces-arena/game-engine": "^0.1.0",
     "@deuces-arena/shared": "^0.1.0",
     "cors": "^2.8.6",
