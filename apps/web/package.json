@@ -6,13 +6,14 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "prebuild": "npm run build --workspace @deuces-arena/game-engine",
-    "predev": "npm run build --workspace @deuces-arena/game-engine",
-    "pretypecheck": "npm run build --workspace @deuces-arena/game-engine",
+    "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
+    "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
+    "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@deuces-arena/game-engine": "0.1.0",
+    "@deuces-arena/shared": "^0.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
@@ -20,6 +21,7 @@
     "next": "^16.2.6",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

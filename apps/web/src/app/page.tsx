@@ -1,5 +1,5 @@
-import { LocalGameTable } from "@/components/local-game-table";
+import { GameShell } from "@/components/game-shell";
 
 export default function HomePage() {
-  return <LocalGameTable />;
+  return <GameShell />;
 }
