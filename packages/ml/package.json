@@ -8,5 +8,8 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deuces-arena/game-engine": "^0.1.0"
   }
 }
