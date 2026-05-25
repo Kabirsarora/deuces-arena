@@ -17,6 +17,10 @@ export {
 
 export type { Card, CardId, Rank, Suit } from "./cards.js";
 
+export { chooseBotMove } from "./bots.js";
+
+export type { BotDecision, BotDecisionInput, BotStrategy } from "./bots.js";
+
 export { assertValidHand, canBeat, compareHands } from "./compare.js";
 
 export type { HandComparisonResult } from "./compare.js";
