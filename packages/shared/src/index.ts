@@ -18,6 +18,7 @@ export type PublicRoomState = {
   readonly activePlayerId: string | null;
   readonly currentTrick: CurrentTrick | null;
   readonly turnNumber: number;
+  readonly placements: readonly string[];
   readonly recentEvents: readonly GameEvent[];
   readonly yourPlayerId: string | null;
   readonly yourHand: readonly Card[];

@@ -348,6 +348,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     activePlayerId: room.game?.activePlayerId ?? null,
     currentTrick: room.game?.currentTrick ?? null,
     turnNumber: room.game?.turnNumber ?? 0,
+    placements: room.game?.placements ?? [],
     recentEvents: room.game?.events.slice(-12) ?? [],
     yourPlayerId: player?.id ?? null,
     yourHand: hand

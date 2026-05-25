@@ -9,7 +9,7 @@ import type {
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Copy, History, Play, Send, Users } from "lucide-react";
+import { Activity, Copy, History, Play, Send, Sparkles, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -476,6 +476,15 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
             ))}
           </AnimatePresence>
         </div>
+
+        {room?.status === "complete" ? (
+          <div className="mt-5 rounded-md border border-[var(--gold)] bg-black/28 px-4 py-3">
+            <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
+              <Sparkles className="size-4" />
+              {getRoomPlayerName(room, room.placements[0] ?? "")} wins
+            </p>
+          </div>
+        ) : null}
       </div>
     </section>
   );
