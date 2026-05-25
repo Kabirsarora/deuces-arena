@@ -1,5 +1,7 @@
 # Deuces Arena
 
+[![CI](https://github.com/jagjitarora/deuces-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/jagjitarora/deuces-arena/actions/workflows/ci.yml)
+
 Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, and ML-ready strategy coaching.
 
 ## Current Features
@@ -32,6 +34,8 @@ npm run db:migrate --workspace @deuces-arena/db
 ```
 
 ## Verification
+
+GitHub Actions runs the same verification suite on pushes to `main`, `codex/**` branches, and pull requests.
 
 ```bash
 npm run format
