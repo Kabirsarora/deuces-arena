@@ -51,6 +51,16 @@ export { calculatePlacementRatingChanges } from "./rating.js";
 
 export type { RatedPlayerResult, RatingChange } from "./rating.js";
 
+export { evaluateMoveByRandomRollouts, simulateRandomPlayout } from "./simulation.js";
+
+export type {
+  MoveEvaluation,
+  MoveEvaluationInput,
+  PlayoutResult,
+  RandomPlayoutInput,
+  SimulationStatus
+} from "./simulation.js";
+
 export { validateMove } from "./moves.js";
 
 export type {
