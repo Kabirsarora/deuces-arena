@@ -10,6 +10,10 @@ export type PublicPlayerStats = {
   readonly averagePlacement: number | null;
 };
 
+export type PublicGuestProfile = PublicPlayerStats & {
+  readonly guestId: string;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -92,6 +96,10 @@ export type ClientToServerEvents = {
   "room:replay": (
     payload: { readonly roomCode: string },
     callback: (ack: ServerAck<RoomReplayExport>) => void
+  ) => void;
+  "profile:get": (
+    payload: { readonly guestId: string },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
   ) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
 };

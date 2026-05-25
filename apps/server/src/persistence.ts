@@ -8,6 +8,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
+import type { PublicGuestProfile } from "@deuces-arena/shared";
 
 type PersistableRoomPlayer = {
   readonly id: string;
@@ -82,6 +83,46 @@ export async function createPersistedMatch(
     };
   } catch (error) {
     console.error("Unable to persist match start.", error);
+    return null;
+  }
+}
+
+export async function getPersistedGuestProfile(
+  guestId: string
+): Promise<PublicGuestProfile | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: {
+        guestId
+      },
+      select: {
+        guestId: true,
+        rating: true,
+        gamesPlayed: true,
+        wins: true,
+        placementTotal: true
+      }
+    });
+
+    if (user?.guestId === null || user?.guestId === undefined) {
+      return null;
+    }
+
+    return {
+      guestId: user.guestId,
+      rating: user.rating,
+      gamesPlayed: user.gamesPlayed,
+      wins: user.wins,
+      averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed
+    };
+  } catch (error) {
+    console.error("Unable to read guest profile.", error);
     return null;
   }
 }

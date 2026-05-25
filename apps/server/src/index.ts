@@ -13,6 +13,7 @@ import {
 import type {
   ClientToServerEvents,
   InterServerEvents,
+  PublicGuestProfile,
   PublicRoomPlayer,
   PublicRoomState,
   RoomReplayExport,
@@ -27,6 +28,7 @@ import { Server } from "socket.io";
 import {
   completePersistedMatch,
   createPersistedMatch,
+  getPersistedGuestProfile,
   persistMoveEvent,
   type PersistedMatch
 } from "./persistence.js";
@@ -209,6 +211,17 @@ io.on("connection", (socket) => {
     }
 
     callback(ok(replayExportForRoom(room)));
+  });
+
+  socket.on("profile:get", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+
+    if (guestId === null) {
+      callback(fail("Guest profile not found."));
+      return;
+    }
+
+    callback(ok(await publicGuestProfile(guestId)));
   });
 
   socket.on("game:move", (payload, callback) => {
@@ -530,6 +543,34 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
   };
   guestProfiles.set(guestId, profile);
   return profile;
+}
+
+async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> {
+  const persistedProfile = await getPersistedGuestProfile(guestId);
+
+  if (persistedProfile !== null) {
+    const profile = getOrCreateGuestProfile(guestId);
+    profile.rating = persistedProfile.rating;
+    profile.gamesPlayed = persistedProfile.gamesPlayed;
+    profile.wins = persistedProfile.wins;
+    profile.placementTotal =
+      persistedProfile.averagePlacement === null
+        ? 0
+        : persistedProfile.averagePlacement * persistedProfile.gamesPlayed;
+
+    return persistedProfile;
+  }
+
+  const profile = getOrCreateGuestProfile(guestId);
+
+  return {
+    guestId,
+    rating: profile.rating,
+    gamesPlayed: profile.gamesPlayed,
+    wins: profile.wins,
+    averagePlacement:
+      profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
+  };
 }
 
 function inferPlacements(game: GameState): readonly string[] {

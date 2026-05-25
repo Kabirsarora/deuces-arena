@@ -9,13 +9,24 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  PublicGuestProfile,
   PublicRoomPlayer,
   PublicRoomState,
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Copy, Download, History, Play, Send, Sparkles, Users } from "lucide-react";
+import {
+  Activity,
+  Copy,
+  Download,
+  History,
+  Play,
+  Send,
+  Sparkles,
+  Trophy,
+  Users
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -32,6 +43,7 @@ export function OnlineRoomPanel() {
   const [playerName, setPlayerName] = useState("Player");
   const [joinCode, setJoinCode] = useState("");
   const [room, setRoom] = useState<PublicRoomState | null>(null);
+  const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -70,6 +82,11 @@ export function OnlineRoomPanel() {
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
+      socket.emit("profile:get", { guestId: getOrCreateGuestId() }, (ack) => {
+        if (ack.ok) {
+          setProfile(ack.data);
+        }
+      });
       const session = loadRoomSession();
 
       if (session !== null) {
@@ -97,6 +114,23 @@ export function OnlineRoomPanel() {
       socketRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (room?.yourPlayerId === null || room === null) {
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.id === room.yourPlayerId);
+
+    if (player?.stats === undefined || player.stats === null) {
+      return;
+    }
+
+    setProfile({
+      guestId: getOrCreateGuestId(),
+      ...player.stats
+    });
+  }, [room]);
 
   function createRoom() {
     socketRef.current?.emit(
@@ -251,6 +285,8 @@ export function OnlineRoomPanel() {
               onChange={(event) => setPlayerName(event.target.value)}
             />
           </label>
+
+          <ProfileSummary profile={profile} />
 
           <div className="grid gap-2">
             <Button onClick={createRoom} disabled={!connected}>
@@ -413,6 +449,49 @@ function getOrCreateGuestId(): string {
   const guestId = `guest-${crypto.randomUUID()}`;
   window.localStorage.setItem(GUEST_ID_KEY, guestId);
   return guestId;
+}
+
+function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
+  return (
+    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <Trophy className="size-4 text-[var(--gold)]" />
+          Guest Profile
+        </p>
+        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          {profile?.rating ?? 1000}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <ProfileMetric label="Games" value={profile?.gamesPlayed ?? 0} />
+        <ProfileMetric label="Wins" value={profile?.wins ?? 0} />
+        <ProfileMetric
+          label="Avg"
+          value={
+            profile?.averagePlacement === null || profile?.averagePlacement === undefined
+              ? "-"
+              : profile.averagePlacement.toFixed(2)
+          }
+        />
+      </div>
+    </section>
+  );
+}
+
+function ProfileMetric({
+  label,
+  value
+}: {
+  readonly label: string;
+  readonly value: number | string;
+}) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/7 px-2 py-2">
+      <p className="text-base font-black">{value}</p>
+      <p className="text-[11px] text-zinc-400">{label}</p>
+    </div>
+  );
 }
 
 function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) {
