@@ -3,12 +3,13 @@
 import { generateLegalMoves, getCardId, type Card, type Move } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  PublicRoomPlayer,
   PublicRoomState,
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, Play, Send, Users } from "lucide-react";
+import { Activity, Copy, History, Play, Send, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
@@ -259,7 +260,10 @@ export function OnlineRoomPanel() {
         </aside>
 
         <section className="grid gap-3">
-          <OnlineTable room={room} />
+          <div className="grid gap-3 xl:grid-cols-[1fr_18rem]">
+            <OnlineTable room={room} />
+            <OnlineMoveTracker room={room} />
+          </div>
 
           <section className="rounded-md border border-white/10 bg-black/28 p-3 shadow-2xl backdrop-blur">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -349,6 +353,92 @@ function loadRoomSession(): { readonly roomCode: string; readonly playerId: stri
   return null;
 }
 
+function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) {
+  const recentEvents = room?.recentEvents.slice(-6).reverse() ?? [];
+
+  return (
+    <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-bold">
+            <History className="size-4 text-[var(--aqua)]" />
+            Room Tracker
+          </p>
+          <p className="text-xs text-zinc-400">{room?.recentEvents.length ?? 0} synced events</p>
+        </div>
+        <div className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          {room?.status ?? "idle"}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {(room?.players ?? []).map((player) => (
+          <OnlinePlayerStat key={player.id} player={player} />
+        ))}
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/20">
+        {recentEvents.length === 0 ? (
+          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
+            Accepted moves will stream here.
+          </div>
+        ) : (
+          <ol className="max-h-52 overflow-y-auto p-2">
+            {recentEvents.map((event) => (
+              <li
+                key={`${event.turnNumber}-${event.playerId}`}
+                className="mb-2 rounded-md border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold">
+                      {getRoomPlayerName(room, event.playerId)}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-300">
+                      {event.wasPass
+                        ? "Passed"
+                        : event.move.type === "play"
+                          ? event.move.cards.map(formatCard).join(" ")
+                          : ""}
+                    </p>
+                  </div>
+                  <span className="rounded-sm bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                    #{event.turnNumber + 1}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
+                  <Activity className="size-3" />
+                  {event.legalMoveCount} legal · {event.cardsRemainingAfter[event.playerId]} left
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/7 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-xs font-bold">{player.name}</p>
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            player.connected ? "bg-emerald-300" : "bg-red-300"
+          )}
+        />
+      </div>
+      <div className="mt-1 grid gap-y-1 text-[11px] text-zinc-400">
+        <span>{player.cardsRemaining} cards</span>
+        <span>{player.kind}</span>
+      </div>
+    </div>
+  );
+}
+
 function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   return (
     <section className="table-felt min-h-[28rem] rounded-md border border-white/10 p-4 shadow-2xl">
@@ -387,25 +477,6 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
           </AnimatePresence>
         </div>
       </div>
-
-      <ol className="mt-6 grid gap-2 md:grid-cols-2">
-        {(room?.recentEvents ?? [])
-          .slice(-6)
-          .reverse()
-          .map((event) => (
-            <li
-              key={`${event.turnNumber}-${event.playerId}`}
-              className="rounded-md border border-white/10 bg-black/24 p-2 text-xs"
-            >
-              <span className="font-bold">#{event.turnNumber + 1}</span>{" "}
-              {event.wasPass
-                ? "Pass"
-                : event.move.type === "play"
-                  ? event.move.cards.map(formatCard).join(" ")
-                  : ""}
-            </li>
-          ))}
-      </ol>
     </section>
   );
 }
@@ -450,6 +521,10 @@ function OnlineCard({
 
 function formatCard(card: Card): string {
   return `${card.rank}${suitSymbol(card.suit)}`;
+}
+
+function getRoomPlayerName(room: PublicRoomState | null, playerId: string): string {
+  return room?.players.find((player) => player.id === playerId)?.name ?? playerId;
 }
 
 function suitSymbol(suit: Card["suit"]): string {
