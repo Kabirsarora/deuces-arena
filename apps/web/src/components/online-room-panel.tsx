@@ -12,6 +12,7 @@ import type {
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
+  PublicMatchHistoryItem,
   PublicOpenRoom,
   PublicRoomPlayer,
   PublicRoomState,
@@ -25,6 +26,7 @@ import {
   Copy,
   Download,
   DoorOpen,
+  Gauge,
   History,
   ListOrdered,
   Play,
@@ -52,6 +54,7 @@ export function OnlineRoomPanel() {
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
+  const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -97,6 +100,7 @@ export function OnlineRoomPanel() {
       });
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
+      refreshMatchHistory(socket, setMatchHistory);
       const session = loadRoomSession();
 
       if (session !== null) {
@@ -146,6 +150,7 @@ export function OnlineRoomPanel() {
 
     if (room.status === "complete" && socketRef.current !== null) {
       refreshLeaderboard(socketRef.current, setLeaderboard);
+      refreshMatchHistory(socketRef.current, setMatchHistory);
     }
   }, [room]);
 
@@ -313,6 +318,7 @@ export function OnlineRoomPanel() {
           </label>
 
           <ProfileSummary profile={profile} />
+          <MatchHistorySummary entries={matchHistory} />
           <LobbySummary
             lobby={lobby}
             connected={connected}
@@ -506,6 +512,17 @@ function refreshLobby(
   });
 }
 
+function refreshMatchHistory(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setMatchHistory: (entries: readonly PublicMatchHistoryItem[]) => void
+): void {
+  socket.emit("profile:history", { guestId: getOrCreateGuestId(), limit: 5 }, (ack) => {
+    if (ack.ok) {
+      setMatchHistory(ack.data);
+    }
+  });
+}
+
 function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
   return (
     <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
@@ -531,6 +548,60 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
         />
       </div>
     </section>
+  );
+}
+
+function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMatchHistoryItem[] }) {
+  return (
+    <details className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
+        <span className="flex items-center gap-2">
+          <History className="size-4 text-[var(--aqua)]" />
+          Recent Matches
+        </span>
+        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
+          {entries.length}
+        </span>
+      </summary>
+
+      <div className="mt-3 grid gap-2">
+        {entries.length === 0 ? (
+          <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+            Completed online matches will appear here.
+          </p>
+        ) : (
+          entries.map((entry) => (
+            <div
+              key={entry.matchId}
+              className="rounded-md border border-white/10 bg-white/7 px-2 py-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold">
+                  {entry.placement === null ? "Unplaced" : ordinal(entry.placement)}
+                </p>
+                <span
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[11px] font-black",
+                    entry.ratingDelta === null
+                      ? "bg-white/7 text-zinc-300"
+                      : entry.ratingDelta >= 0
+                        ? "bg-emerald-400/15 text-emerald-200"
+                        : "bg-red-400/15 text-red-200"
+                  )}
+                >
+                  {formatRatingDelta(entry.ratingDelta)}
+                </span>
+              </div>
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
+                <Gauge className="size-3" />
+                {entry.movesPlayed ?? 0} moves · {entry.bombsPlayed} bombs ·{" "}
+                {entry.roomCode ?? "archived"}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -837,6 +908,27 @@ function formatHandType(type: string): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatRatingDelta(delta: number | null): string {
+  if (delta === null) {
+    return "rating";
+  }
+
+  return delta >= 0 ? `+${delta}` : `${delta}`;
+}
+
+function ordinal(value: number): string {
+  const suffix =
+    value % 10 === 1 && value % 100 !== 11
+      ? "st"
+      : value % 10 === 2 && value % 100 !== 12
+        ? "nd"
+        : value % 10 === 3 && value % 100 !== 13
+          ? "rd"
+          : "th";
+
+  return `${value}${suffix} place`;
 }
 
 function getRoomPlayerName(room: PublicRoomState | null, playerId: string): string {
