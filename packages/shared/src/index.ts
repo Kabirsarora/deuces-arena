@@ -3,12 +3,20 @@ import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-eng
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 
+export type PublicPlayerStats = {
+  readonly rating: number;
+  readonly gamesPlayed: number;
+  readonly wins: number;
+  readonly averagePlacement: number | null;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
   readonly kind: PlayerKind;
   readonly connected: boolean;
   readonly cardsRemaining: number;
+  readonly stats: PublicPlayerStats | null;
 };
 
 export type PublicRoomState = {
@@ -26,11 +34,13 @@ export type PublicRoomState = {
 
 export type CreateRoomPayload = {
   readonly playerName: string;
+  readonly guestId?: string;
 };
 
 export type JoinRoomPayload = {
   readonly roomCode: string;
   readonly playerName: string;
+  readonly guestId?: string;
 };
 
 export type ReconnectRoomPayload = {

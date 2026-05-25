@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import {
   applyMove,
   chooseBotMove,
+  calculatePlacementRatingChanges,
   createDeck,
   createInitialGame,
   type Card,
@@ -33,7 +34,16 @@ type RoomPlayer = {
   readonly id: string;
   readonly name: string;
   readonly kind: "human" | "bot" | "guest";
+  readonly guestId: string | null;
   readonly socketId: string | null;
+};
+
+type GuestProfile = {
+  readonly guestId: string;
+  rating: number;
+  gamesPlayed: number;
+  wins: number;
+  placementTotal: number;
 };
 
 type Room = {
@@ -42,11 +52,13 @@ type Room = {
   players: RoomPlayer[];
   game: GameState | null;
   persistedMatch: PersistedMatch | null;
+  statsApplied: boolean;
 };
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 const rooms = new Map<string, Room>();
+const guestProfiles = new Map<string, GuestProfile>();
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGIN }));
@@ -72,7 +84,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 
 io.on("connection", (socket) => {
   socket.on("room:create", (payload, callback) => {
-    const room = createRoom(payload.playerName, socket.id);
+    const room = createRoom(payload.playerName, socket.id, payload.guestId);
     const player = room.players[0];
 
     if (player === undefined) {
@@ -108,7 +120,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const player = addHumanPlayer(room, payload.playerName, socket.id);
+    const player = addHumanPlayer(room, payload.playerName, socket.id, payload.guestId);
     socket.data = {
       playerId: player.id,
       roomCode: room.code
@@ -242,30 +254,48 @@ httpServer.listen(PORT, () => {
   console.log(`Deuces Arena server listening on http://localhost:${PORT}`);
 });
 
-function createRoom(playerName: string, socketId: string): Room {
+function createRoom(playerName: string, socketId: string, guestId: string | undefined): Room {
   const code = createRoomCode();
   const room: Room = {
     code,
     createdAt: new Date(),
-    players: [createHumanPlayer(playerName, socketId, 0)],
+    players: [createHumanPlayer(playerName, socketId, 0, guestId)],
     game: null,
-    persistedMatch: null
+    persistedMatch: null,
+    statsApplied: false
   };
   rooms.set(code, room);
   return room;
 }
 
-function addHumanPlayer(room: Room, playerName: string, socketId: string): RoomPlayer {
-  const player = createHumanPlayer(playerName, socketId, room.players.length);
+function addHumanPlayer(
+  room: Room,
+  playerName: string,
+  socketId: string,
+  guestId: string | undefined
+): RoomPlayer {
+  const player = createHumanPlayer(playerName, socketId, room.players.length, guestId);
   room.players = [...room.players, player];
   return player;
 }
 
-function createHumanPlayer(playerName: string, socketId: string, seatIndex: number): RoomPlayer {
+function createHumanPlayer(
+  playerName: string,
+  socketId: string,
+  seatIndex: number,
+  guestId: string | undefined
+): RoomPlayer {
+  const normalizedGuestId = normalizeGuestId(guestId);
+
+  if (normalizedGuestId !== null) {
+    getOrCreateGuestProfile(normalizedGuestId);
+  }
+
   return {
     id: `player-${seatIndex + 1}`,
     name: playerName.trim() || `Player ${seatIndex + 1}`,
     kind: "human",
+    guestId: normalizedGuestId,
     socketId
   };
 }
@@ -279,6 +309,7 @@ function fillRoomWithBots(room: Room): void {
         id: `player-${seatIndex + 1}`,
         name: `Bot ${seatIndex + 1}`,
         kind: "bot",
+        guestId: null,
         socketId: null
       }
     ];
@@ -332,8 +363,44 @@ function persistLastMove(room: Room): void {
   void persistMoveEvent(room.persistedMatch, event, game);
 
   if (game.status === "complete") {
+    applyGuestStats(room, game);
     void completePersistedMatch(room.persistedMatch, game);
   }
+}
+
+function applyGuestStats(room: Room, game: GameState): void {
+  if (room.statsApplied) {
+    return;
+  }
+
+  const placements = inferPlacements(game);
+  const ratingChanges = calculatePlacementRatingChanges(
+    room.players.map((player) => ({
+      playerId: player.id,
+      ratingBefore: player.guestId === null ? 1000 : getOrCreateGuestProfile(player.guestId).rating,
+      placement: toPlacement(placements.indexOf(player.id) + 1)
+    }))
+  );
+
+  for (const player of room.players) {
+    if (player.guestId === null) {
+      continue;
+    }
+
+    const profile = getOrCreateGuestProfile(player.guestId);
+    const ratingChange = ratingChanges.find((change) => change.playerId === player.id);
+    const placement = toPlacement(placements.indexOf(player.id) + 1);
+
+    profile.gamesPlayed += 1;
+    profile.wins += placement === 1 ? 1 : 0;
+    profile.placementTotal += placement;
+
+    if (ratingChange !== undefined) {
+      profile.rating = ratingChange.ratingAfter;
+    }
+  }
+
+  room.statsApplied = true;
 }
 
 function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
@@ -357,13 +424,24 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
 
 function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
   const gamePlayer = room.game?.players.find((candidate) => candidate.id === player.id);
+  const profile = player.guestId === null ? null : getOrCreateGuestProfile(player.guestId);
 
   return {
     id: player.id,
     name: player.name,
     kind: player.kind,
     connected: player.kind === "bot" || player.socketId !== null,
-    cardsRemaining: gamePlayer?.hand.length ?? 13
+    cardsRemaining: gamePlayer?.hand.length ?? 13,
+    stats:
+      profile === null
+        ? null
+        : {
+            rating: profile.rating,
+            gamesPlayed: profile.gamesPlayed,
+            wins: profile.wins,
+            averagePlacement:
+              profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
+          }
   };
 }
 
@@ -401,6 +479,47 @@ function normalizeRoomCode(roomCode: string): string {
 
 function isPlayerInRoom(room: Room, socketId: string): boolean {
   return room.players.some((player) => player.socketId === socketId);
+}
+
+function normalizeGuestId(guestId: string | undefined): string | null {
+  const normalized = guestId?.trim();
+  return normalized === undefined || normalized === "" ? null : normalized.slice(0, 80);
+}
+
+function getOrCreateGuestProfile(guestId: string): GuestProfile {
+  const existingProfile = guestProfiles.get(guestId);
+
+  if (existingProfile !== undefined) {
+    return existingProfile;
+  }
+
+  const profile: GuestProfile = {
+    guestId,
+    rating: 1000,
+    gamesPlayed: 0,
+    wins: 0,
+    placementTotal: 0
+  };
+  guestProfiles.set(guestId, profile);
+  return profile;
+}
+
+function inferPlacements(game: GameState): readonly string[] {
+  return [
+    ...game.placements,
+    ...game.players
+      .filter((player) => !game.placements.includes(player.id))
+      .sort((left, right) => left.hand.length - right.hand.length)
+      .map((player) => player.id)
+  ];
+}
+
+function toPlacement(value: number): 1 | 2 | 3 | 4 {
+  if (value === 1 || value === 2 || value === 3 || value === 4) {
+    return value;
+  }
+
+  return 4;
 }
 
 function shuffleDeck(): Card[] {

@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
+const GUEST_ID_KEY = "deuces-arena-guest-id";
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -98,7 +99,14 @@ export function OnlineRoomPanel() {
   }, []);
 
   function createRoom() {
-    socketRef.current?.emit("room:create", { playerName }, handleRoomAck("Room created."));
+    socketRef.current?.emit(
+      "room:create",
+      {
+        playerName,
+        guestId: getOrCreateGuestId()
+      },
+      handleRoomAck("Room created.")
+    );
   }
 
   function joinRoom() {
@@ -106,7 +114,8 @@ export function OnlineRoomPanel() {
       "room:join",
       {
         roomCode: joinCode,
-        playerName
+        playerName,
+        guestId: getOrCreateGuestId()
       },
       handleRoomAck("Joined room.")
     );
@@ -359,6 +368,18 @@ function loadRoomSession(): { readonly roomCode: string; readonly playerId: stri
   return null;
 }
 
+function getOrCreateGuestId(): string {
+  const existingGuestId = window.localStorage.getItem(GUEST_ID_KEY);
+
+  if (existingGuestId !== null && existingGuestId.trim() !== "") {
+    return existingGuestId;
+  }
+
+  const guestId = `guest-${crypto.randomUUID()}`;
+  window.localStorage.setItem(GUEST_ID_KEY, guestId);
+  return guestId;
+}
+
 function OnlineMoveTracker({ room }: { readonly room: PublicRoomState | null }) {
   const recentEvents = createReplayTimeline(room?.recentEvents ?? [])
     .slice(-6)
@@ -439,7 +460,7 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
       </div>
       <div className="mt-1 grid gap-y-1 text-[11px] text-zinc-400">
         <span>{player.cardsRemaining} cards</span>
-        <span>{player.kind}</span>
+        <span>{player.stats === null ? player.kind : `${player.stats.rating} rating`}</span>
       </div>
     </div>
   );
@@ -462,6 +483,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
             <p className="truncate text-sm font-bold">{player.name}</p>
             <p className="text-xs text-zinc-400">
               {player.kind} · {player.cardsRemaining} cards ·{" "}
+              {player.stats === null ? "unrated" : `${player.stats.wins} wins`} ·{" "}
               {player.connected ? "connected" : "away"}
             </p>
           </div>
