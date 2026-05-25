@@ -19,6 +19,27 @@ export type PublicLeaderboardEntry = PublicPlayerStats & {
   readonly displayName: string | null;
 };
 
+export type PublicMatchHistoryPlayer = {
+  readonly name: string;
+  readonly kind: PlayerKind;
+  readonly placement: number | null;
+};
+
+export type PublicMatchHistoryItem = {
+  readonly matchId: string;
+  readonly roomCode: string | null;
+  readonly mode: "CASUAL" | "RANKED" | "LOCAL_DEMO";
+  readonly completedAt: string | null;
+  readonly placement: number | null;
+  readonly ratingBefore: number | null;
+  readonly ratingAfter: number | null;
+  readonly ratingDelta: number | null;
+  readonly cardsRemaining: number | null;
+  readonly bombsPlayed: number;
+  readonly movesPlayed: number | null;
+  readonly opponents: readonly PublicMatchHistoryPlayer[];
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -109,6 +130,10 @@ export type ClientToServerEvents = {
   "leaderboard:list": (
     payload: { readonly limit?: number },
     callback: (ack: ServerAck<readonly PublicLeaderboardEntry[]>) => void
+  ) => void;
+  "profile:history": (
+    payload: { readonly guestId: string; readonly limit?: number },
+    callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
   ) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
 };

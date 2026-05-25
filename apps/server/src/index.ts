@@ -6,6 +6,7 @@ import {
   calculatePlacementRatingChanges,
   createDeck,
   createInitialGame,
+  summarizeGame,
   type Card,
   type GameState,
   type PlayerState
@@ -15,6 +16,7 @@ import type {
   InterServerEvents,
   PublicGuestProfile,
   PublicLeaderboardEntry,
+  PublicMatchHistoryItem,
   PublicRoomPlayer,
   PublicRoomState,
   RoomReplayExport,
@@ -31,6 +33,7 @@ import {
   createPersistedMatch,
   getPersistedGuestProfile,
   getPersistedLeaderboard,
+  getPersistedMatchHistory,
   persistMoveEvent,
   type PersistedMatch
 } from "./persistence.js";
@@ -228,6 +231,17 @@ io.on("connection", (socket) => {
 
   socket.on("leaderboard:list", async (payload, callback) => {
     callback(ok(await publicLeaderboard(payload.limit)));
+  });
+
+  socket.on("profile:history", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+
+    if (guestId === null) {
+      callback(fail("Guest profile not found."));
+      return;
+    }
+
+    callback(ok(await publicMatchHistory(guestId, payload.limit)));
   });
 
   socket.on("game:move", (payload, callback) => {
@@ -602,6 +616,61 @@ async function publicLeaderboard(
       averagePlacement:
         profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
     }));
+}
+
+async function publicMatchHistory(
+  guestId: string,
+  limit: number | undefined
+): Promise<readonly PublicMatchHistoryItem[]> {
+  const historyLimit = Math.max(1, Math.min(limit ?? 10, 25));
+  const persistedHistory = await getPersistedMatchHistory(guestId, historyLimit);
+
+  if (persistedHistory !== null) {
+    return persistedHistory;
+  }
+
+  return [...rooms.values()]
+    .filter(
+      (room) =>
+        room.game?.status === "complete" &&
+        room.players.some((player) => player.guestId === guestId)
+    )
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .slice(0, historyLimit)
+    .map((room) => toInMemoryMatchHistoryItem(room, guestId));
+}
+
+function toInMemoryMatchHistoryItem(room: Room, guestId: string): PublicMatchHistoryItem {
+  const game = room.game;
+  const player = room.players.find((candidate) => candidate.guestId === guestId);
+
+  if (game === null || player === undefined) {
+    throw new Error("Cannot create history for an incomplete room.");
+  }
+
+  const placements = inferPlacements(game);
+  const summaries = summarizeGame(game);
+  const summary = summaries.find((candidate) => candidate.playerId === player.id);
+  const profile = getOrCreateGuestProfile(guestId);
+
+  return {
+    matchId: room.persistedMatch?.matchId ?? room.code,
+    roomCode: room.code,
+    mode: "CASUAL",
+    completedAt: room.createdAt.toISOString(),
+    placement: placements.indexOf(player.id) + 1,
+    ratingBefore: null,
+    ratingAfter: profile.rating,
+    ratingDelta: null,
+    cardsRemaining: summary?.cardsRemaining ?? null,
+    bombsPlayed: summary?.bombsPlayed ?? 0,
+    movesPlayed: summary?.movesPlayed ?? null,
+    opponents: room.players.map((roomPlayer) => ({
+      name: roomPlayer.name,
+      kind: roomPlayer.kind,
+      placement: placements.indexOf(roomPlayer.id) + 1
+    }))
+  };
 }
 
 function inferPlacements(game: GameState): readonly string[] {

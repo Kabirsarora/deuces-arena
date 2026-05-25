@@ -8,7 +8,11 @@ import {
 } from "@deuces-arena/game-engine";
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
-import type { PublicGuestProfile, PublicLeaderboardEntry } from "@deuces-arena/shared";
+import type {
+  PublicGuestProfile,
+  PublicLeaderboardEntry,
+  PublicMatchHistoryItem
+} from "@deuces-arena/shared";
 
 type PersistableRoomPlayer = {
   readonly id: string;
@@ -182,6 +186,87 @@ export async function getPersistedLeaderboard(
     );
   } catch (error) {
     console.error("Unable to read leaderboard.", error);
+    return null;
+  }
+}
+
+export async function getPersistedMatchHistory(
+  guestId: string,
+  limit: number
+): Promise<readonly PublicMatchHistoryItem[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const matches = await db.prisma.matchPlayer.findMany({
+      where: {
+        user: {
+          guestId
+        },
+        match: {
+          status: "COMPLETED"
+        }
+      },
+      orderBy: {
+        match: {
+          completedAt: "desc"
+        }
+      },
+      take: limit,
+      select: {
+        matchId: true,
+        placement: true,
+        ratingBefore: true,
+        ratingAfter: true,
+        cardsRemaining: true,
+        bombsPlayed: true,
+        averageMoveCount: true,
+        match: {
+          select: {
+            roomCode: true,
+            mode: true,
+            completedAt: true,
+            players: {
+              orderBy: {
+                playerSeat: "asc"
+              },
+              select: {
+                playerLabel: true,
+                kind: true,
+                placement: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return matches.map((matchPlayer) => ({
+      matchId: matchPlayer.matchId,
+      roomCode: matchPlayer.match.roomCode,
+      mode: matchPlayer.match.mode,
+      completedAt: matchPlayer.match.completedAt?.toISOString() ?? null,
+      placement: matchPlayer.placement,
+      ratingBefore: matchPlayer.ratingBefore,
+      ratingAfter: matchPlayer.ratingAfter,
+      ratingDelta:
+        matchPlayer.ratingBefore === null || matchPlayer.ratingAfter === null
+          ? null
+          : matchPlayer.ratingAfter - matchPlayer.ratingBefore,
+      cardsRemaining: matchPlayer.cardsRemaining,
+      bombsPlayed: matchPlayer.bombsPlayed,
+      movesPlayed: matchPlayer.averageMoveCount,
+      opponents: matchPlayer.match.players.map((player) => ({
+        name: player.playerLabel,
+        kind: fromDbPlayerKind(player.kind),
+        placement: player.placement
+      }))
+    }));
+  } catch (error) {
+    console.error("Unable to read match history.", error);
     return null;
   }
 }
@@ -417,6 +502,18 @@ function toDbPlayerKind(kind: PersistableRoomPlayer["kind"]): "HUMAN" | "BOT" | 
   }
 
   return "HUMAN";
+}
+
+function fromDbPlayerKind(kind: "HUMAN" | "BOT" | "GUEST"): "human" | "bot" | "guest" {
+  if (kind === "BOT") {
+    return "bot";
+  }
+
+  if (kind === "GUEST") {
+    return "guest";
+  }
+
+  return "human";
 }
 
 function getMoveHandType(event: GameEvent): string | null {
