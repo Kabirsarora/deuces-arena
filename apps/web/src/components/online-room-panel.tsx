@@ -11,6 +11,8 @@ import type {
   ClientToServerEvents,
   PublicGuestProfile,
   PublicLeaderboardEntry,
+  PublicLobbyState,
+  PublicOpenRoom,
   PublicRoomPlayer,
   PublicRoomState,
   ServerAck,
@@ -19,8 +21,10 @@ import type {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  CircleDot,
   Copy,
   Download,
+  DoorOpen,
   History,
   ListOrdered,
   Play,
@@ -47,6 +51,7 @@ export function OnlineRoomPanel() {
   const [room, setRoom] = useState<PublicRoomState | null>(null);
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
+  const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -91,6 +96,7 @@ export function OnlineRoomPanel() {
         }
       });
       refreshLeaderboard(socket, setLeaderboard);
+      refreshLobby(socket, setLobby);
       const session = loadRoomSession();
 
       if (session !== null) {
@@ -108,6 +114,9 @@ export function OnlineRoomPanel() {
     });
     socket.on("room:state", (state) => {
       setRoom(state);
+    });
+    socket.on("lobby:state", (state) => {
+      setLobby(state);
     });
     socket.on("game:error", (payload) => {
       setMessage(payload.message);
@@ -152,10 +161,19 @@ export function OnlineRoomPanel() {
   }
 
   function joinRoom() {
+    joinRoomByCode(joinCode);
+  }
+
+  function joinOpenRoom(openRoom: PublicOpenRoom) {
+    setJoinCode(openRoom.roomCode);
+    joinRoomByCode(openRoom.roomCode);
+  }
+
+  function joinRoomByCode(roomCode: string) {
     socketRef.current?.emit(
       "room:join",
       {
-        roomCode: joinCode,
+        roomCode,
         playerName,
         guestId: getOrCreateGuestId()
       },
@@ -295,6 +313,12 @@ export function OnlineRoomPanel() {
           </label>
 
           <ProfileSummary profile={profile} />
+          <LobbySummary
+            lobby={lobby}
+            connected={connected}
+            onJoinRoom={joinOpenRoom}
+            currentRoomCode={room?.roomCode ?? null}
+          />
           <LeaderboardSummary entries={leaderboard} />
 
           <div className="grid gap-2">
@@ -471,6 +495,17 @@ function refreshLeaderboard(
   });
 }
 
+function refreshLobby(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setLobby: (state: PublicLobbyState) => void
+): void {
+  socket.emit("lobby:get", (ack) => {
+    if (ack.ok) {
+      setLobby(ack.data);
+    }
+  });
+}
+
 function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
   return (
     <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
@@ -494,6 +529,67 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
               : profile.averagePlacement.toFixed(2)
           }
         />
+      </div>
+    </section>
+  );
+}
+
+function LobbySummary({
+  lobby,
+  connected,
+  currentRoomCode,
+  onJoinRoom
+}: {
+  readonly lobby: PublicLobbyState | null;
+  readonly connected: boolean;
+  readonly currentRoomCode: string | null;
+  readonly onJoinRoom: (room: PublicOpenRoom) => void;
+}) {
+  const activity = lobby?.activity;
+  const openRooms = lobby?.openRooms ?? [];
+
+  return (
+    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <CircleDot className="size-4 text-emerald-300" />
+          Live Lobby
+        </p>
+        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          {activity?.connectedUsers ?? 0} online
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <ProfileMetric label="Open" value={activity?.openRooms ?? 0} />
+        <ProfileMetric label="Playing" value={activity?.playersInActiveGames ?? 0} />
+        <ProfileMetric label="Tables" value={activity?.activeRooms ?? 0} />
+      </div>
+
+      <div className="mt-2 grid gap-2">
+        {openRooms.length === 0 ? (
+          <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+            No open rooms right now.
+          </p>
+        ) : (
+          openRooms.slice(0, 3).map((openRoom) => (
+            <button
+              key={openRoom.roomCode}
+              type="button"
+              className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/7 px-2 py-2 text-left transition hover:border-[var(--gold)] hover:bg-white/10 disabled:cursor-default disabled:opacity-50"
+              disabled={!connected || currentRoomCode === openRoom.roomCode}
+              onClick={() => onJoinRoom(openRoom)}
+            >
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold">{openRoom.hostName}'s table</p>
+                <p className="text-[11px] text-zinc-400">
+                  {openRoom.seatedPlayers}/{openRoom.maxPlayers} seated · {openRoom.roomCode}
+                </p>
+              </div>
+              <DoorOpen className="size-4 shrink-0 text-[var(--gold)]" />
+            </button>
+          ))
+        )}
       </div>
     </section>
   );

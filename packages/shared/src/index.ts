@@ -40,6 +40,31 @@ export type PublicMatchHistoryItem = {
   readonly opponents: readonly PublicMatchHistoryPlayer[];
 };
 
+export type PublicOpenRoom = {
+  readonly roomCode: string;
+  readonly hostName: string;
+  readonly seatedPlayers: number;
+  readonly maxPlayers: number;
+  readonly botSeatsAvailable: number;
+  readonly createdAt: string;
+};
+
+export type PublicLobbyActivity = {
+  readonly openRooms: number;
+  readonly activeRooms: number;
+  readonly completedRooms: number;
+  readonly connectedUsers: number;
+  readonly seatedHumans: number;
+  readonly seatedBots: number;
+  readonly playersInOpenRooms: number;
+  readonly playersInActiveGames: number;
+};
+
+export type PublicLobbyState = {
+  readonly activity: PublicLobbyActivity;
+  readonly openRooms: readonly PublicOpenRoom[];
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -135,11 +160,13 @@ export type ClientToServerEvents = {
     payload: { readonly guestId: string; readonly limit?: number },
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
   ) => void;
+  "lobby:get": (callback: (ack: ServerAck<PublicLobbyState>) => void) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
 };
 
 export type ServerToClientEvents = {
   "room:state": (state: PublicRoomState) => void;
+  "lobby:state": (state: PublicLobbyState) => void;
   "game:error": (payload: { readonly message: string }) => void;
 };
 

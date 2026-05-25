@@ -16,6 +16,7 @@ import type {
   InterServerEvents,
   PublicGuestProfile,
   PublicLeaderboardEntry,
+  PublicLobbyState,
   PublicMatchHistoryItem,
   PublicRoomPlayer,
   PublicRoomState,
@@ -65,6 +66,7 @@ type Room = {
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
+const MAX_PLAYERS_PER_ROOM = 4;
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 
@@ -108,6 +110,7 @@ io.on("connection", (socket) => {
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
+    emitLobbyState();
   });
 
   socket.on("room:join", (payload, callback) => {
@@ -123,7 +126,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.filter((player) => player.kind === "human").length >= 4) {
+    if (room.players.filter((player) => player.kind === "human").length >= MAX_PLAYERS_PER_ROOM) {
       callback(fail("Room is full."));
       return;
     }
@@ -137,6 +140,7 @@ io.on("connection", (socket) => {
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
+    emitLobbyState();
   });
 
   socket.on("room:reconnect", (payload, callback) => {
@@ -170,6 +174,7 @@ io.on("connection", (socket) => {
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
+    emitLobbyState();
   });
 
   socket.on("room:start", async (payload, callback) => {
@@ -199,6 +204,7 @@ io.on("connection", (socket) => {
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
+    emitLobbyState();
     scheduleBotTurn(room);
   });
 
@@ -244,6 +250,10 @@ io.on("connection", (socket) => {
     callback(ok(await publicMatchHistory(guestId, payload.limit)));
   });
 
+  socket.on("lobby:get", (callback) => {
+    callback(ok(publicLobbyState()));
+  });
+
   socket.on("game:move", (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -271,6 +281,7 @@ io.on("connection", (socket) => {
     persistLastMove(room);
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
+    emitLobbyState();
     scheduleBotTurn(room);
   });
 
@@ -297,6 +308,7 @@ io.on("connection", (socket) => {
         : player
     );
     emitRoomState(room);
+    emitLobbyState();
   });
 });
 
@@ -351,7 +363,7 @@ function createHumanPlayer(
 }
 
 function fillRoomWithBots(room: Room): void {
-  while (room.players.length < 4) {
+  while (room.players.length < MAX_PLAYERS_PER_ROOM) {
     const seatIndex = room.players.length;
     room.players = [
       ...room.players,
@@ -397,6 +409,7 @@ function scheduleBotTurn(room: Room): void {
       room.game = result.state;
       persistLastMove(room);
       emitRoomState(room);
+      emitLobbyState();
       scheduleBotTurn(room);
     }
   }, 700);
@@ -512,6 +525,53 @@ function emitRoomState(room: Room): void {
       io.to(player.socketId).emit("room:state", publicStateForSocket(room, player.socketId));
     }
   }
+}
+
+function emitLobbyState(): void {
+  io.emit("lobby:state", publicLobbyState());
+}
+
+function publicLobbyState(): PublicLobbyState {
+  const roomList = [...rooms.values()];
+  const openRooms = roomList
+    .filter((room) => room.game === null && room.players.length < MAX_PLAYERS_PER_ROOM)
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .map((room) => {
+      const seatedPlayers = room.players.filter((player) => player.kind === "human").length;
+
+      return {
+        roomCode: room.code,
+        hostName: room.players[0]?.name ?? "Open table",
+        seatedPlayers,
+        maxPlayers: MAX_PLAYERS_PER_ROOM,
+        botSeatsAvailable: MAX_PLAYERS_PER_ROOM - seatedPlayers,
+        createdAt: room.createdAt.toISOString()
+      };
+    });
+  const activeRooms = roomList.filter(
+    (room) => room.game !== null && room.game.status === "in-progress"
+  );
+  const completedRooms = roomList.filter((room) => room.game?.status === "complete");
+
+  return {
+    activity: {
+      openRooms: openRooms.length,
+      activeRooms: activeRooms.length,
+      completedRooms: completedRooms.length,
+      connectedUsers: io.engine.clientsCount,
+      seatedHumans: roomList.reduce(
+        (total, room) => total + room.players.filter((player) => player.kind === "human").length,
+        0
+      ),
+      seatedBots: roomList.reduce(
+        (total, room) => total + room.players.filter((player) => player.kind === "bot").length,
+        0
+      ),
+      playersInOpenRooms: openRooms.reduce((total, room) => total + room.seatedPlayers, 0),
+      playersInActiveGames: activeRooms.reduce((total, room) => total + room.players.length, 0)
+    },
+    openRooms
+  };
 }
 
 function getGamePlayer(game: GameState, playerId: string): PlayerState {
