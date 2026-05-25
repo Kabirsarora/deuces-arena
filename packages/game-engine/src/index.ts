@@ -16,3 +16,12 @@ export {
 } from "./cards.js";
 
 export type { Card, CardId, Rank, Suit } from "./cards.js";
+
+export {
+  detectHand,
+  getHandPrimaryStrength,
+  getStraightRankStrength,
+  isValidHand
+} from "./hands.js";
+
+export type { HandAnalysis, HandDetectionResult, HandType, InvalidHand } from "./hands.js";
