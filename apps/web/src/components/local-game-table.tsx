@@ -13,7 +13,7 @@ import {
   type PlayerState
 } from "@deuces-arena/game-engine";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, RotateCcw, Send, Sparkles } from "lucide-react";
+import { Bot, Crown, RotateCcw, Send, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -133,7 +133,7 @@ export function LocalGameTable() {
       <section className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-7xl flex-col gap-3">
         <TopBar game={game} onReset={resetGame} />
 
-        <div className="grid flex-1 grid-rows-[auto_1fr_auto] gap-3 lg:grid-cols-[13rem_1fr_13rem] lg:grid-rows-[auto_1fr_auto]">
+        <div className="grid flex-1 grid-rows-[auto_1fr_auto] gap-3 lg:grid-cols-[14rem_1fr_14rem] lg:grid-rows-[auto_1fr_auto]">
           <OpponentPanel
             player={getPlayer(game, "bot-top")}
             activePlayerId={game.activePlayerId}
@@ -171,6 +171,8 @@ export function LocalGameTable() {
             onPass={passTurn}
             canPlaySelected={canPlaySelected}
             canPass={canPass}
+            selectedCount={selectedCards.length}
+            legalMoveCount={legalMoves.length}
             gameComplete={game.status === "complete"}
             className="lg:col-span-3"
           />
@@ -182,17 +184,18 @@ export function LocalGameTable() {
 
 function TopBar({ game, onReset }: { readonly game: GameState; readonly onReset: () => void }) {
   return (
-    <header className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/24 px-3 py-3 backdrop-blur">
+    <header className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/28 px-3 py-3 shadow-2xl backdrop-blur">
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--aqua)]">
-          Deuces Arena
-        </p>
-        <h1 className="truncate text-xl font-bold sm:text-2xl">Local Table</h1>
+        <p className="text-xs font-semibold uppercase text-[var(--aqua)]">Deuces Arena</p>
+        <h1 className="truncate text-xl font-black sm:text-2xl">Local Table</h1>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="hidden rounded-md border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 sm:block">
-          Turn {game.turnNumber + 1}
+          <span className="text-zinc-400">Turn</span> {game.turnNumber + 1}
+        </div>
+        <div className="hidden rounded-md border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 md:block">
+          {PLAYER_NAMES[game.activePlayerId]} to move
         </div>
         <Button variant="secondary" size="sm" onClick={onReset}>
           <RotateCcw className="size-4" />
@@ -217,21 +220,45 @@ function OpponentPanel({
   return (
     <div
       className={cn(
-        "flex min-h-20 flex-1 items-center justify-between rounded-md border px-3 py-3 transition",
-        active ? "border-[var(--gold)] bg-[rgba(242,193,78,0.12)]" : "border-white/10 bg-white/7",
+        "flex min-h-24 flex-1 items-center justify-between gap-3 rounded-md border px-3 py-3 transition",
+        active
+          ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.12)]"
+          : "border-white/10 bg-white/7",
         className
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="grid size-10 place-items-center rounded-md bg-black/32">
+        <div className="relative grid size-11 place-items-center rounded-md border border-white/10 bg-black/36">
           <Bot className="size-5 text-[var(--aqua)]" />
+          {active ? (
+            <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[var(--gold)] shadow-[0_0_16px_rgba(242,193,78,0.8)]" />
+          ) : null}
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{PLAYER_NAMES[player.id]}</p>
           <p className="text-xs text-zinc-400">{player.hand.length} cards</p>
         </div>
       </div>
-      {active ? <span className="text-xs font-bold text-[var(--gold)]">TURN</span> : null}
+      <div className="flex items-center">
+        <MiniCardStack count={Math.min(player.hand.length, 4)} />
+      </div>
+    </div>
+  );
+}
+
+function MiniCardStack({ count }: { readonly count: number }) {
+  return (
+    <div className="relative h-10 w-14">
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={`card-back-${index}`}
+          className="card-back absolute h-10 w-7 rounded-sm border border-white/15 shadow-lg"
+          style={{
+            left: index * 8,
+            transform: `rotate(${(index - 1.5) * 5}deg)`
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -250,29 +277,28 @@ function TableCenter({
   return (
     <section
       className={cn(
-        "relative grid min-h-[18rem] place-items-center overflow-hidden rounded-md border border-[var(--felt-line)] bg-[radial-gradient(circle_at_center,_var(--table)_0%,_var(--table-deep)_72%)] p-4 shadow-2xl",
+        "table-felt relative grid min-h-[20rem] place-items-center overflow-hidden rounded-md border border-[var(--felt-line)] p-4 shadow-[0_28px_80px_rgba(0,0,0,0.45)]",
         className
       )}
     >
-      <div className="absolute inset-4 rounded-md border border-white/7" />
+      <div className="absolute inset-3 rounded-md border border-white/8" />
+      <div className="absolute inset-8 rounded-full border border-white/8" />
       <div className="absolute inset-x-8 top-1/2 h-px bg-white/8" />
-      <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-4 text-center">
+      <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 text-center">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
-            Current Trick
-          </p>
-          <h2 className="mt-1 text-lg font-bold">
+          <p className="text-xs font-semibold uppercase text-zinc-400">Current Trick</p>
+          <h2 className="mt-1 text-xl font-black">
             {trick === null
               ? "Open table"
               : `${formatHandType(trick.hand.type)} by ${PLAYER_NAMES[trick.lastPlayedByPlayerId]}`}
           </h2>
         </div>
 
-        <div className="flex min-h-24 flex-wrap items-center justify-center gap-2">
+        <div className="flex min-h-28 flex-wrap items-center justify-center gap-2">
           <AnimatePresence mode="popLayout">
             {trick === null ? (
               <motion.div
-                className="rounded-md border border-dashed border-white/18 px-4 py-6 text-sm text-zinc-300"
+                className="rounded-md border border-dashed border-white/18 bg-black/18 px-4 py-6 text-sm text-zinc-300"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
@@ -285,7 +311,9 @@ function TableCenter({
           </AnimatePresence>
         </div>
 
-        <p className="min-h-6 max-w-lg text-sm text-zinc-200">{message}</p>
+        <div className="rounded-md border border-white/10 bg-black/24 px-4 py-2">
+          <p className="min-h-6 max-w-lg text-sm text-zinc-200">{message}</p>
+        </div>
 
         {game.status === "complete" ? (
           <div className="rounded-md border border-[var(--gold)] bg-black/28 px-4 py-3">
@@ -309,6 +337,8 @@ function HumanHand({
   onPass,
   canPlaySelected,
   canPass,
+  selectedCount,
+  legalMoveCount,
   gameComplete,
   className
 }: {
@@ -320,6 +350,8 @@ function HumanHand({
   readonly onPass: () => void;
   readonly canPlaySelected: boolean;
   readonly canPass: boolean;
+  readonly selectedCount: number;
+  readonly legalMoveCount: number;
   readonly gameComplete: boolean;
   readonly className?: string;
 }) {
@@ -328,15 +360,22 @@ function HumanHand({
   return (
     <section
       className={cn(
-        "rounded-md border bg-black/22 p-3 backdrop-blur",
+        "rounded-md border bg-black/26 p-3 shadow-2xl backdrop-blur",
         active ? "border-[var(--gold)]" : "border-white/10",
         className
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold">{PLAYER_NAMES[player.id]}</p>
-          <p className="text-xs text-zinc-400">{active ? "Your move" : "Waiting for the table"}</p>
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-bold">
+            <Crown className="size-4 text-[var(--gold)]" />
+            {PLAYER_NAMES[player.id]}
+          </p>
+          <p className="text-xs text-zinc-400">
+            {active
+              ? `${selectedCount} selected · ${legalMoveCount} legal options`
+              : "Waiting for the table"}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -353,7 +392,7 @@ function HumanHand({
         </div>
       </div>
 
-      <div className="flex min-h-32 items-end overflow-x-auto px-1 pb-2 pt-4">
+      <div className="flex min-h-36 items-end overflow-x-auto px-1 pb-2 pt-5">
         <div className="flex items-end gap-1 sm:gap-2">
           {player.hand.map((card) => {
             const selected = selectedCardIds.includes(getCardId(card));
@@ -362,7 +401,7 @@ function HumanHand({
               <motion.button
                 key={getCardId(card)}
                 type="button"
-                className="shrink-0 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
+                className="shrink-0 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)] disabled:cursor-default"
                 animate={{ y: selected ? -18 : 0 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onToggleCard(card)}
@@ -394,11 +433,14 @@ function CardView({
     <motion.div
       layout
       className={cn(
-        "card-face grid rounded-md border shadow-xl",
+        "card-face relative grid overflow-hidden rounded-md border shadow-xl",
         compact ? "h-20 w-14 p-1.5" : "h-24 w-16 p-2 sm:h-28 sm:w-20",
-        selected ? "border-[var(--gold)] ring-2 ring-[var(--gold)]" : "border-black/12"
+        selected
+          ? "border-[var(--gold)] shadow-[0_16px_34px_rgba(242,193,78,0.25)] ring-2 ring-[var(--gold)]"
+          : "border-black/12"
       )}
     >
+      <div className="absolute inset-x-2 top-1 h-px bg-white/70" />
       <div
         className={cn("text-left font-black leading-none", red ? "text-red-600" : "text-zinc-950")}
       >
@@ -408,11 +450,20 @@ function CardView({
       <div
         className={cn(
           "self-center text-center font-black leading-none",
-          compact ? "text-2xl" : "text-3xl",
+          compact ? "text-3xl" : "text-4xl",
           red ? "text-red-600" : "text-zinc-950"
         )}
       >
         {suitSymbol(card.suit)}
+      </div>
+      <div
+        className={cn(
+          "absolute bottom-1 right-1 rotate-180 font-black leading-none",
+          compact ? "text-sm" : "text-base",
+          red ? "text-red-600" : "text-zinc-950"
+        )}
+      >
+        {card.rank}
       </div>
     </motion.div>
   );
