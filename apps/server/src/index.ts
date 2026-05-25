@@ -14,6 +14,7 @@ import type {
   ClientToServerEvents,
   InterServerEvents,
   PublicGuestProfile,
+  PublicLeaderboardEntry,
   PublicRoomPlayer,
   PublicRoomState,
   RoomReplayExport,
@@ -29,6 +30,7 @@ import {
   completePersistedMatch,
   createPersistedMatch,
   getPersistedGuestProfile,
+  getPersistedLeaderboard,
   persistMoveEvent,
   type PersistedMatch
 } from "./persistence.js";
@@ -222,6 +224,10 @@ io.on("connection", (socket) => {
     }
 
     callback(ok(await publicGuestProfile(guestId)));
+  });
+
+  socket.on("leaderboard:list", async (payload, callback) => {
+    callback(ok(await publicLeaderboard(payload.limit)));
   });
 
   socket.on("game:move", (payload, callback) => {
@@ -571,6 +577,31 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     averagePlacement:
       profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
   };
+}
+
+async function publicLeaderboard(
+  limit: number | undefined
+): Promise<readonly PublicLeaderboardEntry[]> {
+  const leaderboardLimit = Math.max(1, Math.min(limit ?? 10, 25));
+  const persistedLeaderboard = await getPersistedLeaderboard(leaderboardLimit);
+
+  if (persistedLeaderboard !== null) {
+    return persistedLeaderboard;
+  }
+
+  return [...guestProfiles.values()]
+    .filter((profile) => profile.gamesPlayed > 0)
+    .sort((left, right) => right.rating - left.rating || right.wins - left.wins)
+    .slice(0, leaderboardLimit)
+    .map((profile) => ({
+      guestId: profile.guestId,
+      displayName: null,
+      rating: profile.rating,
+      gamesPlayed: profile.gamesPlayed,
+      wins: profile.wins,
+      averagePlacement:
+        profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
+    }));
 }
 
 function inferPlacements(game: GameState): readonly string[] {

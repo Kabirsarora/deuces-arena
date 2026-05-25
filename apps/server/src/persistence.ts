@@ -8,7 +8,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
-import type { PublicGuestProfile } from "@deuces-arena/shared";
+import type { PublicGuestProfile, PublicLeaderboardEntry } from "@deuces-arena/shared";
 
 type PersistableRoomPlayer = {
   readonly id: string;
@@ -123,6 +123,65 @@ export async function getPersistedGuestProfile(
     };
   } catch (error) {
     console.error("Unable to read guest profile.", error);
+    return null;
+  }
+}
+
+export async function getPersistedLeaderboard(
+  limit: number
+): Promise<readonly PublicLeaderboardEntry[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const users = await db.prisma.user.findMany({
+      where: {
+        guestId: {
+          not: null
+        },
+        gamesPlayed: {
+          gt: 0
+        }
+      },
+      orderBy: [
+        {
+          rating: "desc"
+        },
+        {
+          wins: "desc"
+        }
+      ],
+      take: limit,
+      select: {
+        guestId: true,
+        displayName: true,
+        rating: true,
+        gamesPlayed: true,
+        wins: true,
+        placementTotal: true
+      }
+    });
+
+    return users.flatMap((user) =>
+      user.guestId === null
+        ? []
+        : [
+            {
+              guestId: user.guestId,
+              displayName: user.displayName,
+              rating: user.rating,
+              gamesPlayed: user.gamesPlayed,
+              wins: user.wins,
+              averagePlacement:
+                user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed
+            }
+          ]
+    );
+  } catch (error) {
+    console.error("Unable to read leaderboard.", error);
     return null;
   }
 }

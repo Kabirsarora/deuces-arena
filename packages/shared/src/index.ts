@@ -14,6 +14,11 @@ export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
 };
 
+export type PublicLeaderboardEntry = PublicPlayerStats & {
+  readonly guestId: string;
+  readonly displayName: string | null;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -100,6 +105,10 @@ export type ClientToServerEvents = {
   "profile:get": (
     payload: { readonly guestId: string },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
+  "leaderboard:list": (
+    payload: { readonly limit?: number },
+    callback: (ack: ServerAck<readonly PublicLeaderboardEntry[]>) => void
   ) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
 };

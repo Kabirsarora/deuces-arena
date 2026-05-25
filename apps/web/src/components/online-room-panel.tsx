@@ -10,6 +10,7 @@ import {
 import type {
   ClientToServerEvents,
   PublicGuestProfile,
+  PublicLeaderboardEntry,
   PublicRoomPlayer,
   PublicRoomState,
   ServerAck,
@@ -21,6 +22,7 @@ import {
   Copy,
   Download,
   History,
+  ListOrdered,
   Play,
   Send,
   Sparkles,
@@ -44,6 +46,7 @@ export function OnlineRoomPanel() {
   const [joinCode, setJoinCode] = useState("");
   const [room, setRoom] = useState<PublicRoomState | null>(null);
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
+  const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -87,6 +90,7 @@ export function OnlineRoomPanel() {
           setProfile(ack.data);
         }
       });
+      refreshLeaderboard(socket, setLeaderboard);
       const session = loadRoomSession();
 
       if (session !== null) {
@@ -130,6 +134,10 @@ export function OnlineRoomPanel() {
       guestId: getOrCreateGuestId(),
       ...player.stats
     });
+
+    if (room.status === "complete" && socketRef.current !== null) {
+      refreshLeaderboard(socketRef.current, setLeaderboard);
+    }
   }, [room]);
 
   function createRoom() {
@@ -287,6 +295,7 @@ export function OnlineRoomPanel() {
           </label>
 
           <ProfileSummary profile={profile} />
+          <LeaderboardSummary entries={leaderboard} />
 
           <div className="grid gap-2">
             <Button onClick={createRoom} disabled={!connected}>
@@ -451,6 +460,17 @@ function getOrCreateGuestId(): string {
   return guestId;
 }
 
+function refreshLeaderboard(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setLeaderboard: (entries: readonly PublicLeaderboardEntry[]) => void
+): void {
+  socket.emit("leaderboard:list", { limit: 5 }, (ack) => {
+    if (ack.ok) {
+      setLeaderboard(ack.data);
+    }
+  });
+}
+
 function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
   return (
     <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
@@ -475,6 +495,48 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
           }
         />
       </div>
+    </section>
+  );
+}
+
+function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLeaderboardEntry[] }) {
+  return (
+    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <ListOrdered className="size-4 text-[var(--aqua)]" />
+          Leaderboard
+        </p>
+        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          Rating
+        </span>
+      </div>
+      {entries.length === 0 ? (
+        <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+          No rated games yet.
+        </p>
+      ) : (
+        <ol className="grid gap-2">
+          {entries.map((entry, index) => (
+            <li
+              key={entry.guestId}
+              className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/7 px-2 py-2"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold">
+                  #{index + 1} {entry.displayName ?? "Guest player"}
+                </p>
+                <p className="text-[11px] text-zinc-400">
+                  {entry.wins} wins · {entry.gamesPlayed} games
+                </p>
+              </div>
+              <span className="shrink-0 rounded-md bg-black/24 px-2 py-1 text-xs font-black">
+                {entry.rating}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
