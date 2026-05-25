@@ -34,6 +34,8 @@ export { applyMove, createInitialGame } from "./game.js";
 
 export type { GameActionResult, GameState, GameStatus, PlayerState } from "./game.js";
 
+export { generateLegalMoves } from "./legal-moves.js";
+
 export { validateMove } from "./moves.js";
 
 export type {
