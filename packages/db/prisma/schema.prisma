@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MatchMode {
+  CASUAL
+  RANKED
+  LOCAL_DEMO
+}
+
+enum MatchStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum PlayerKind {
+  HUMAN
+  BOT
+  GUEST
+}
+
+enum MoveKind {
+  PLAY
+  PASS
+}
+
+model User {
+  id              String        @id @default(cuid())
+  username        String        @unique
+  displayName     String?
+  rating          Int           @default(1000)
+  gamesPlayed     Int           @default(0)
+  wins            Int           @default(0)
+  losses          Int           @default(0)
+  supporterStatus String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  matchPlayers    MatchPlayer[]
+
+  @@index([rating])
+}
+
+model Match {
+  id          String        @id @default(cuid())
+  mode        MatchMode     @default(CASUAL)
+  status      MatchStatus   @default(IN_PROGRESS)
+  roomCode    String?
+  seed        String?
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  players     MatchPlayer[]
+  moves       MoveEvent[]
+
+  @@index([mode, status])
+  @@index([startedAt])
+}
+
+model MatchPlayer {
+  id               String      @id @default(cuid())
+  matchId          String
+  userId           String?
+  playerSeat       Int
+  playerLabel      String
+  kind             PlayerKind
+  placement        Int?
+  ratingBefore     Int?
+  ratingAfter      Int?
+  cardsRemaining   Int?
+  bombsPlayed      Int         @default(0)
+  averageMoveCount Int?
+  match            Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  moves            MoveEvent[]
+
+  @@unique([matchId, playerSeat])
+  @@index([userId])
+  @@index([matchId])
+}
+
+model MoveEvent {
+  id                   String      @id @default(cuid())
+  matchId              String
+  matchPlayerId        String
+  turnNumber           Int
+  kind                 MoveKind
+  handType             String?
+  cards                Json
+  handBefore           Json
+  legalMoves           Json?
+  currentTrickBefore   Json?
+  cardsRemainingBefore Json
+  cardsRemainingAfter  Json
+  gameResult           Json?
+  placement            Int?
+  winProbability       Float?
+  simulationScore      Float?
+  modelScore           Float?
+  createdAt            DateTime    @default(now())
+  match                Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchPlayer          MatchPlayer @relation(fields: [matchPlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, turnNumber])
+  @@index([matchPlayerId])
+  @@index([matchId, turnNumber])
+}
