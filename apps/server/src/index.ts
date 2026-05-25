@@ -329,7 +329,7 @@ function persistLastMove(room: Room): void {
     return;
   }
 
-  void persistMoveEvent(room.persistedMatch, event);
+  void persistMoveEvent(room.persistedMatch, event, game);
 
   if (game.status === "complete") {
     void completePersistedMatch(room.persistedMatch, game);

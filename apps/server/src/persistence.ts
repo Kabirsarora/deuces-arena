@@ -66,7 +66,8 @@ export async function createPersistedMatch(
 
 export async function persistMoveEvent(
   persistedMatch: PersistedMatch | null,
-  event: GameEvent
+  event: GameEvent,
+  game: GameState
 ): Promise<void> {
   const db = await getDb();
 
@@ -96,12 +97,32 @@ export async function persistMoveEvent(
         }),
         currentTrickBefore: toPrismaJson(event.currentTrickBefore),
         cardsRemainingBefore: toPrismaJson(event.cardsRemainingBefore),
-        cardsRemainingAfter: toPrismaJson(event.cardsRemainingAfter)
+        cardsRemainingAfter: toPrismaJson(event.cardsRemainingAfter),
+        placement:
+          game.status === "complete"
+            ? (getPlacementByPlayerId(game)[event.playerId] ?? null)
+            : null,
+        ...(game.status === "complete"
+          ? {
+              gameResult: createGameResult(game)
+            }
+          : {})
       }
     });
   } catch (error) {
     console.error("Unable to persist move event.", error);
   }
+}
+
+function createGameResult(game: GameState): Prisma.InputJsonValue {
+  const summaries = summarizeGame(game);
+  const placementByPlayerId = getPlacementByPlayerId(game);
+
+  return toPrismaJson({
+    status: game.status,
+    placements: placementByPlayerId,
+    players: summaries
+  });
 }
 
 export async function completePersistedMatch(
