@@ -304,7 +304,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.players = room.players.map((player) =>
+    const nextPlayers = room.players.map((player) =>
       player.id === playerId
         ? {
             ...player,
@@ -312,6 +312,14 @@ io.on("connection", (socket) => {
           }
         : player
     );
+
+    if (room.game === null && nextPlayers.every((player) => player.socketId === null)) {
+      rooms.delete(room.code);
+      emitLobbyState();
+      return;
+    }
+
+    room.players = nextPlayers;
     emitRoomState(room);
     emitLobbyState();
   });
@@ -539,7 +547,12 @@ function emitLobbyState(): void {
 function publicLobbyState(): PublicLobbyState {
   const roomList = [...rooms.values()];
   const openRooms = roomList
-    .filter((room) => room.game === null && room.players.length < MAX_PLAYERS_PER_ROOM)
+    .filter(
+      (room) =>
+        room.game === null &&
+        room.players.length < MAX_PLAYERS_PER_ROOM &&
+        room.players.some((player) => player.socketId !== null)
+    )
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .map((room) => {
       const seatedPlayers = room.players.filter((player) => player.kind === "human").length;
