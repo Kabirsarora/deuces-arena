@@ -29,3 +29,14 @@ export {
 } from "./hands.js";
 
 export type { HandAnalysis, HandDetectionResult, HandType, InvalidHand } from "./hands.js";
+
+export { validateMove } from "./moves.js";
+
+export type {
+  CurrentTrick,
+  Move,
+  MoveValidationContext,
+  MoveValidationResult,
+  PassMove,
+  PlayMove
+} from "./moves.js";
