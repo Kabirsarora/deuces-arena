@@ -1,0 +1,23 @@
+{
+  "name": "deuces-arena",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real-time multiplayer Deuces / Big Two platform with reusable game logic, bots, replay data, and future AI coaching.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
