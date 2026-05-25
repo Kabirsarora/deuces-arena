@@ -120,7 +120,8 @@ describe("game state", () => {
       currentTrick: null,
       turnNumber: 0,
       placements: [],
-      status: "in-progress"
+      status: "in-progress",
+      events: []
     };
 
     const result = applyMove(game, "player-1", {
@@ -136,5 +137,38 @@ describe("game state", () => {
 
     expect(result.state.status).toBe("complete");
     expect(result.state.placements).toEqual(["player-1"]);
+  });
+
+  it("records structured move events for replay and future analysis", () => {
+    const result = applyMove(testGame(), "player-1", {
+      type: "play",
+      cards: [createCard("3", "diamonds")]
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.state.events).toHaveLength(1);
+    expect(result.state.events[0]).toMatchObject({
+      turnNumber: 0,
+      playerId: "player-1",
+      wasPass: false,
+      legalMoveCount: expect.any(Number),
+      cardsRemainingBefore: {
+        "player-1": 13,
+        "player-2": 13,
+        "player-3": 13,
+        "player-4": 13
+      },
+      cardsRemainingAfter: {
+        "player-1": 12,
+        "player-2": 13,
+        "player-3": 13,
+        "player-4": 13
+      }
+    });
   });
 });

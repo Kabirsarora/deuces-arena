@@ -36,7 +36,7 @@ export type { HandAnalysis, HandDetectionResult, HandType, InvalidHand } from ".
 
 export { applyMove, createInitialGame } from "./game.js";
 
-export type { GameActionResult, GameState, GameStatus, PlayerState } from "./game.js";
+export type { GameActionResult, GameEvent, GameState, GameStatus, PlayerState } from "./game.js";
 
 export { generateLegalMoves } from "./legal-moves.js";
 

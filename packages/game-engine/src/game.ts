@@ -1,5 +1,6 @@
 import { LOWEST_CARD, createDeck, isSameCard, sortCards, type Card } from "./cards.js";
 import type { HandAnalysis } from "./hands.js";
+import { generateLegalMoves } from "./legal-moves.js";
 import { validateMove, type CurrentTrick, type Move } from "./moves.js";
 
 export type PlayerState = {
@@ -16,6 +17,19 @@ export type GameState = {
   readonly turnNumber: number;
   readonly placements: readonly string[];
   readonly status: GameStatus;
+  readonly events: readonly GameEvent[];
+};
+
+export type GameEvent = {
+  readonly turnNumber: number;
+  readonly playerId: string;
+  readonly move: Move;
+  readonly wasPass: boolean;
+  readonly handBefore: readonly Card[];
+  readonly currentTrickBefore: CurrentTrick | null;
+  readonly cardsRemainingBefore: Readonly<Record<string, number>>;
+  readonly cardsRemainingAfter: Readonly<Record<string, number>>;
+  readonly legalMoveCount: number;
 };
 
 export type GameActionResult =
@@ -58,7 +72,8 @@ export function createInitialGame(
     currentTrick: null,
     turnNumber: 0,
     placements: [],
-    status: "in-progress"
+    status: "in-progress",
+    events: []
   };
 }
 
@@ -105,10 +120,28 @@ export function applyMove(state: GameState, playerId: string, move: Move): GameA
     };
   }
 
+  const legalMoveCount = generateLegalMoves(player.hand, {
+    isFirstMove: state.turnNumber === 0,
+    currentTrick: state.currentTrick
+  }).length;
+  const cardsRemainingBefore = getCardsRemaining(state);
+
   if (move.type === "pass") {
+    const nextState = applyPass(state, playerId);
+
     return {
       ok: true,
-      state: applyPass(state, playerId)
+      state: appendGameEvent(nextState, {
+        turnNumber: state.turnNumber,
+        playerId,
+        move,
+        wasPass: true,
+        handBefore: player.hand,
+        currentTrickBefore: state.currentTrick,
+        cardsRemainingBefore,
+        cardsRemainingAfter: getCardsRemaining(nextState),
+        legalMoveCount
+      })
     };
   }
 
@@ -119,9 +152,21 @@ export function applyMove(state: GameState, playerId: string, move: Move): GameA
     };
   }
 
+  const nextState = applyPlay(state, playerId, move.cards, validation.hand);
+
   return {
     ok: true,
-    state: applyPlay(state, playerId, move.cards, validation.hand)
+    state: appendGameEvent(nextState, {
+      turnNumber: state.turnNumber,
+      playerId,
+      move,
+      wasPass: false,
+      handBefore: player.hand,
+      currentTrickBefore: state.currentTrick,
+      cardsRemainingBefore,
+      cardsRemainingAfter: getCardsRemaining(nextState),
+      legalMoveCount
+    })
   };
 }
 
@@ -250,4 +295,15 @@ function removeCards(hand: readonly Card[], cards: readonly Card[]): Card[] {
 
 function uniqueIds(ids: readonly string[]): string[] {
   return [...new Set(ids)];
+}
+
+function getCardsRemaining(state: GameState): Readonly<Record<string, number>> {
+  return Object.fromEntries(state.players.map((player) => [player.id, player.hand.length]));
+}
+
+function appendGameEvent(state: GameState, event: GameEvent): GameState {
+  return {
+    ...state,
+    events: [...state.events, event]
+  };
 }
