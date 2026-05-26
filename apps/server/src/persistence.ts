@@ -41,6 +41,32 @@ export type EquipCosmeticResult =
       readonly reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned";
     };
 
+type CosmeticProgressionStats = {
+  readonly gamesPlayed: number;
+  readonly wins: number;
+};
+
+const COSMETIC_UNLOCK_RULES: readonly {
+  readonly slug: string;
+  readonly source: "EARNED";
+  readonly isUnlocked: (stats: CosmeticProgressionStats) => boolean;
+}[] = [
+  {
+    slug: "classic-red-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.gamesPlayed >= 1
+  },
+  {
+    slug: "midnight-felt-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 1
+  }
+];
+
+export function getEarnedCosmeticUnlockSlugs(stats: CosmeticProgressionStats): readonly string[] {
+  return COSMETIC_UNLOCK_RULES.filter((rule) => rule.isUnlocked(stats)).map((rule) => rule.slug);
+}
+
 let dbModulePromise: Promise<typeof DbModule> | null = null;
 
 export async function createPersistedMatch(
@@ -651,9 +677,83 @@ export async function completePersistedMatch(
         ];
       })
     ]);
+    await awardEarnedCosmetics(db, Object.values(persistedMatch.userIds));
   } catch (error) {
     console.error("Unable to persist match completion.", error);
   }
+}
+
+async function awardEarnedCosmetics(
+  db: typeof DbModule,
+  userIds: readonly string[]
+): Promise<void> {
+  const uniqueUserIds = [...new Set(userIds)];
+
+  if (uniqueUserIds.length === 0) {
+    return;
+  }
+
+  const users = await db.prisma.user.findMany({
+    where: {
+      id: {
+        in: uniqueUserIds
+      }
+    },
+    select: {
+      id: true,
+      gamesPlayed: true,
+      wins: true
+    }
+  });
+  const unlockSlugs = [...new Set(users.flatMap(getEarnedCosmeticUnlockSlugs))];
+
+  if (unlockSlugs.length === 0) {
+    return;
+  }
+
+  const cosmetics = await db.prisma.cosmetic.findMany({
+    where: {
+      slug: {
+        in: unlockSlugs
+      },
+      isActive: true,
+      isSupporter: false
+    },
+    select: {
+      id: true,
+      slug: true
+    }
+  });
+  const cosmeticIdBySlug = new Map(cosmetics.map((cosmetic) => [cosmetic.slug, cosmetic.id]));
+
+  await Promise.all(
+    users.flatMap((user) =>
+      getEarnedCosmeticUnlockSlugs(user).flatMap((slug) => {
+        const cosmeticId = cosmeticIdBySlug.get(slug);
+
+        if (cosmeticId === undefined) {
+          return [];
+        }
+
+        return [
+          db.prisma.userCosmeticUnlock.upsert({
+            where: {
+              userId_cosmeticId: {
+                userId: user.id,
+                cosmeticId
+              }
+            },
+            create: {
+              userId: user.id,
+              cosmeticId,
+              source: "EARNED"
+            },
+            update: {}
+          })
+        ];
+      })
+    )
+  );
 }
 
 async function getUsersByPlayerId(
