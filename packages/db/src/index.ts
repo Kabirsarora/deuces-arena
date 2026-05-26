@@ -10,5 +10,5 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
-export type { Match, MatchPlayer, MoveEvent, User } from "@prisma/client";
+export type { CoachEvaluation, Match, MatchPlayer, MoveEvent, User } from "@prisma/client";
 export type { Prisma } from "@prisma/client";

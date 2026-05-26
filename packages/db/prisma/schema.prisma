@@ -59,6 +59,7 @@ model Match {
   updatedAt   DateTime      @updatedAt
   players     MatchPlayer[]
   moves       MoveEvent[]
+  coachEvaluations CoachEvaluation[]
 
   @@index([mode, status])
   @@index([startedAt])
@@ -80,6 +81,7 @@ model MatchPlayer {
   match            Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
   user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   moves            MoveEvent[]
+  coachEvaluations CoachEvaluation[]
 
   @@unique([matchId, playerSeat])
   @@index([userId])
@@ -111,4 +113,26 @@ model MoveEvent {
   @@unique([matchId, turnNumber])
   @@index([matchPlayerId])
   @@index([matchId, turnNumber])
+}
+
+model CoachEvaluation {
+  id                 String      @id @default(cuid())
+  matchId            String
+  matchPlayerId      String
+  roomCode           String?
+  playerId           String
+  playerLabel        String
+  turnNumber         Int
+  handBefore         Json
+  currentTrickBefore Json?
+  evaluations        Json
+  rolloutsPerMove    Int
+  evaluatedMoveCount Int
+  createdAt          DateTime    @default(now())
+  match              Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchPlayer        MatchPlayer @relation(fields: [matchPlayerId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, turnNumber])
+  @@index([matchPlayerId])
+  @@index([roomCode, createdAt])
 }

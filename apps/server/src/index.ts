@@ -40,6 +40,7 @@ import {
   getPersistedGuestProfile,
   getPersistedLeaderboard,
   getPersistedMatchHistory,
+  persistCoachEvaluation,
   persistMoveEvent,
   type PersistedMatch
 } from "./persistence.js";
@@ -436,6 +437,7 @@ io.on("connection", (socket) => {
     room.coachEvaluations = [...room.coachEvaluations, record].slice(
       -MAX_COACH_EVALUATIONS_PER_ROOM
     );
+    void persistCoachEvaluation(room.persistedMatch, record);
     callback(ok(evaluations));
   });
 

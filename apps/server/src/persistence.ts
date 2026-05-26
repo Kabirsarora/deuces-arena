@@ -9,6 +9,7 @@ import {
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
+  PublicCoachEvaluationRecord,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicMatchHistoryItem
@@ -23,6 +24,7 @@ type PersistableRoomPlayer = {
 
 export type PersistedMatch = {
   readonly matchId: string;
+  readonly roomCode: string;
   readonly matchPlayerIds: Readonly<Record<string, string>>;
   readonly userIds: Readonly<Record<string, string>>;
   readonly ratingBeforeByPlayerId: Readonly<Record<string, number>>;
@@ -72,6 +74,7 @@ export async function createPersistedMatch(
 
     return {
       matchId: match.id,
+      roomCode,
       matchPlayerIds: Object.fromEntries(
         match.players.flatMap((matchPlayer) => {
           const roomPlayer = players[matchPlayer.playerSeat];
@@ -268,6 +271,43 @@ export async function getPersistedMatchHistory(
   } catch (error) {
     console.error("Unable to read match history.", error);
     return null;
+  }
+}
+
+export async function persistCoachEvaluation(
+  persistedMatch: PersistedMatch | null,
+  record: PublicCoachEvaluationRecord
+): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || persistedMatch === null) {
+    return;
+  }
+
+  const matchPlayerId = persistedMatch.matchPlayerIds[record.playerId];
+
+  if (matchPlayerId === undefined) {
+    return;
+  }
+
+  try {
+    await db.prisma.coachEvaluation.create({
+      data: {
+        matchId: persistedMatch.matchId,
+        matchPlayerId,
+        roomCode: persistedMatch.roomCode,
+        playerId: record.playerId,
+        playerLabel: record.playerName,
+        turnNumber: record.turnNumber,
+        handBefore: toPrismaJson(record.handBefore),
+        currentTrickBefore: toPrismaJson(record.currentTrickBefore),
+        evaluations: toPrismaJson(record.evaluations),
+        rolloutsPerMove: record.evaluations[0]?.rollouts ?? 0,
+        evaluatedMoveCount: record.evaluations.length
+      }
+    });
+  } catch (error) {
+    console.error("Unable to persist coach evaluation.", error);
   }
 }
 
