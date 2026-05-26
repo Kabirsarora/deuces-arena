@@ -20,7 +20,7 @@
 
 - Build mobile-first web table.
 - Add human vs baseline bots.
-- Use `random-legal` and `lowest-legal` bots only as honest baselines, not as claimed AI.
+- Use `random-legal`, `lowest-legal`, and `simple-heuristic` bots only as honest baselines, not as claimed AI.
 - Add polished card selection, trick display, turn indicator, and game over screen.
 
 ## Phase 4: Online Multiplayer

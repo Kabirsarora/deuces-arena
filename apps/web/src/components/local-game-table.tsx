@@ -77,7 +77,7 @@ export function LocalGameTable() {
           isFirstMove: game.turnNumber === 0,
           currentTrick: game.currentTrick
         },
-        strategy: "lowest-legal"
+        strategy: "simple-heuristic"
       });
       const result = applyMove(game, bot.id, decision.move);
 

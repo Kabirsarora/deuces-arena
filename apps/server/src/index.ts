@@ -613,7 +613,7 @@ function scheduleBotTurn(room: Room): void {
         isFirstMove: room.game.turnNumber === 0,
         currentTrick: room.game.currentTrick
       },
-      strategy: "lowest-legal"
+      strategy: "simple-heuristic"
     });
     const result = applyMove(room.game, activePlayer.id, decision.move);
 

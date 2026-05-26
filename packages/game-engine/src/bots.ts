@@ -1,8 +1,9 @@
-import { compareCards, type Card } from "./cards.js";
+import { compareCards, getRankStrength, type Card } from "./cards.js";
+import { detectHand, type HandAnalysis } from "./hands.js";
 import { generateLegalMoves } from "./legal-moves.js";
 import type { Move, MoveValidationContext, PlayMove } from "./moves.js";
 
-export type BotStrategy = "random-legal" | "lowest-legal";
+export type BotStrategy = "random-legal" | "lowest-legal" | "simple-heuristic";
 
 export type BotDecisionInput = {
   readonly hand: readonly Card[];
@@ -39,6 +40,14 @@ export function chooseBotMove(input: BotDecisionInput): BotDecision {
     };
   }
 
+  if (strategy === "simple-heuristic") {
+    return {
+      move: chooseSimpleHeuristicMove(legalMoves, input.context),
+      legalMoveCount: legalMoves.length,
+      strategy
+    };
+  }
+
   return {
     move: chooseRandomMove(legalMoves, input.random ?? Math.random),
     legalMoveCount: legalMoves.length,
@@ -69,6 +78,66 @@ function chooseLowestLegalMove(moves: readonly Move[]): Move {
       type: "pass"
     }
   );
+}
+
+function chooseSimpleHeuristicMove(moves: readonly Move[], context: MoveValidationContext): Move {
+  const playMoves = moves.filter((move): move is PlayMove => move.type === "play");
+  const passMove = moves.find((move) => move.type === "pass");
+
+  if (playMoves.length === 0) {
+    return (
+      passMove ?? {
+        type: "pass"
+      }
+    );
+  }
+
+  if (context.currentTrick === null) {
+    return (
+      [...playMoves].sort(compareLeadHeuristicMoves)[0] ?? {
+        type: "pass"
+      }
+    );
+  }
+
+  const currentHandType = context.currentTrick.hand.type;
+  const nonBombResponses = playMoves.filter((move) => detectPlayableHand(move)?.type !== "bomb");
+
+  if (currentHandType !== "bomb" && nonBombResponses.length === 0 && passMove !== undefined) {
+    return passMove;
+  }
+
+  return (
+    [...(nonBombResponses.length > 0 ? nonBombResponses : playMoves)].sort(comparePlayMoves)[0] ?? {
+      type: "pass"
+    }
+  );
+}
+
+function compareLeadHeuristicMoves(left: PlayMove, right: PlayMove): number {
+  if (left.cards.length !== right.cards.length) {
+    return right.cards.length - left.cards.length;
+  }
+
+  const leftHand = detectPlayableHand(left);
+  const rightHand = detectPlayableHand(right);
+  const leftStrength = leftHand === undefined ? Number.MAX_SAFE_INTEGER : handStrength(leftHand);
+  const rightStrength = rightHand === undefined ? Number.MAX_SAFE_INTEGER : handStrength(rightHand);
+
+  if (leftStrength !== rightStrength) {
+    return leftStrength - rightStrength;
+  }
+
+  return comparePlayMoves(left, right);
+}
+
+function detectPlayableHand(move: PlayMove): HandAnalysis | undefined {
+  const hand = detectHand(move.cards);
+  return hand.type === "invalid" ? undefined : hand;
+}
+
+function handStrength(hand: HandAnalysis): number {
+  return getRankStrength(hand.primaryRank);
 }
 
 function comparePlayMoves(left: PlayMove, right: PlayMove): number {
