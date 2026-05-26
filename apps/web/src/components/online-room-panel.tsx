@@ -23,6 +23,7 @@ import type {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  CheckCircle2,
   CircleDot,
   Copy,
   Download,
@@ -85,6 +86,13 @@ export function OnlineRoomPanel() {
     );
   const isYourTurn =
     room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
+  const yourPlayer = room?.players.find((candidate) => candidate.id === room.yourPlayerId) ?? null;
+  const connectedHumans =
+    room?.players.filter((player) => player.kind === "human" && player.connected) ?? [];
+  const roomCanStart =
+    room !== null &&
+    room.status === "waiting" &&
+    (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -215,6 +223,21 @@ export function OnlineRoomPanel() {
       { roomCode: room.roomCode },
       handleRoomAck("Game started.")
     );
+  }
+
+  function setReady(ready: boolean) {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit("room:ready", { roomCode: room.roomCode, ready }, (ack) => {
+      if (ack.ok) {
+        setRoom(ack.data);
+        setMessage(ready ? "You are ready." : "You are no longer ready.");
+      } else {
+        setMessage(ack.error);
+      }
+    });
   }
 
   function exportReplay() {
@@ -412,11 +435,16 @@ export function OnlineRoomPanel() {
               </Button>
               <Button
                 className="mt-2 w-full"
-                onClick={startRoom}
+                variant="secondary"
+                onClick={() => setReady(!yourPlayer?.ready)}
                 disabled={room.status !== "waiting"}
               >
+                <CheckCircle2 className="size-4" />
+                {yourPlayer?.ready ? "Ready" : "Mark Ready"}
+              </Button>
+              <Button className="mt-2 w-full" onClick={startRoom} disabled={!roomCanStart}>
                 <Play className="size-4" />
-                Start With Bots
+                {connectedHumans.length <= 1 ? "Start With Bots" : "Start When Ready"}
               </Button>
               <Button className="mt-2 w-full" variant="secondary" onClick={exportReplay}>
                 <Download className="size-4" />
@@ -717,7 +745,7 @@ function LobbySummary({
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">{openRoom.hostName}'s table</p>
                 <p className="text-[11px] text-zinc-400">
-                  {openRoom.seatedPlayers}/{openRoom.maxPlayers} seated · {openRoom.roomCode}
+                  {openRoom.readyPlayers}/{openRoom.seatedPlayers} ready · {openRoom.roomCode}
                 </p>
               </div>
               <DoorOpen className="size-4 shrink-0 text-[var(--gold)]" />
@@ -938,7 +966,10 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
       </div>
       <div className="mt-1 grid gap-y-1 text-[11px] text-zinc-400">
         <span>{player.cardsRemaining} cards</span>
-        <span>{player.stats === null ? player.kind : `${player.stats.rating} rating`}</span>
+        <span>
+          {player.stats === null ? player.kind : `${player.stats.rating} rating`} ·{" "}
+          {player.ready ? "ready" : "not ready"}
+        </span>
       </div>
     </div>
   );
@@ -962,7 +993,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
             <p className="text-xs text-zinc-400">
               {player.kind} · {player.cardsRemaining} cards ·{" "}
               {player.stats === null ? "unrated" : `${player.stats.wins} wins`} ·{" "}
-              {player.connected ? "connected" : "away"}
+              {player.connected ? "connected" : "away"} · {player.ready ? "ready" : "not ready"}
             </p>
           </div>
         ))}

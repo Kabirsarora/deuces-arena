@@ -44,6 +44,7 @@ export type PublicOpenRoom = {
   readonly roomCode: string;
   readonly hostName: string;
   readonly seatedPlayers: number;
+  readonly readyPlayers: number;
   readonly maxPlayers: number;
   readonly botSeatsAvailable: number;
   readonly createdAt: string;
@@ -70,6 +71,7 @@ export type PublicRoomPlayer = {
   readonly name: string;
   readonly kind: PlayerKind;
   readonly connected: boolean;
+  readonly ready: boolean;
   readonly cardsRemaining: number;
   readonly stats: PublicPlayerStats | null;
 };
@@ -156,6 +158,10 @@ export type ClientToServerEvents = {
   ) => void;
   "room:start": (
     payload: { readonly roomCode: string },
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "room:ready": (
+    payload: { readonly roomCode: string; readonly ready: boolean },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
   "room:replay": (

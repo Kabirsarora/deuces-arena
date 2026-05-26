@@ -47,6 +47,7 @@ type RoomPlayer = {
   readonly kind: "human" | "bot" | "guest";
   readonly guestId: string | null;
   readonly socketId: string | null;
+  readonly ready: boolean;
 };
 
 type GuestProfile = {
@@ -204,6 +205,11 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (!canStartRoom(room)) {
+      callback(fail("All connected players must be ready before starting."));
+      return;
+    }
+
     fillRoomWithBots(room);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
@@ -215,6 +221,40 @@ io.on("connection", (socket) => {
     emitRoomState(room);
     emitLobbyState();
     scheduleBotTurn(room);
+  });
+
+  socket.on("room:ready", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    if (room.game !== null) {
+      callback(fail("Ready state can only be changed before a game starts."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    room.players = room.players.map((candidate) =>
+      candidate.id === player.id
+        ? {
+            ...candidate,
+            ready: payload.ready
+          }
+        : candidate
+    );
+
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+    emitLobbyState();
   });
 
   socket.on("room:replay", (payload, callback) => {
@@ -347,7 +387,8 @@ io.on("connection", (socket) => {
       player.id === playerId
         ? {
             ...player,
-            socketId: null
+            socketId: null,
+            ready: false
           }
         : player
     );
@@ -411,8 +452,21 @@ function createHumanPlayer(
     name: playerName.trim() || `Player ${seatIndex + 1}`,
     kind: "human",
     guestId: normalizedGuestId,
-    socketId
+    socketId,
+    ready: false
   };
+}
+
+function canStartRoom(room: Room): boolean {
+  const connectedHumans = room.players.filter(
+    (player) => player.kind === "human" && player.socketId !== null
+  );
+
+  if (connectedHumans.length <= 1) {
+    return true;
+  }
+
+  return connectedHumans.every((player) => player.ready);
 }
 
 function fillRoomWithBots(room: Room): void {
@@ -425,7 +479,8 @@ function fillRoomWithBots(room: Room): void {
         name: `Bot ${seatIndex + 1}`,
         kind: "bot",
         guestId: null,
-        socketId: null
+        socketId: null,
+        ready: true
       }
     ];
   }
@@ -559,6 +614,7 @@ function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
     name: player.name,
     kind: player.kind,
     connected: player.kind === "bot" || player.socketId !== null,
+    ready: player.ready,
     cardsRemaining: gamePlayer?.hand.length ?? 13,
     stats:
       profile === null
@@ -597,11 +653,15 @@ function publicLobbyState(): PublicLobbyState {
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .map((room) => {
       const seatedPlayers = room.players.filter((player) => player.kind === "human").length;
+      const readyPlayers = room.players.filter(
+        (player) => player.kind === "human" && player.ready
+      ).length;
 
       return {
         roomCode: room.code,
         hostName: room.players[0]?.name ?? "Open table",
         seatedPlayers,
+        readyPlayers,
         maxPlayers: MAX_PLAYERS_PER_ROOM,
         botSeatsAvailable: MAX_PLAYERS_PER_ROOM - seatedPlayers,
         createdAt: room.createdAt.toISOString()
