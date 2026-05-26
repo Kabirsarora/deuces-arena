@@ -44,3 +44,7 @@ npm run typecheck
 npm run test
 npm run build
 ```
+
+## Deployment
+
+See [docs/deployment.md](docs/deployment.md) for web, server, database, and environment variable deployment notes.
