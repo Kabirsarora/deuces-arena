@@ -9,11 +9,19 @@ Deuces Arena is split into separately deployable web, server, and database piece
 - Database: use PostgreSQL through Neon, Supabase, or another managed provider.
 - Redis: add later for cross-instance rooms, matchmaking, and presence when one server process is no longer enough.
 
+Recommended free/low-cost path:
+
+- Vercel for `apps/web`.
+- Render, Railway, or Fly.io for `apps/server`.
+- Neon or Supabase for PostgreSQL.
+- Upstash Redis later, only after room state moves beyond a single server process.
+
 ## Required Environment Variables
 
 Web:
 
 ```bash
+NEXT_PUBLIC_APP_URL="https://your-web-app.example.com"
 NEXT_PUBLIC_SERVER_URL="https://your-server.example.com"
 ```
 
@@ -25,7 +33,14 @@ CLIENT_ORIGIN="https://your-web-app.example.com"
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/deuces_arena"
 ```
 
-The app can run without `DATABASE_URL`, but match history, move persistence, and durable guest stats require PostgreSQL.
+ML export scripts:
+
+```bash
+COACH_EVALUATION_EXPORT_PATH="artifacts/coach-evaluations.jsonl"
+COACH_EVALUATION_EXPORT_LIMIT="1000"
+```
+
+The app can run without `DATABASE_URL`, but match history, move persistence, durable guest stats, coach-evaluation persistence, and earned cosmetic unlocks require PostgreSQL.
 
 ## Build Commands
 
@@ -47,6 +62,14 @@ Server build:
 npm run build --workspace @deuces-arena/server
 ```
 
+Provider notes:
+
+- Vercel root directory: `apps/web`.
+- Vercel build command: `npm run build --workspace @deuces-arena/web`.
+- Vercel install command: `npm ci`.
+- Render/Railway/Fly build command: `npm ci && npm run build --workspace @deuces-arena/server`.
+- Render/Railway/Fly start command: `npm run start --workspace @deuces-arena/server`.
+
 ## Start Commands
 
 Web hosts usually run Next.js automatically after build.
@@ -54,7 +77,7 @@ Web hosts usually run Next.js automatically after build.
 Server:
 
 ```bash
-node apps/server/dist/index.js
+npm run start --workspace @deuces-arena/server
 ```
 
 ## Database Migration
@@ -64,7 +87,10 @@ Run this after setting `DATABASE_URL`:
 ```bash
 npm run db:generate --workspace @deuces-arena/db
 npm run db:migrate --workspace @deuces-arena/db
+npm run db:seed --workspace @deuces-arena/db
 ```
+
+Run migrations from a trusted machine or CI job with database access. Do not run destructive migration resets against production.
 
 ## Production Notes
 
@@ -72,3 +98,6 @@ npm run db:migrate --workspace @deuces-arena/db
 - Set `CLIENT_ORIGIN` to the exact deployed web origin before enabling public traffic.
 - Use one server instance until Redis-backed presence and room state are added.
 - Do not claim the bot or coach is AI until recommendations are grounded in simulations or model outputs.
+- Enable HTTPS for both web and server origins; browsers require secure contexts for production WebSocket usage in most deployments.
+- Keep `DATABASE_URL`, future auth secrets, and future Stripe keys out of client-exposed `NEXT_PUBLIC_*` variables.
+- If the server provider sleeps free instances, the first connection after idle may be slow. That is acceptable for a demo but should be disclosed in the README once deployed.

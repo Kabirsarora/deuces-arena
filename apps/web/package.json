@@ -9,6 +9,7 @@
     "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
     "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
     "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared",
+    "start": "next start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
