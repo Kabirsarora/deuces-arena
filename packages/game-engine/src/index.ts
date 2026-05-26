@@ -55,9 +55,14 @@ export { createReplayTimeline } from "./replay.js";
 
 export type { ReplayTimelineItem } from "./replay.js";
 
-export { evaluateMoveByRandomRollouts, simulateRandomPlayout } from "./simulation.js";
+export {
+  evaluateLegalMovesByRandomRollouts,
+  evaluateMoveByRandomRollouts,
+  simulateRandomPlayout
+} from "./simulation.js";
 
 export type {
+  LegalMoveEvaluationInput,
   MoveEvaluation,
   MoveEvaluationInput,
   PlayoutResult,

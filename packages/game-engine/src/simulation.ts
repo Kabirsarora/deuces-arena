@@ -34,6 +34,15 @@ export type MoveEvaluation = {
   readonly averagePlacement: number;
 };
 
+export type LegalMoveEvaluationInput = {
+  readonly state: GameState;
+  readonly playerId: string;
+  readonly rolloutsPerMove: number;
+  readonly maxMoves?: number;
+  readonly random?: () => number;
+  readonly maxTurnsPerRollout?: number;
+};
+
 const DEFAULT_MAX_TURNS = 500;
 
 export function simulateRandomPlayout(input: RandomPlayoutInput): PlayoutResult {
@@ -111,6 +120,52 @@ export function evaluateMoveByRandomRollouts(input: MoveEvaluationInput): MoveEv
   };
 }
 
+export function evaluateLegalMovesByRandomRollouts(
+  input: LegalMoveEvaluationInput
+): readonly MoveEvaluation[] {
+  if (input.rolloutsPerMove <= 0) {
+    throw new Error("Legal move evaluation requires at least one rollout per move.");
+  }
+
+  if (input.state.activePlayerId !== input.playerId) {
+    throw new Error("Legal move evaluation can only run for the active player.");
+  }
+
+  const player = input.state.players.find((candidate) => candidate.id === input.playerId);
+
+  if (player === undefined) {
+    throw new Error("Unknown player.");
+  }
+
+  const legalMoves = generateLegalMoves(player.hand, {
+    isFirstMove: input.state.turnNumber === 0,
+    currentTrick: input.state.currentTrick
+  });
+  const movesToEvaluate =
+    input.maxMoves === undefined ? legalMoves : legalMoves.slice(0, Math.max(0, input.maxMoves));
+
+  return movesToEvaluate
+    .map((move) =>
+      evaluateMoveByRandomRollouts({
+        state: input.state,
+        playerId: input.playerId,
+        move,
+        rollouts: input.rolloutsPerMove,
+        ...(input.random === undefined
+          ? {}
+          : {
+              random: input.random
+            }),
+        ...(input.maxTurnsPerRollout === undefined
+          ? {}
+          : {
+              maxTurnsPerRollout: input.maxTurnsPerRollout
+            })
+      })
+    )
+    .sort(compareMoveEvaluations);
+}
+
 function chooseRandomMove(moves: readonly Move[], random: () => number): Move {
   if (moves.length === 0) {
     return {
@@ -124,6 +179,22 @@ function chooseRandomMove(moves: readonly Move[], random: () => number): Move {
       type: "pass"
     }
   );
+}
+
+function compareMoveEvaluations(left: MoveEvaluation, right: MoveEvaluation): number {
+  if (right.winRate !== left.winRate) {
+    return right.winRate - left.winRate;
+  }
+
+  if (left.averagePlacement !== right.averagePlacement) {
+    return left.averagePlacement - right.averagePlacement;
+  }
+
+  return getMoveCardCount(right.move) - getMoveCardCount(left.move);
+}
+
+function getMoveCardCount(move: Move): number {
+  return move.type === "pass" ? 0 : move.cards.length;
 }
 
 function inferPlacements(state: GameState): readonly string[] {

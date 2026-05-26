@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createCard, type GameState } from "./index.js";
-import { evaluateMoveByRandomRollouts, simulateRandomPlayout } from "./simulation.js";
+import {
+  evaluateLegalMovesByRandomRollouts,
+  evaluateMoveByRandomRollouts,
+  simulateRandomPlayout
+} from "./simulation.js";
 
 describe("simulation", () => {
   it("simulates a playout from a game state", () => {
@@ -48,6 +52,33 @@ describe("simulation", () => {
         rollouts: 1
       })
     ).toThrow("The first move cannot be a pass.");
+  });
+
+  it("ranks legal moves by simulated outcome", () => {
+    const evaluations = evaluateLegalMovesByRandomRollouts({
+      state: oneCardWinState(),
+      playerId: "player-1",
+      rolloutsPerMove: 3,
+      random: () => 0
+    });
+
+    expect(evaluations).toHaveLength(1);
+    expect(evaluations[0]).toMatchObject({
+      rollouts: 3,
+      wins: 3,
+      winRate: 1,
+      averagePlacement: 1
+    });
+  });
+
+  it("rejects legal move ranking for inactive players", () => {
+    expect(() =>
+      evaluateLegalMovesByRandomRollouts({
+        state: oneCardWinState(),
+        playerId: "player-2",
+        rolloutsPerMove: 1
+      })
+    ).toThrow("Legal move evaluation can only run for the active player.");
   });
 });
 
