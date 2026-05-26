@@ -84,6 +84,14 @@ export type PublicChatMessage = {
   readonly createdAt: string;
 };
 
+export type PublicMoveEvaluation = {
+  readonly move: Move;
+  readonly rollouts: number;
+  readonly wins: number;
+  readonly winRate: number;
+  readonly averagePlacement: number;
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly status: RoomStatus;
@@ -189,6 +197,10 @@ export type ClientToServerEvents = {
   "chat:send": (
     payload: ChatPayload,
     callback: (ack: ServerAck<PublicChatMessage>) => void
+  ) => void;
+  "coach:evaluate": (
+    payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number },
+    callback: (ack: ServerAck<readonly PublicMoveEvaluation[]>) => void
   ) => void;
 };
 

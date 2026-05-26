@@ -6,6 +6,7 @@ import {
   calculatePlacementRatingChanges,
   createDeck,
   createInitialGame,
+  evaluateLegalMovesByRandomRollouts,
   summarizeGame,
   type Card,
   type GameState,
@@ -19,6 +20,7 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicMoveEvaluation,
   PublicRoomPlayer,
   PublicRoomState,
   RoomReplayExport,
@@ -388,6 +390,29 @@ io.on("connection", (socket) => {
     room.chatMessages = [...room.chatMessages, message].slice(-MAX_CHAT_MESSAGES_PER_ROOM);
     callback(ok(message));
     io.to(room.code).emit("chat:message", message);
+  });
+
+  socket.on("coach:evaluate", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined || room.game === null) {
+      callback(fail("Game not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.game.activePlayerId !== player.id) {
+      callback(fail("Move evaluation is only available on your turn."));
+      return;
+    }
+
+    callback(ok(publicMoveEvaluations(room.game, player.id, payload.rollouts, payload.maxMoves)));
   });
 
   socket.on("disconnect", () => {
@@ -848,6 +873,31 @@ async function publicMatchHistory(
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .slice(0, historyLimit)
     .map((room) => toInMemoryMatchHistoryItem(room, guestId));
+}
+
+function publicMoveEvaluations(
+  game: GameState,
+  playerId: string,
+  rollouts: number | undefined,
+  maxMoves: number | undefined
+): readonly PublicMoveEvaluation[] {
+  return evaluateLegalMovesByRandomRollouts({
+    state: game,
+    playerId,
+    rolloutsPerMove: clampInteger(rollouts ?? 8, 1, 25),
+    maxMoves: clampInteger(maxMoves ?? 12, 1, 25),
+    maxTurnsPerRollout: 300
+  }).map((evaluation) => ({
+    move: evaluation.move,
+    rollouts: evaluation.rollouts,
+    wins: evaluation.wins,
+    winRate: evaluation.winRate,
+    averagePlacement: evaluation.averagePlacement
+  }));
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(Math.trunc(value), max));
 }
 
 function toInMemoryMatchHistoryItem(room: Room, guestId: string): PublicMatchHistoryItem {

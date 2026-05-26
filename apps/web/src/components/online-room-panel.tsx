@@ -14,6 +14,7 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicMoveEvaluation,
   PublicOpenRoom,
   PublicRoomPlayer,
   PublicRoomState,
@@ -59,6 +60,7 @@ export function OnlineRoomPanel() {
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
+  const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -181,6 +183,10 @@ export function OnlineRoomPanel() {
       refreshMatchHistory(socketRef.current, setMatchHistory);
     }
   }, [room]);
+
+  useEffect(() => {
+    setMoveEvaluations([]);
+  }, [room?.turnNumber, room?.roomCode]);
 
   function createRoom() {
     socketRef.current?.emit(
@@ -342,6 +348,25 @@ export function OnlineRoomPanel() {
     });
   }
 
+  function evaluateMoves() {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit(
+      "coach:evaluate",
+      { roomCode: room.roomCode, rollouts: 8, maxMoves: 12 },
+      (ack) => {
+        if (ack.ok) {
+          setMoveEvaluations(ack.data);
+          setMessage("Move lab updated from random rollouts.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
     setSelectedCardIds((current) =>
@@ -484,7 +509,13 @@ export function OnlineRoomPanel() {
         <section className="grid gap-3">
           <div className="grid gap-3 xl:grid-cols-[1fr_18rem]">
             <OnlineTable room={room} />
-            <OnlineMoveTracker room={room} onSendChat={sendChat} />
+            <OnlineMoveTracker
+              room={room}
+              moveEvaluations={moveEvaluations}
+              canEvaluate={isYourTurn}
+              onEvaluateMoves={evaluateMoves}
+              onSendChat={sendChat}
+            />
           </div>
 
           <section className="rounded-md border border-white/10 bg-black/28 p-3 shadow-2xl backdrop-blur">
@@ -849,9 +880,15 @@ function ProfileMetric({
 
 function OnlineMoveTracker({
   room,
+  moveEvaluations,
+  canEvaluate,
+  onEvaluateMoves,
   onSendChat
 }: {
   readonly room: PublicRoomState | null;
+  readonly moveEvaluations: readonly PublicMoveEvaluation[];
+  readonly canEvaluate: boolean;
+  readonly onEvaluateMoves: () => void;
   readonly onSendChat: (body: string) => void;
 }) {
   const recentEvents = createReplayTimeline(room?.recentEvents ?? [])
@@ -916,8 +953,71 @@ function OnlineMoveTracker({
         )}
       </div>
 
+      <MoveLab
+        evaluations={moveEvaluations}
+        disabled={!canEvaluate}
+        onEvaluateMoves={onEvaluateMoves}
+      />
+
       <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
     </aside>
+  );
+}
+
+function MoveLab({
+  evaluations,
+  disabled,
+  onEvaluateMoves
+}: {
+  readonly evaluations: readonly PublicMoveEvaluation[];
+  readonly disabled: boolean;
+  readonly onEvaluateMoves: () => void;
+}) {
+  return (
+    <details className="mt-3 rounded-md border border-white/10 bg-black/20 p-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
+        <span className="flex items-center gap-2">
+          <Gauge className="size-3.5 text-[var(--aqua)]" />
+          Move Lab
+        </span>
+        <span className="text-[10px] font-normal text-zinc-500">rollouts</span>
+      </summary>
+
+      <Button
+        className="mt-3 w-full"
+        size="sm"
+        variant="secondary"
+        disabled={disabled}
+        onClick={onEvaluateMoves}
+      >
+        Analyze Legal Moves
+      </Button>
+
+      <div className="mt-2 grid gap-2">
+        {evaluations.length === 0 ? (
+          <p className="rounded-md border border-white/10 bg-white/7 px-2 py-2 text-xs text-zinc-500">
+            Run analysis on your turn to rank legal moves with random simulations.
+          </p>
+        ) : (
+          evaluations.slice(0, 3).map((evaluation, index) => (
+            <div
+              key={`${index}-${formatMove(evaluation.move)}`}
+              className="rounded-md border border-white/10 bg-white/7 px-2 py-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-xs font-bold">{formatMove(evaluation.move)}</p>
+                <span className="rounded-md bg-black/24 px-2 py-1 text-[10px] text-zinc-300">
+                  {(evaluation.winRate * 100).toFixed(0)}%
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-zinc-400">
+                Avg place {evaluation.averagePlacement.toFixed(2)} · {evaluation.rollouts} rollouts
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -1107,6 +1207,10 @@ function formatHandType(type: string): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatMove(move: Move): string {
+  return move.type === "pass" ? "Pass" : move.cards.map(formatCard).join(" ");
 }
 
 function formatRatingDelta(delta: number | null): string {
