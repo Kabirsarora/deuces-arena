@@ -391,7 +391,7 @@ export function OnlineRoomPanel() {
   return (
     <main className="min-h-screen px-3 py-16 text-white sm:px-5 lg:px-8">
       <section className="mx-auto grid w-full max-w-7xl gap-3 lg:grid-cols-[24rem_1fr]">
-        <aside className="rounded-md border border-white/10 bg-black/28 p-4 shadow-2xl backdrop-blur">
+        <aside className="hud-glass rounded-[1.5rem] border border-white/10 p-4 backdrop-blur">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase text-[var(--aqua)]">Online Rooms</p>
@@ -399,7 +399,7 @@ export function OnlineRoomPanel() {
             </div>
             <span
               className={cn(
-                "rounded-md px-2 py-1 text-xs font-bold",
+                "rounded-full px-2 py-1 text-xs font-bold",
                 connected ? "bg-emerald-400/15 text-emerald-200" : "bg-red-400/15 text-red-200"
               )}
             >
@@ -410,7 +410,7 @@ export function OnlineRoomPanel() {
           <label className="mb-3 block text-xs font-bold text-zinc-300">
             Display name
             <input
-              className="mt-1 h-10 w-full rounded-md border border-white/10 bg-white/8 px-3 text-sm text-white outline-none focus:border-[var(--gold)]"
+              className="mt-1 h-10 w-full rounded-full border border-white/10 bg-white/8 px-3 text-sm text-white outline-none focus:border-[var(--gold)]"
               value={playerName}
               onChange={(event) => setPlayerName(event.target.value)}
             />
@@ -433,7 +433,7 @@ export function OnlineRoomPanel() {
             </Button>
             <div className="flex gap-2">
               <input
-                className="h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-white/8 px-3 text-sm uppercase text-white outline-none focus:border-[var(--gold)]"
+                className="h-10 min-w-0 flex-1 rounded-full border border-white/10 bg-white/8 px-3 text-sm uppercase text-white outline-none focus:border-[var(--gold)]"
                 placeholder="Room code"
                 value={joinCode}
                 onChange={(event) => setJoinCode(event.target.value)}
@@ -449,7 +449,7 @@ export function OnlineRoomPanel() {
           </div>
 
           {room !== null ? (
-            <div className="mt-4 rounded-md border border-white/10 bg-white/7 p-3">
+            <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-white/7 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-xs text-zinc-400">Room code</p>
@@ -501,7 +501,7 @@ export function OnlineRoomPanel() {
             </div>
           ) : null}
 
-          <p className="mt-4 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-300">
+          <p className="mt-4 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-300">
             {message}
           </p>
         </aside>
@@ -518,7 +518,7 @@ export function OnlineRoomPanel() {
             />
           </div>
 
-          <section className="rounded-md border border-white/10 bg-black/28 p-3 shadow-2xl backdrop-blur">
+          <section className="hand-dock border border-white/10 p-3 shadow-2xl backdrop-blur">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold">Your Hand</p>
@@ -680,13 +680,13 @@ function refreshMatchHistory(
 
 function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
   return (
-    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-bold">
           <Trophy className="size-4 text-[var(--gold)]" />
           Guest Profile
         </p>
-        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
           {profile?.rating ?? 1000}
         </span>
       </div>
@@ -708,27 +708,27 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
 
 function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMatchHistoryItem[] }) {
   return (
-    <details className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
         <span className="flex items-center gap-2">
           <History className="size-4 text-[var(--aqua)]" />
           Recent Matches
         </span>
-        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
           {entries.length}
         </span>
       </summary>
 
       <div className="mt-3 grid gap-2">
         {entries.length === 0 ? (
-          <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
             Completed online matches will appear here.
           </p>
         ) : (
           entries.map((entry) => (
             <div
               key={entry.matchId}
-              className="rounded-md border border-white/10 bg-white/7 px-2 py-2"
+              className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-bold">
@@ -775,13 +775,13 @@ function LobbySummary({
   const openRooms = lobby?.openRooms ?? [];
 
   return (
-    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-bold">
           <CircleDot className="size-4 text-emerald-300" />
           Live Lobby
         </p>
-        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
           {activity?.connectedUsers ?? 0} online
         </span>
       </div>
@@ -794,7 +794,7 @@ function LobbySummary({
 
       <div className="mt-2 grid gap-2">
         {openRooms.length === 0 ? (
-          <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
             No open rooms right now.
           </p>
         ) : (
@@ -802,7 +802,7 @@ function LobbySummary({
             <button
               key={openRoom.roomCode}
               type="button"
-              className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/7 px-2 py-2 text-left transition hover:border-[var(--gold)] hover:bg-white/10 disabled:cursor-default disabled:opacity-50"
+              className="flex items-center justify-between gap-2 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2 text-left transition hover:border-[var(--gold)] hover:bg-white/10 disabled:cursor-default disabled:opacity-50"
               disabled={!connected || currentRoomCode === openRoom.roomCode}
               onClick={() => onJoinRoom(openRoom)}
             >
@@ -823,18 +823,18 @@ function LobbySummary({
 
 function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLeaderboardEntry[] }) {
   return (
-    <section className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-bold">
           <ListOrdered className="size-4 text-[var(--aqua)]" />
           Leaderboard
         </p>
-        <span className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
           Rating
         </span>
       </div>
       {entries.length === 0 ? (
-        <p className="rounded-md border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+        <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
           No rated games yet.
         </p>
       ) : (
@@ -842,7 +842,7 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
           {entries.map((entry, index) => (
             <li
               key={entry.guestId}
-              className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/7 px-2 py-2"
+              className="flex items-center justify-between gap-2 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
             >
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold">
@@ -852,7 +852,7 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
                   {entry.wins} wins · {entry.gamesPlayed} games
                 </p>
               </div>
-              <span className="shrink-0 rounded-md bg-black/24 px-2 py-1 text-xs font-black">
+              <span className="shrink-0 rounded-full bg-black/24 px-2 py-1 text-xs font-black">
                 {entry.rating}
               </span>
             </li>
@@ -871,7 +871,7 @@ function ProfileMetric({
   readonly value: number | string;
 }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/7 px-2 py-2">
+    <div className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2">
       <p className="text-base font-black">{value}</p>
       <p className="text-[11px] text-zinc-400">{label}</p>
     </div>
@@ -896,62 +896,78 @@ function OnlineMoveTracker({
     .reverse();
 
   return (
-    <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <aside className="hud-glass flex min-h-64 flex-col rounded-[1.25rem] border border-white/10 p-3 backdrop-blur">
+      <div className="flex items-center justify-between gap-2">
         <div>
           <p className="flex items-center gap-2 text-sm font-bold">
             <History className="size-4 text-[var(--aqua)]" />
-            Room Tracker
+            Table Tools
           </p>
           <p className="text-xs text-zinc-400">{room?.recentEvents.length ?? 0} synced events</p>
         </div>
-        <div className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+        <div className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
           {room?.status ?? "idle"}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {(room?.players ?? []).map((player) => (
-          <OnlinePlayerStat key={player.id} player={player} />
-        ))}
-      </div>
+      <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
+          Players
+          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-normal text-zinc-400">
+            {room?.players.length ?? 0}
+          </span>
+        </summary>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {(room?.players ?? []).map((player) => (
+            <OnlinePlayerStat key={player.id} player={player} />
+          ))}
+        </div>
+      </details>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/20">
-        {recentEvents.length === 0 ? (
-          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
-            Accepted moves will stream here.
-          </div>
-        ) : (
-          <ol className="max-h-52 overflow-y-auto p-2">
-            {recentEvents.map((event) => (
-              <li
-                key={`${event.turnNumber}-${event.playerId}`}
-                className="mb-2 rounded-md border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold">
-                      {getRoomPlayerName(room, event.playerId)}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-300">
-                      {event.kind === "pass"
-                        ? "Passed"
-                        : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
-                    </p>
+      <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
+          Replay Log
+          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-normal text-zinc-400">
+            Open
+          </span>
+        </summary>
+        <div className="mt-2 min-h-0 flex-1 overflow-hidden rounded-[0.9rem] border border-white/10 bg-black/20">
+          {recentEvents.length === 0 ? (
+            <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
+              Accepted moves will stream here.
+            </div>
+          ) : (
+            <ol className="max-h-52 overflow-y-auto p-2">
+              {recentEvents.map((event) => (
+                <li
+                  key={`${event.turnNumber}-${event.playerId}`}
+                  className="mb-2 rounded-[0.9rem] border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold">
+                        {getRoomPlayerName(room, event.playerId)}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-300">
+                        {event.kind === "pass"
+                          ? "Passed"
+                          : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                      #{event.turnNumber + 1}
+                    </span>
                   </div>
-                  <span className="rounded-sm bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                    #{event.turnNumber + 1}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
-                  <Activity className="size-3" />
-                  {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
+                    <Activity className="size-3" />
+                    {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </details>
 
       <MoveLab
         evaluations={moveEvaluations}
@@ -974,7 +990,7 @@ function MoveLab({
   readonly onEvaluateMoves: () => void;
 }) {
   return (
-    <details className="mt-3 rounded-md border border-white/10 bg-black/20 p-2">
+    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
         <span className="flex items-center gap-2">
           <Gauge className="size-3.5 text-[var(--aqua)]" />
@@ -995,18 +1011,18 @@ function MoveLab({
 
       <div className="mt-2 grid gap-2">
         {evaluations.length === 0 ? (
-          <p className="rounded-md border border-white/10 bg-white/7 px-2 py-2 text-xs text-zinc-500">
+          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2 text-xs text-zinc-500">
             Run analysis on your turn to rank legal moves with random simulations.
           </p>
         ) : (
           evaluations.slice(0, 3).map((evaluation, index) => (
             <div
               key={`${index}-${formatMove(evaluation.move)}`}
-              className="rounded-md border border-white/10 bg-white/7 px-2 py-2"
+              className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
             >
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-xs font-bold">{formatMove(evaluation.move)}</p>
-                <span className="rounded-md bg-black/24 px-2 py-1 text-[10px] text-zinc-300">
+                <span className="rounded-full bg-black/24 px-2 py-1 text-[10px] text-zinc-300">
                   {(evaluation.winRate * 100).toFixed(0)}%
                 </span>
               </div>
@@ -1044,7 +1060,7 @@ function RoomChat({
   }
 
   return (
-    <div className="mt-3 rounded-md border border-white/10 bg-black/20 p-2">
+    <div className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-xs font-bold">
           <MessageCircle className="size-3.5 text-[var(--gold)]" />
@@ -1070,7 +1086,7 @@ function RoomChat({
 
       <form className="mt-2 flex gap-2" onSubmit={submitChat}>
         <input
-          className="h-9 min-w-0 flex-1 rounded-md border border-white/10 bg-white/7 px-2 text-xs text-white outline-none focus:border-[var(--gold)]"
+          className="h-9 min-w-0 flex-1 rounded-full border border-white/10 bg-white/7 px-2 text-xs text-white outline-none focus:border-[var(--gold)]"
           maxLength={240}
           placeholder={disabled ? "Join a room to chat" : "Message"}
           value={draft}
@@ -1087,7 +1103,7 @@ function RoomChat({
 
 function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/7 p-2">
+    <div className="rounded-[0.9rem] border border-white/10 bg-white/7 p-2">
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-xs font-bold">{player.name}</p>
         <span
@@ -1109,54 +1125,112 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
 }
 
 function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
+  const players = room?.players ?? [];
+
   return (
-    <section className="table-felt min-h-[28rem] rounded-md border border-white/10 p-4 shadow-2xl">
-      <div className="grid gap-3 md:grid-cols-4">
-        {(room?.players ?? []).map((player) => (
-          <div
-            key={player.id}
-            className={cn(
-              "rounded-md border p-3",
-              room?.activePlayerId === player.id
-                ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)]"
-                : "border-white/10 bg-black/24"
-            )}
-          >
-            <p className="truncate text-sm font-bold">{player.name}</p>
-            <p className="text-xs text-zinc-400">
-              {player.kind} · {player.cardsRemaining} cards ·{" "}
-              {player.stats === null ? "unrated" : `${player.stats.wins} wins`} ·{" "}
-              {player.connected ? "connected" : "away"} · {player.ready ? "ready" : "not ready"}
-            </p>
-          </div>
-        ))}
-      </div>
+    <section className="table-felt table-oval relative min-h-[32rem] overflow-hidden border border-white/10 p-4">
+      <div className="absolute inset-4 rounded-[44%/18%] border border-white/8" />
+      <div className="absolute inset-10 rounded-full border border-white/8" />
 
-      <div className="mt-8 grid place-items-center text-center">
-        <p className="text-xs font-semibold uppercase text-zinc-400">Current Trick</p>
-        <h2 className="mt-1 text-xl font-black">
-          {room?.currentTrick === null || room === null
-            ? "Open table"
-            : room.currentTrick.hand.type}
-        </h2>
-        <div className="mt-4 flex min-h-24 flex-wrap justify-center gap-2">
-          <AnimatePresence mode="popLayout">
-            {room?.currentTrick?.hand.cards.map((card) => (
-              <OnlineCard key={getCardId(card)} card={card} compact />
-            ))}
-          </AnimatePresence>
+      {players.length === 0 ? (
+        <div className="absolute inset-x-5 top-5 z-10 rounded-full border border-dashed border-white/15 bg-black/18 px-4 py-3 text-center text-sm text-zinc-300">
+          Create or join a room to take a seat.
         </div>
+      ) : (
+        players
+          .slice(0, 4)
+          .map((player, index) => (
+            <OnlineSeat
+              key={player.id}
+              player={player}
+              active={room?.activePlayerId === player.id}
+              position={index}
+            />
+          ))
+      )}
 
-        {room?.status === "complete" ? (
-          <div className="mt-5 rounded-md border border-[var(--gold)] bg-black/28 px-4 py-3">
-            <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
-              <Sparkles className="size-4" />
-              {getRoomPlayerName(room, room.placements[0] ?? "")} wins
-            </p>
+      <div className="relative z-10 grid min-h-[28rem] place-items-center text-center">
+        <div>
+          <p className="text-xs font-semibold uppercase text-zinc-400">Current Trick</p>
+          <h2 className="mt-1 text-xl font-black">
+            {room?.currentTrick === null || room === null
+              ? "Open table"
+              : room.currentTrick.hand.type}
+          </h2>
+          <div className="mt-4 flex min-h-24 flex-wrap justify-center gap-2">
+            <AnimatePresence mode="popLayout">
+              {room?.currentTrick === null || room === null ? (
+                <motion.div
+                  className="rounded-full border border-dashed border-white/18 bg-black/18 px-5 py-6 text-sm text-zinc-300"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                >
+                  Waiting for the next lead.
+                </motion.div>
+              ) : (
+                room.currentTrick.hand.cards.map((card) => (
+                  <OnlineCard key={getCardId(card)} card={card} compact />
+                ))
+              )}
+            </AnimatePresence>
           </div>
-        ) : null}
+
+          {room?.status === "complete" ? (
+            <div className="mt-5 rounded-full border border-[var(--gold)] bg-black/28 px-4 py-3">
+              <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
+                <Sparkles className="size-4" />
+                {getRoomPlayerName(room, room.placements[0] ?? "")} wins
+              </p>
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
+  );
+}
+
+function OnlineSeat({
+  player,
+  active,
+  position
+}: {
+  readonly player: PublicRoomPlayer;
+  readonly active: boolean;
+  readonly position: number;
+}) {
+  const seatPosition = [
+    "left-1/2 top-4 -translate-x-1/2",
+    "left-4 top-1/2 -translate-y-1/2",
+    "right-4 top-1/2 -translate-y-1/2",
+    "bottom-4 left-1/2 -translate-x-1/2"
+  ][position];
+
+  return (
+    <div
+      className={cn(
+        "seat-panel absolute z-20 flex w-[min(17rem,calc(100%-2rem))] items-center justify-between gap-3 border px-3 py-2",
+        seatPosition,
+        active
+          ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
+          : "border-white/10"
+      )}
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm font-bold">{player.name}</p>
+        <p className="text-xs text-zinc-400">
+          {player.cardsRemaining} cards · {player.connected ? "online" : "away"}
+        </p>
+      </div>
+      <span
+        className={cn(
+          "rounded-full px-2 py-1 text-[10px] font-black",
+          player.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/7 text-zinc-300"
+        )}
+      >
+        {player.ready ? "Ready" : player.kind}
+      </span>
+    </div>
   );
 }
 
