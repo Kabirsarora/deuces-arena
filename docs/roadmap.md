@@ -39,8 +39,8 @@
 
 - Add simple placement-based rating.
 - Add leaderboards and ranked history.
-- Add simulation-based move evaluation.
-- Add self-play data generation and future ML model hooks.
+- Add simulation-based move evaluation and exportable coach-evaluation records.
+- Add self-play data generation, JSONL exports, and future ML model hooks.
 - Add AI coach only when explanations can be grounded in analysis.
 
 ## Phase 7: Cosmetics and Supporter Features
