@@ -465,6 +465,25 @@ httpServer.listen(PORT, () => {
 
 export { app, httpServer, io };
 
+process.once("SIGINT", () => closeServer("SIGINT"));
+process.once("SIGTERM", () => closeServer("SIGTERM"));
+
+let isClosing = false;
+
+function closeServer(signal: NodeJS.Signals): void {
+  if (isClosing) {
+    return;
+  }
+
+  isClosing = true;
+  console.log(`Received ${signal}. Closing Deuces Arena server.`);
+  io.close(() => {
+    httpServer.close(() => {
+      process.exit(0);
+    });
+  });
+}
+
 function createRoom(playerName: string, socketId: string, guestId: string | undefined): Room {
   const code = createRoomCode();
   const room: Room = {
