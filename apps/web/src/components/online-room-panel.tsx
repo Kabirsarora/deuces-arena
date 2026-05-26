@@ -1282,6 +1282,8 @@ function RoomChat({
 }
 
 function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
+  const equippedCount = player.equippedCosmetics.length;
+
   return (
     <div className="rounded-[0.9rem] border border-white/10 bg-white/7 p-2">
       <div className="flex items-center justify-between gap-2">
@@ -1299,6 +1301,7 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
           {player.stats === null ? player.kind : `${player.stats.rating} rating`} ·{" "}
           {player.ready ? "ready" : "not ready"}
         </span>
+        {equippedCount > 0 ? <span>{equippedCount} cosmetic loadout</span> : null}
       </div>
     </div>
   );
@@ -1379,6 +1382,7 @@ function OnlineSeat({
   readonly active: boolean;
   readonly position: number;
 }) {
+  const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
   const seatPosition = [
     "left-1/2 top-4 -translate-x-1/2",
     "left-4 top-1/2 -translate-y-1/2",
@@ -1393,7 +1397,9 @@ function OnlineSeat({
         seatPosition,
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
-          : "border-white/10"
+          : profileBorder !== null
+            ? "border-[var(--gold)]/55"
+            : "border-white/10"
       )}
     >
       <div className="min-w-0">
@@ -1411,6 +1417,13 @@ function OnlineSeat({
         {player.ready ? "Ready" : player.kind}
       </span>
     </div>
+  );
+}
+
+function getEquippedCosmetic(player: PublicRoomPlayer, kind: PublicCosmetic["kind"]) {
+  return (
+    player.equippedCosmetics.find((equippedCosmetic) => equippedCosmetic.kind === kind)?.cosmetic ??
+    null
   );
 }
 

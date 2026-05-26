@@ -18,6 +18,7 @@ import type {
   PublicChatMessage,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
+  PublicEquippedCosmetic,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -115,6 +116,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
 ];
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
+const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGIN }));
@@ -370,7 +372,9 @@ io.on("connection", (socket) => {
     const result = await equipPersistedCosmetic(guestId, cosmeticId);
 
     if (result.ok) {
+      guestEquippedCosmetics.set(guestId, result.profile.equippedCosmetics);
       callback(ok(result.profile));
+      emitRoomStatesForGuest(guestId);
       return;
     }
 
@@ -792,7 +796,9 @@ function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
             wins: profile.wins,
             averagePlacement:
               profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
-          }
+          },
+    equippedCosmetics:
+      player.guestId === null ? [] : (guestEquippedCosmetics.get(player.guestId) ?? [])
   };
 }
 
@@ -806,6 +812,14 @@ function emitRoomState(room: Room): void {
 
 function emitLobbyState(): void {
   io.emit("lobby:state", publicLobbyState());
+}
+
+function emitRoomStatesForGuest(guestId: string): void {
+  for (const room of rooms.values()) {
+    if (room.players.some((player) => player.guestId === guestId)) {
+      emitRoomState(room);
+    }
+  }
 }
 
 function publicLobbyState(): PublicLobbyState {
@@ -923,6 +937,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
       persistedProfile.averagePlacement === null
         ? 0
         : persistedProfile.averagePlacement * persistedProfile.gamesPlayed;
+    guestEquippedCosmetics.set(guestId, persistedProfile.equippedCosmetics);
 
     return persistedProfile;
   }

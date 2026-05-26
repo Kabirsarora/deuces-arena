@@ -126,6 +126,7 @@ describe("realtime rooms", () => {
     expect(createdRoom.data.players).toHaveLength(1);
     expect(createdRoom.data.yourPlayerId).toBe("player-1");
     expect(createdRoom.data.yourHand).toHaveLength(0);
+    expect(createdRoom.data.players[0]?.equippedCosmetics).toEqual([]);
 
     const lobby = await emitLobbyGet(host);
 

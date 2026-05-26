@@ -107,6 +107,7 @@ export type PublicRoomPlayer = {
   readonly ready: boolean;
   readonly cardsRemaining: number;
   readonly stats: PublicPlayerStats | null;
+  readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };
 
 export type PublicChatMessage = {
