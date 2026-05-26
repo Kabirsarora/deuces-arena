@@ -915,7 +915,9 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     gamesPlayed: profile.gamesPlayed,
     wins: profile.wins,
     averagePlacement:
-      profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
+      profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed,
+    unlocks: [],
+    equippedCosmetics: []
   };
 }
 

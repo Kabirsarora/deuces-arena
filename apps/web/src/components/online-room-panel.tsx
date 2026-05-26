@@ -179,14 +179,16 @@ export function OnlineRoomPanel() {
 
     setProfile({
       guestId: getOrCreateGuestId(),
-      ...player.stats
+      ...player.stats,
+      unlocks: profile?.unlocks ?? [],
+      equippedCosmetics: profile?.equippedCosmetics ?? []
     });
 
     if (room.status === "complete" && socketRef.current !== null) {
       refreshLeaderboard(socketRef.current, setLeaderboard);
       refreshMatchHistory(socketRef.current, setMatchHistory);
     }
-  }, [room]);
+  }, [profile?.equippedCosmetics, profile?.unlocks, room]);
 
   useEffect(() => {
     setMoveEvaluations([]);
@@ -429,7 +431,7 @@ export function OnlineRoomPanel() {
             currentRoomCode={room?.roomCode ?? null}
           />
           <LeaderboardSummary entries={leaderboard} />
-          <CosmeticsSummary cosmetics={cosmetics} />
+          <CosmeticsSummary cosmetics={cosmetics} profile={profile} />
 
           <div className="grid gap-2">
             <Button onClick={createRoom} disabled={!connected}>
@@ -879,8 +881,18 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
   );
 }
 
-function CosmeticsSummary({ cosmetics }: { readonly cosmetics: readonly PublicCosmetic[] }) {
+function CosmeticsSummary({
+  cosmetics,
+  profile
+}: {
+  readonly cosmetics: readonly PublicCosmetic[];
+  readonly profile: PublicGuestProfile | null;
+}) {
   const visibleCosmetics = cosmetics.slice(0, 4);
+  const unlockedIds = new Set(profile?.unlocks.map((unlock) => unlock.cosmetic.id) ?? []);
+  const equippedIds = new Set(
+    profile?.equippedCosmetics.map((equippedCosmetic) => equippedCosmetic.cosmetic.id) ?? []
+  );
 
   return (
     <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -908,17 +920,29 @@ function CosmeticsSummary({ cosmetics }: { readonly cosmetics: readonly PublicCo
               <CosmeticPreview cosmetic={cosmetic} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-bold">{cosmetic.name}</p>
-                <p className="text-[11px] text-zinc-400">{formatCosmeticKind(cosmetic.kind)}</p>
+                <p className="text-[11px] text-zinc-400">
+                  {formatCosmeticKind(cosmetic.kind)} · {getCosmeticOwnershipLabel(cosmetic)}
+                </p>
               </div>
               <span
                 className={cn(
                   "shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase",
-                  cosmetic.isSupporter
-                    ? "bg-[var(--gold)]/18 text-[var(--gold)]"
-                    : "bg-white/8 text-zinc-300"
+                  equippedIds.has(cosmetic.id)
+                    ? "bg-emerald-400/15 text-emerald-200"
+                    : unlockedIds.has(cosmetic.id)
+                      ? "bg-[var(--aqua)]/16 text-[var(--aqua)]"
+                      : cosmetic.isSupporter
+                        ? "bg-[var(--gold)]/18 text-[var(--gold)]"
+                        : "bg-white/8 text-zinc-300"
                 )}
               >
-                {cosmetic.isSupporter ? "Supporter" : cosmetic.rarity}
+                {equippedIds.has(cosmetic.id)
+                  ? "Equipped"
+                  : unlockedIds.has(cosmetic.id)
+                    ? "Owned"
+                    : cosmetic.isSupporter
+                      ? "Supporter"
+                      : cosmetic.rarity}
               </span>
             </div>
           ))
@@ -926,6 +950,14 @@ function CosmeticsSummary({ cosmetics }: { readonly cosmetics: readonly PublicCo
       </div>
     </details>
   );
+}
+
+function getCosmeticOwnershipLabel(cosmetic: PublicCosmetic): string {
+  if (cosmetic.isSupporter) {
+    return "supporter";
+  }
+
+  return cosmetic.rarity;
 }
 
 function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {

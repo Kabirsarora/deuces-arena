@@ -20,6 +20,8 @@ export type PublicPlayerStats = {
 
 export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
+  readonly unlocks: readonly PublicCosmeticUnlock[];
+  readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };
 
 export type PublicLeaderboardEntry = PublicPlayerStats & {

@@ -114,7 +114,49 @@ export async function getPersistedGuestProfile(
         rating: true,
         gamesPlayed: true,
         wins: true,
-        placementTotal: true
+        placementTotal: true,
+        cosmeticUnlocks: {
+          orderBy: {
+            earnedAt: "desc"
+          },
+          select: {
+            source: true,
+            earnedAt: true,
+            cosmetic: {
+              select: {
+                id: true,
+                slug: true,
+                kind: true,
+                name: true,
+                description: true,
+                rarity: true,
+                isSupporter: true,
+                previewUrl: true
+              }
+            }
+          }
+        },
+        equippedCosmetics: {
+          orderBy: {
+            equippedAt: "desc"
+          },
+          select: {
+            kind: true,
+            equippedAt: true,
+            cosmetic: {
+              select: {
+                id: true,
+                slug: true,
+                kind: true,
+                name: true,
+                description: true,
+                rarity: true,
+                isSupporter: true,
+                previewUrl: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -127,7 +169,17 @@ export async function getPersistedGuestProfile(
       rating: user.rating,
       gamesPlayed: user.gamesPlayed,
       wins: user.wins,
-      averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed
+      averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed,
+      unlocks: user.cosmeticUnlocks.map((unlock) => ({
+        cosmetic: unlock.cosmetic,
+        source: unlock.source,
+        earnedAt: unlock.earnedAt.toISOString()
+      })),
+      equippedCosmetics: user.equippedCosmetics.map((equippedCosmetic) => ({
+        kind: equippedCosmetic.kind,
+        cosmetic: equippedCosmetic.cosmetic,
+        equippedAt: equippedCosmetic.equippedAt.toISOString()
+      }))
     };
   } catch (error) {
     console.error("Unable to read guest profile.", error);

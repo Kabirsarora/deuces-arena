@@ -9,6 +9,7 @@ import type {
   JoinRoomPayload,
   PublicChatMessage,
   PublicCosmetic,
+  PublicGuestProfile,
   PublicLobbyState,
   PublicMoveEvaluation,
   PublicRoomState,
@@ -54,6 +55,21 @@ afterAll(async () => {
 });
 
 describe("realtime rooms", () => {
+  it("returns cosmetic ownership fields with guest profiles", async () => {
+    const socket = await connectTestSocket();
+    const profile = await getProfile(socket, "guest-profile-cosmetics");
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.guestId).toBe("guest-profile-cosmetics");
+    expect(profile.data.unlocks).toEqual([]);
+    expect(profile.data.equippedCosmetics).toEqual([]);
+  });
+
   it("serves the cosmetic catalog over REST and Socket.IO", async () => {
     const socket = await connectTestSocket();
     const socketCatalog = await listCosmetics(socket);
@@ -395,6 +411,14 @@ function sendChat(socket: TestSocket, payload: ChatPayload): Promise<ServerAck<P
 function listCosmetics(socket: TestSocket): Promise<ServerAck<readonly PublicCosmetic[]>> {
   return new Promise((resolve) => {
     socket.emit("cosmetics:list", (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function getProfile(socket: TestSocket, guestId: string): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("profile:get", { guestId }, (ack) => {
       resolve(ack);
     });
   });
