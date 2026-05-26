@@ -33,7 +33,9 @@ const PLAYER_NAMES: Record<string, string> = {
 const BOT_DELAY_MS = 620;
 
 export function LocalGameTable() {
-  const [game, setGame] = useState<GameState>(() => createInitialGame(PLAYER_IDS, shuffleDeck()));
+  const [game, setGame] = useState<GameState>(() =>
+    createInitialGame(PLAYER_IDS, shuffleDeck(createSeededRandom(20260526)))
+  );
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState(
     "Win by shedding every card before the table catches you."
@@ -220,46 +222,50 @@ function MoveTracker({ game }: { readonly game: GameState }) {
   const recentEvents = createReplayTimeline(game.events).slice(-6).reverse();
 
   return (
-    <aside className="flex min-h-64 flex-col rounded-md border border-white/10 bg-black/24 p-3 shadow-2xl backdrop-blur">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-bold">
-            <History className="size-4 text-[var(--aqua)]" />
-            Move Tracker
-          </p>
-          <p className="text-xs text-zinc-400">{game.events.length} recorded events</p>
-        </div>
-        <div className="rounded-md border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {game.status}
-        </div>
-      </div>
+    <aside className="hud-glass rounded-[1.25rem] border border-white/10 p-3 backdrop-blur">
+      <details>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <span>
+            <span className="flex items-center gap-2 text-sm font-bold">
+              <History className="size-4 text-[var(--aqua)]" />
+              Replay Log
+            </span>
+            <span className="mt-1 block text-xs text-zinc-400">
+              {game.events.length} events · {game.status}
+            </span>
+          </span>
+          <span className="rounded-full border border-white/10 px-2 py-1 text-[11px] text-zinc-300">
+            Open
+          </span>
+        </summary>
 
-      <div className="grid grid-cols-2 gap-2">
-        {summaries.map((summary) => (
-          <PlayerStat key={summary.playerId} summary={summary} />
-        ))}
-      </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {summaries.map((summary) => (
+            <PlayerStat key={summary.playerId} summary={summary} />
+          ))}
+        </div>
 
-      <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-md border border-white/10 bg-black/20">
-        {recentEvents.length === 0 ? (
-          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
-            Moves will appear here as the table develops.
-          </div>
-        ) : (
-          <ol className="max-h-52 overflow-y-auto p-2">
-            {recentEvents.map((event) => (
-              <MoveEventRow key={`${event.turnNumber}-${event.playerId}`} event={event} />
-            ))}
-          </ol>
-        )}
-      </div>
+        <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-[1rem] border border-white/10 bg-black/20">
+          {recentEvents.length === 0 ? (
+            <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
+              Moves will appear here as the table develops.
+            </div>
+          ) : (
+            <ol className="max-h-52 overflow-y-auto p-2">
+              {recentEvents.map((event) => (
+                <MoveEventRow key={`${event.turnNumber}-${event.playerId}`} event={event} />
+              ))}
+            </ol>
+          )}
+        </div>
+      </details>
     </aside>
   );
 }
 
 function PlayerStat({ summary }: { readonly summary: PlayerGameSummary }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/7 p-2">
+    <div className="rounded-[0.9rem] border border-white/10 bg-white/7 p-2">
       <p className="truncate text-xs font-bold">{PLAYER_NAMES[summary.playerId]}</p>
       <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-zinc-400">
         <span>{summary.cardsRemaining} cards</span>
@@ -273,7 +279,7 @@ function PlayerStat({ summary }: { readonly summary: PlayerGameSummary }) {
 
 function MoveEventRow({ event }: { readonly event: ReplayTimelineItem }) {
   return (
-    <li className="mb-2 rounded-md border border-white/10 bg-white/6 px-2 py-2 last:mb-0">
+    <li className="mb-2 rounded-[0.9rem] border border-white/10 bg-white/6 px-2 py-2 last:mb-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-bold">{PLAYER_NAMES[event.playerId]}</p>
@@ -305,17 +311,17 @@ function TopBar({
   readonly onReset: () => void;
 }) {
   return (
-    <header className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/28 px-3 py-3 shadow-2xl backdrop-blur">
+    <header className="hud-glass flex items-center justify-between gap-3 rounded-full border border-white/10 px-3 py-3 backdrop-blur">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase text-[var(--aqua)]">Deuces Arena</p>
         <h1 className="truncate text-xl font-black sm:text-2xl">Local Table</h1>
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="hidden rounded-md border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 sm:block">
+        <div className="hidden rounded-full border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 sm:block">
           <span className="text-zinc-400">Turn</span> {game.turnNumber + 1}
         </div>
-        <div className="hidden rounded-md border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 md:block">
+        <div className="hidden rounded-full border border-white/10 bg-white/7 px-3 py-2 text-sm text-zinc-200 md:block">
           {PLAYER_NAMES[game.activePlayerId]} to move
         </div>
         <Button variant="secondary" size="sm" onClick={onExportReplay}>
@@ -345,7 +351,7 @@ function OpponentPanel({
   return (
     <div
       className={cn(
-        "flex min-h-24 flex-1 items-center justify-between gap-3 rounded-md border px-3 py-3 transition",
+        "seat-panel flex min-h-24 flex-1 items-center justify-between gap-3 border px-3 py-3 transition",
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.12)]"
           : "border-white/10 bg-white/7",
@@ -353,7 +359,7 @@ function OpponentPanel({
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="relative grid size-11 place-items-center rounded-md border border-white/10 bg-black/36">
+        <div className="relative grid size-11 place-items-center rounded-full border border-white/10 bg-black/36">
           <Bot className="size-5 text-[var(--aqua)]" />
           {active ? (
             <span className="absolute -right-1 -top-1 size-3 rounded-full bg-[var(--gold)] shadow-[0_0_16px_rgba(242,193,78,0.8)]" />
@@ -402,11 +408,11 @@ function TableCenter({
   return (
     <section
       className={cn(
-        "table-felt relative grid min-h-[20rem] place-items-center overflow-hidden rounded-md border border-[var(--felt-line)] p-4 shadow-[0_28px_80px_rgba(0,0,0,0.45)]",
+        "table-felt table-oval relative grid min-h-[20rem] place-items-center overflow-hidden border border-[var(--felt-line)] p-4",
         className
       )}
     >
-      <div className="absolute inset-3 rounded-md border border-white/8" />
+      <div className="absolute inset-4 rounded-[44%/18%] border border-white/8" />
       <div className="absolute inset-8 rounded-full border border-white/8" />
       <div className="absolute inset-x-8 top-1/2 h-px bg-white/8" />
       <div className="relative z-10 flex w-full max-w-xl flex-col items-center gap-5 text-center">
@@ -423,7 +429,7 @@ function TableCenter({
           <AnimatePresence mode="popLayout">
             {trick === null ? (
               <motion.div
-                className="rounded-md border border-dashed border-white/18 bg-black/18 px-4 py-6 text-sm text-zinc-300"
+                className="rounded-full border border-dashed border-white/18 bg-black/18 px-5 py-6 text-sm text-zinc-300"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
@@ -436,12 +442,12 @@ function TableCenter({
           </AnimatePresence>
         </div>
 
-        <div className="rounded-md border border-white/10 bg-black/24 px-4 py-2">
+        <div className="rounded-full border border-white/10 bg-black/24 px-4 py-2">
           <p className="min-h-6 max-w-lg text-sm text-zinc-200">{message}</p>
         </div>
 
         {game.status === "complete" ? (
-          <div className="rounded-md border border-[var(--gold)] bg-black/28 px-4 py-3">
+          <div className="rounded-full border border-[var(--gold)] bg-black/28 px-4 py-3">
             <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
               <Sparkles className="size-4" />
               {PLAYER_NAMES[game.placements[0] ?? "you"]} wins
@@ -485,7 +491,7 @@ function HumanHand({
   return (
     <section
       className={cn(
-        "rounded-md border bg-black/26 p-3 shadow-2xl backdrop-blur",
+        "hand-dock border p-3 shadow-2xl backdrop-blur",
         active ? "border-[var(--gold)]" : "border-white/10",
         className
       )}
@@ -604,11 +610,11 @@ function getPlayer(game: GameState, playerId: string): PlayerState {
   return player;
 }
 
-function shuffleDeck(): Card[] {
+function shuffleDeck(random: () => number = Math.random): Card[] {
   const deck = createDeck();
 
   for (let index = deck.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(random() * (index + 1));
     const current = deck[index];
     const swap = deck[swapIndex];
 
@@ -619,6 +625,15 @@ function shuffleDeck(): Card[] {
   }
 
   return deck;
+}
+
+function createSeededRandom(seed: number): () => number {
+  let state = seed;
+
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
 }
 
 function describeMove(playerId: string, move: Move): string {

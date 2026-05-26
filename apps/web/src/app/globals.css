@@ -57,10 +57,42 @@ textarea {
 
 .table-felt {
   background:
-    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.08), transparent 16rem),
+    radial-gradient(ellipse at 50% 45%, rgba(255, 255, 255, 0.09), transparent 18rem),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 18px),
     repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.08) 0 1px, transparent 1px 20px),
     radial-gradient(circle at center, var(--table) 0%, var(--table-deep) 78%);
+}
+
+.table-oval {
+  border-radius: 45% / 18%;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 12px rgba(0, 0, 0, 0.16),
+    0 30px 90px rgba(0, 0, 0, 0.48);
+}
+
+.seat-panel {
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04)),
+    rgba(6, 9, 12, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 42px rgba(0, 0, 0, 0.24);
+}
+
+.hand-dock {
+  border-radius: 2rem 2rem 1rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(5, 7, 10, 0.58);
+}
+
+.hud-glass {
+  background: rgba(5, 7, 10, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 56px rgba(0, 0, 0, 0.28);
 }
 
 .card-back {
