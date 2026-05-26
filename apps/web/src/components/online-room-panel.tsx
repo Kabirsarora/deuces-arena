@@ -31,6 +31,7 @@ import {
   Gauge,
   History,
   ListOrdered,
+  LogOut,
   MessageCircle,
   Play,
   Send,
@@ -234,6 +235,24 @@ export function OnlineRoomPanel() {
       if (ack.ok) {
         setRoom(ack.data);
         setMessage(ready ? "You are ready." : "You are no longer ready.");
+      } else {
+        setMessage(ack.error);
+      }
+    });
+  }
+
+  function leaveRoom() {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit("room:leave", { roomCode: room.roomCode }, (ack) => {
+      if (ack.ok) {
+        setRoom(null);
+        setSelectedCardIds([]);
+        removeRoomSession();
+        clearRoomCodeFromUrl();
+        setMessage("Left room.");
       } else {
         setMessage(ack.error);
       }
@@ -450,6 +469,10 @@ export function OnlineRoomPanel() {
                 <Download className="size-4" />
                 Export Replay
               </Button>
+              <Button className="mt-2 w-full" variant="secondary" onClick={leaveRoom}>
+                <LogOut className="size-4" />
+                Leave Room
+              </Button>
             </div>
           ) : null}
 
@@ -526,6 +549,10 @@ function saveRoomSession(room: PublicRoomState): void {
   );
 }
 
+function removeRoomSession(): void {
+  window.localStorage.removeItem(ROOM_SESSION_KEY);
+}
+
 function loadRoomSession(): { readonly roomCode: string; readonly playerId: string } | null {
   const rawSession = window.localStorage.getItem(ROOM_SESSION_KEY);
 
@@ -566,6 +593,12 @@ function getRoomInviteUrl(roomCode: string): string {
 function syncRoomCodeToUrl(roomCode: string): void {
   const url = new URL(window.location.href);
   url.searchParams.set("room", roomCode);
+  window.history.replaceState(null, "", url.toString());
+}
+
+function clearRoomCodeFromUrl(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("room");
   window.history.replaceState(null, "", url.toString());
 }
 

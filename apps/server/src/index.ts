@@ -257,6 +257,27 @@ io.on("connection", (socket) => {
     emitLobbyState();
   });
 
+  socket.on("room:leave", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    leaveRoom(room, player.id);
+    socket.leave(room.code);
+    socket.data = {};
+    callback(ok(undefined));
+  });
+
   socket.on("room:replay", (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -383,25 +404,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const nextPlayers = room.players.map((player) =>
-      player.id === playerId
-        ? {
-            ...player,
-            socketId: null,
-            ready: false
-          }
-        : player
-    );
-
-    if (room.game === null && nextPlayers.every((player) => player.socketId === null)) {
-      rooms.delete(room.code);
-      emitLobbyState();
-      return;
-    }
-
-    room.players = nextPlayers;
-    emitRoomState(room);
-    emitLobbyState();
+    leaveRoom(room, playerId);
   });
 });
 
@@ -433,6 +436,34 @@ function addHumanPlayer(
   const player = createHumanPlayer(playerName, socketId, room.players.length, guestId);
   room.players = [...room.players, player];
   return player;
+}
+
+function leaveRoom(room: Room, playerId: string): void {
+  if (room.game === null) {
+    room.players = room.players.filter((player) => player.id !== playerId);
+
+    if (room.players.length === 0) {
+      rooms.delete(room.code);
+      emitLobbyState();
+      return;
+    }
+
+    emitRoomState(room);
+    emitLobbyState();
+    return;
+  }
+
+  room.players = room.players.map((player) =>
+    player.id === playerId
+      ? {
+          ...player,
+          socketId: null,
+          ready: false
+        }
+      : player
+  );
+  emitRoomState(room);
+  emitLobbyState();
 }
 
 function createHumanPlayer(

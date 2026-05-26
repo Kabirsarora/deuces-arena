@@ -164,6 +164,10 @@ export type ClientToServerEvents = {
     payload: { readonly roomCode: string; readonly ready: boolean },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
+  "room:leave": (
+    payload: { readonly roomCode: string },
+    callback: (ack: ServerAck) => void
+  ) => void;
   "room:replay": (
     payload: { readonly roomCode: string },
     callback: (ack: ServerAck<RoomReplayExport>) => void
