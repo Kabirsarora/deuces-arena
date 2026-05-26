@@ -54,6 +54,7 @@ const GUEST_ID_KEY = "deuces-arena-guest-id";
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
+  const lastCompletionRefreshRef = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [playerName, setPlayerName] = useState("Player");
   const [joinCode, setJoinCode] = useState("");
@@ -116,11 +117,7 @@ export function OnlineRoomPanel() {
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
-      socket.emit("profile:get", { guestId: getOrCreateGuestId() }, (ack) => {
-        if (ack.ok) {
-          setProfile(ack.data);
-        }
-      });
+      refreshProfile(socket, setProfile);
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
       refreshMatchHistory(socket, setMatchHistory);
@@ -185,6 +182,14 @@ export function OnlineRoomPanel() {
     });
 
     if (room.status === "complete" && socketRef.current !== null) {
+      const completionKey = `${room.roomCode}:${room.turnNumber}`;
+
+      if (lastCompletionRefreshRef.current !== completionKey) {
+        lastCompletionRefreshRef.current = completionKey;
+        refreshProfile(socketRef.current, setProfile);
+        refreshCosmetics(socketRef.current, setCosmetics);
+      }
+
       refreshLeaderboard(socketRef.current, setLeaderboard);
       refreshMatchHistory(socketRef.current, setMatchHistory);
     }
@@ -670,6 +675,17 @@ function getOrCreateGuestId(): string {
   return guestId;
 }
 
+function refreshProfile(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setProfile: (profile: PublicGuestProfile) => void
+): void {
+  socket.emit("profile:get", { guestId: getOrCreateGuestId() }, (ack) => {
+    if (ack.ok) {
+      setProfile(ack.data);
+    }
+  });
+}
+
 function refreshLeaderboard(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   setLeaderboard: (entries: readonly PublicLeaderboardEntry[]) => void
@@ -737,6 +753,10 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
               : profile.averagePlacement.toFixed(2)
           }
         />
+      </div>
+      <div className="mt-2 flex items-center justify-between rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
+        <span className="text-zinc-400">Unlocked cosmetics</span>
+        <span className="font-black text-[var(--gold)]">{profile?.unlocks.length ?? 0}</span>
       </div>
     </section>
   );
