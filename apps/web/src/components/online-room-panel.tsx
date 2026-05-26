@@ -1329,9 +1329,17 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
 
 function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   const players = room?.players ?? [];
+  const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
+  const tableTheme =
+    yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
 
   return (
-    <section className="table-felt table-oval relative min-h-[32rem] overflow-hidden border border-white/10 p-4">
+    <section
+      className={cn(
+        "table-felt table-oval relative min-h-[32rem] overflow-hidden border border-white/10 p-4",
+        getTableThemeClass(tableTheme)
+      )}
+    >
       <div className="absolute inset-4 rounded-[44%/18%] border border-white/8" />
       <div className="absolute inset-10 rounded-full border border-white/8" />
 
@@ -1403,6 +1411,7 @@ function OnlineSeat({
   readonly position: number;
 }) {
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
+  const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = [
     "left-1/2 top-4 -translate-x-1/2",
     "left-4 top-1/2 -translate-y-1/2",
@@ -1428,14 +1437,43 @@ function OnlineSeat({
           {player.cardsRemaining} cards · {player.connected ? "online" : "away"}
         </p>
       </div>
-      <span
-        className={cn(
-          "rounded-full px-2 py-1 text-[10px] font-black",
-          player.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/7 text-zinc-300"
-        )}
-      >
-        {player.ready ? "Ready" : player.kind}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <OnlineMiniCardStack count={Math.min(player.cardsRemaining, 3)} cardBack={cardBack} />
+        <span
+          className={cn(
+            "rounded-full px-2 py-1 text-[10px] font-black",
+            player.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/7 text-zinc-300"
+          )}
+        >
+          {player.ready ? "Ready" : player.kind}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function OnlineMiniCardStack({
+  count,
+  cardBack
+}: {
+  readonly count: number;
+  readonly cardBack: PublicCosmetic | null;
+}) {
+  return (
+    <div className="relative hidden h-8 w-10 sm:block">
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={`online-card-back-${index}`}
+          className={cn(
+            "card-back absolute h-8 w-5 rounded-sm border border-white/15 shadow-lg",
+            getCardBackClass(cardBack)
+          )}
+          style={{
+            left: index * 7,
+            transform: `rotate(${(index - 1) * 5}deg)`
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -1445,6 +1483,22 @@ function getEquippedCosmetic(player: PublicRoomPlayer, kind: PublicCosmetic["kin
     player.equippedCosmetics.find((equippedCosmetic) => equippedCosmetic.kind === kind)?.cosmetic ??
     null
   );
+}
+
+function getTableThemeClass(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic?.slug === "midnight-felt-table") {
+    return "table-theme-midnight-felt";
+  }
+
+  return "";
+}
+
+function getCardBackClass(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic?.slug === "classic-red-card-back") {
+    return "card-back-classic-red";
+  }
+
+  return "";
 }
 
 function OnlineCard({

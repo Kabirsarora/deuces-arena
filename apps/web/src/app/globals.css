@@ -63,6 +63,13 @@ textarea {
     radial-gradient(circle at center, var(--table) 0%, var(--table-deep) 78%);
 }
 
+.table-theme-midnight-felt {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(61, 214, 208, 0.11), transparent 17rem),
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 16px),
+    radial-gradient(circle at 50% 55%, #12433a 0%, #061c18 76%);
+}
+
 .table-oval {
   border-radius: 45% / 18%;
   box-shadow:
@@ -100,4 +107,11 @@ textarea {
     radial-gradient(circle at center, rgba(255, 255, 255, 0.2), transparent 30%),
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 7px),
     linear-gradient(145deg, #163a5f, #0b1c33 58%, #35182d);
+}
+
+.card-back-classic-red {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22), transparent 28%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 7px),
+    linear-gradient(145deg, #f43f5e, #7f1d1d 62%, #2a0d14);
 }
