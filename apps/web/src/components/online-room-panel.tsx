@@ -87,6 +87,13 @@ export function OnlineRoomPanel() {
     room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
 
   useEffect(() => {
+    const inviteCode = getRoomCodeFromUrl();
+
+    if (inviteCode !== null) {
+      setJoinCode(inviteCode);
+      setMessage(`Invite loaded for room ${inviteCode}.`);
+    }
+
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
       autoConnect: true
     });
@@ -306,6 +313,7 @@ export function OnlineRoomPanel() {
         setRoom(ack.data);
         setSelectedCardIds([]);
         saveRoomSession(ack.data);
+        syncRoomCodeToUrl(ack.data.roomCode);
         setMessage(successMessage);
       } else {
         setMessage(ack.error);
@@ -383,13 +391,27 @@ export function OnlineRoomPanel() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => void navigator.clipboard?.writeText(room.roomCode)}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(room.roomCode);
+                    setMessage("Room code copied.");
+                  }}
                 >
                   <Copy className="size-4" />
                 </Button>
               </div>
               <Button
                 className="mt-3 w-full"
+                variant="secondary"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(getRoomInviteUrl(room.roomCode));
+                  setMessage("Invite link copied.");
+                }}
+              >
+                <Copy className="size-4" />
+                Copy Invite Link
+              </Button>
+              <Button
+                className="mt-2 w-full"
                 onClick={startRoom}
                 disabled={room.status !== "waiting"}
               >
@@ -500,6 +522,23 @@ function loadRoomSession(): { readonly roomCode: string; readonly playerId: stri
   }
 
   return null;
+}
+
+function getRoomCodeFromUrl(): string | null {
+  const roomCode = new URLSearchParams(window.location.search).get("room")?.trim().toUpperCase();
+  return roomCode === undefined || roomCode === "" ? null : roomCode;
+}
+
+function getRoomInviteUrl(roomCode: string): string {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomCode);
+  return url.toString();
+}
+
+function syncRoomCodeToUrl(roomCode: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomCode);
+  window.history.replaceState(null, "", url.toString());
 }
 
 function getOrCreateGuestId(): string {
