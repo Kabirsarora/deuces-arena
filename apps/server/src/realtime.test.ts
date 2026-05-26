@@ -9,7 +9,9 @@ import type {
   JoinRoomPayload,
   PublicChatMessage,
   PublicLobbyState,
+  PublicMoveEvaluation,
   PublicRoomState,
+  RoomReplayExport,
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
@@ -191,6 +193,113 @@ describe("realtime rooms", () => {
     expect(broadcast.body).toBe("hello **** table");
     expect(broadcast.playerName).toBe("Host");
   });
+
+  it("only evaluates moves for the active player and includes coach records in replay export", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Expected four connected sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Coach Host",
+      guestId: "guest-coach-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRooms = await Promise.all([
+      joinRoom(second, {
+        roomCode,
+        playerName: "Coach Two",
+        guestId: "guest-coach-two"
+      }),
+      joinRoom(third, {
+        roomCode,
+        playerName: "Coach Three",
+        guestId: "guest-coach-three"
+      }),
+      joinRoom(fourth, {
+        roomCode,
+        playerName: "Coach Four",
+        guestId: "guest-coach-four"
+      })
+    ]);
+
+    expect(joinedRooms.every((ack) => ack.ok)).toBe(true);
+
+    await Promise.all(players.map((socket) => setReady(socket, { roomCode, ready: true })));
+    const startedRoom = await startRoom(host, { roomCode });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok || startedRoom.data.activePlayerId === null) {
+      return;
+    }
+
+    const socketsByPlayerId = new Map<string, TestSocket>(
+      players.map((socket, index) => [`player-${index + 1}`, socket] as const)
+    );
+    const activeSocket = socketsByPlayerId.get(startedRoom.data.activePlayerId);
+    const inactiveSocket = players.find((socket) => socket !== activeSocket);
+
+    if (activeSocket === undefined || inactiveSocket === undefined) {
+      throw new Error("Unable to resolve active and inactive sockets.");
+    }
+
+    const inactiveEvaluation = await evaluateMoves(inactiveSocket, {
+      roomCode,
+      rollouts: 1,
+      maxMoves: 2
+    });
+
+    expect(inactiveEvaluation.ok).toBe(false);
+
+    if (inactiveEvaluation.ok) {
+      return;
+    }
+
+    expect(inactiveEvaluation.error).toContain("only available on your turn");
+
+    const activeEvaluation = await evaluateMoves(activeSocket, {
+      roomCode,
+      rollouts: 1,
+      maxMoves: 2
+    });
+
+    expect(activeEvaluation.ok).toBe(true);
+
+    if (!activeEvaluation.ok) {
+      return;
+    }
+
+    expect(activeEvaluation.data.length).toBeGreaterThan(0);
+    expect(activeEvaluation.data.length).toBeLessThanOrEqual(2);
+    expect(activeEvaluation.data[0]?.rollouts).toBe(1);
+
+    const replay = await exportReplay(activeSocket, { roomCode });
+
+    expect(replay.ok).toBe(true);
+
+    if (!replay.ok) {
+      return;
+    }
+
+    expect(replay.data.coachEvaluations).toHaveLength(1);
+    expect(replay.data.coachEvaluations[0]?.playerId).toBe(startedRoom.data.activePlayerId);
+    expect(replay.data.coachEvaluations[0]?.evaluations).toHaveLength(activeEvaluation.data.length);
+  });
 });
 
 async function connectTestSocket(): Promise<TestSocket> {
@@ -254,6 +363,28 @@ function setReady(
 function sendChat(socket: TestSocket, payload: ChatPayload): Promise<ServerAck<PublicChatMessage>> {
   return new Promise((resolve) => {
     socket.emit("chat:send", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function evaluateMoves(
+  socket: TestSocket,
+  payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number }
+): Promise<ServerAck<readonly PublicMoveEvaluation[]>> {
+  return new Promise((resolve) => {
+    socket.emit("coach:evaluate", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function exportReplay(
+  socket: TestSocket,
+  payload: { readonly roomCode: string }
+): Promise<ServerAck<RoomReplayExport>> {
+  return new Promise((resolve) => {
+    socket.emit("room:replay", payload, (ack) => {
       resolve(ack);
     });
   });
