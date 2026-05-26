@@ -55,6 +55,8 @@ npm run test
 npm run build
 ```
 
+Current automated coverage includes engine rule tests, chat sanitization tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, Move Lab authorization, and replay export of coach evaluations.
+
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for web, server, database, and environment variable deployment notes.
