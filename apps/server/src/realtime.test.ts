@@ -34,6 +34,7 @@ const sockets: TestSocket[] = [];
 beforeAll(async () => {
   process.env.PORT = "0";
   process.env.DATABASE_URL = "";
+  process.env.CLIENT_ORIGIN = "http://localhost:3000, https://preview.example.com ";
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -55,6 +56,16 @@ afterAll(async () => {
 });
 
 describe("realtime rooms", () => {
+  it("exposes configured client origins in health checks", async () => {
+    const response = await fetch(`${serverUrl}/health`);
+
+    expect(response.ok).toBe(true);
+
+    const health = (await response.json()) as { readonly allowedOrigins: readonly string[] };
+
+    expect(health.allowedOrigins).toEqual(["http://localhost:3000", "https://preview.example.com"]);
+  });
+
   it("returns cosmetic ownership fields with guest profiles", async () => {
     const socket = await connectTestSocket();
     const profile = await getProfile(socket, "guest-profile-cosmetics");

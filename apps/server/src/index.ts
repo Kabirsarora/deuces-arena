@@ -78,7 +78,7 @@ type Room = {
 };
 
 const PORT = Number(process.env.PORT ?? 4000);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
+const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
@@ -119,7 +119,7 @@ const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
 
 const app = express();
-app.use(cors({ origin: CLIENT_ORIGIN }));
+app.use(cors({ origin: CLIENT_ORIGINS }));
 app.use(express.json());
 
 app.get("/health", (_request, response) => {
@@ -127,6 +127,7 @@ app.get("/health", (_request, response) => {
     ok: true,
     service: "@deuces-arena/server",
     rooms: rooms.size,
+    allowedOrigins: CLIENT_ORIGINS,
     activity: publicLobbyState().activity
   });
 });
@@ -144,7 +145,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
   httpServer,
   {
     cors: {
-      origin: CLIENT_ORIGIN
+      origin: CLIENT_ORIGINS
     }
   }
 );
@@ -905,6 +906,16 @@ function isPlayerInRoom(room: Room, socketId: string): boolean {
 function normalizeGuestId(guestId: string | undefined): string | null {
   const normalized = guestId?.trim();
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 80);
+}
+
+function parseClientOrigins(value: string | undefined): string[] {
+  const origins =
+    value
+      ?.split(",")
+      .map((origin) => origin.trim())
+      .filter((origin) => origin !== "") ?? [];
+
+  return origins.length === 0 ? ["http://localhost:3000"] : origins;
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {

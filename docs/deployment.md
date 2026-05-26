@@ -33,6 +33,12 @@ CLIENT_ORIGIN="https://your-web-app.example.com"
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/deuces_arena"
 ```
 
+`CLIENT_ORIGIN` also accepts a comma-separated allowlist for deploy previews:
+
+```bash
+CLIENT_ORIGIN="https://deuces-arena.vercel.app,https://deuces-arena-git-preview.vercel.app"
+```
+
 ML export scripts:
 
 ```bash
@@ -95,7 +101,7 @@ Run migrations from a trusted machine or CI job with database access. Do not run
 ## Production Notes
 
 - Keep the server as the authority for all online moves.
-- Set `CLIENT_ORIGIN` to the exact deployed web origin before enabling public traffic.
+- Set `CLIENT_ORIGIN` to the exact deployed web origin, or a tight comma-separated allowlist, before enabling public traffic.
 - Use one server instance until Redis-backed presence and room state are added.
 - Do not claim the bot or coach is AI until recommendations are grounded in simulations or model outputs.
 - Enable HTTPS for both web and server origins; browsers require secure contexts for production WebSocket usage in most deployments.
