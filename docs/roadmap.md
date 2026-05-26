@@ -2,49 +2,56 @@
 
 ## Phase 1: Foundation
 
-- Configure monorepo tooling.
-- Add reusable TypeScript package boundaries.
-- Document architecture and mobile-transfer goals.
-- Configure formatting, linting, testing, and type checking.
+- Done: configure monorepo tooling.
+- Done: add reusable TypeScript package boundaries.
+- Done: document architecture and mobile-transfer goals.
+- Done: configure formatting, linting, testing, type checking, builds, and CI.
 
 ## Phase 2: Game Engine
 
-- Model cards, ranks, suits, and deck generation.
-- Implement card comparison with diamonds < clubs < hearts < spades and 3 < ... < A < 2.
-- Detect singles, pairs, trips, quads, full houses, straights, longer straights, and bombs.
-- Validate first move requiring the 3 of diamonds.
-- Implement trick state, passing, trick winners, turn rotation, legal move generation, and game winner logic.
-- Add heavy Vitest coverage.
+- Done: model cards, ranks, suits, and deck generation.
+- Done: implement card comparison with diamonds < clubs < hearts < spades and 3 < ... < A < 2.
+- Done: detect singles, pairs, trips, quads, full houses, straights, longer straights, and bombs.
+- Done: validate first move requiring the 3 of diamonds.
+- Done: implement trick state, passing, trick winners, turn rotation, legal move generation, and game winner logic.
+- Done: add heavy Vitest coverage.
 
 ## Phase 3: Local Play
 
-- Build mobile-first web table.
-- Add human vs baseline bots.
-- Use `random-legal`, `lowest-legal`, and `simple-heuristic` bots only as honest baselines, not as claimed AI.
-- Add polished card selection, trick display, turn indicator, and game over screen.
+- Done: build mobile-first web table.
+- Done: add human vs baseline bots.
+- Done: use `random-legal`, `lowest-legal`, and `simple-heuristic` bots only as honest baselines, not as claimed AI.
+- In progress: continue polishing table layout, card motion, and visual identity so the UI feels less generic.
 
 ## Phase 4: Online Multiplayer
 
-- Add rooms, lobby, ready states, reconnects, and room links.
-- Add Socket.IO event contracts and server-authoritative move validation.
-- Persist matches and moves.
+- Done: add rooms, lobby, ready states, reconnects, leave-room flow, and room links.
+- Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
+- Done: add Socket.IO event contracts and server-authoritative move validation.
+- Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
+- Next: add stronger disconnect/abandon handling and production rate limits.
 
 ## Phase 5: Accounts, Stats, and Replays
 
-- Add user accounts and guest play.
-- Store match history, move history, placements, bombs played, rating, and replay timelines.
-- Build profile and replay review screens.
+- Done: add guest profiles.
+- Done: store match history, move history, placements, bombs played, rating, cards remaining, and replay timelines.
+- Done: expose profile, leaderboard, match history, and replay export in the online UI.
+- Next: add full account auth, profile pages, and a richer replay review screen.
 
 ## Phase 6: Ranked and AI
 
-- Add simple placement-based rating.
-- Add leaderboards and ranked history.
-- Add simulation-based move evaluation and exportable coach-evaluation records.
-- Add self-play data generation, JSONL exports, and future ML model hooks.
-- Add AI coach only when explanations can be grounded in analysis.
+- Done: add simple placement-based rating.
+- Done: add leaderboard and match history foundations.
+- Done: add simulation-based move evaluation and exportable coach-evaluation records.
+- Done: add self-play data generation, JSONL exports, and future ML model hooks.
+- Next: split casual and ranked queues.
+- Next: add stronger Monte Carlo evaluators and replay-based mistake detection.
+- Later: add AI coach explanations only when grounded in legal moves, simulations, replay data, and model outputs.
 
 ## Phase 7: Cosmetics and Supporter Features
 
-- Add unlockable card backs, table themes, avatars, borders, badges, emotes, and win animations.
-- Keep all monetization non-pay-to-win.
-- Add Stripe support later for optional supporter features.
+- Done: add cosmetic schema, seed data, catalog API, profile unlocks, equipment validation, and public loadouts.
+- Done: add earned starter cosmetics after completed matches/wins.
+- Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
+- Next: make equipped card backs and table themes visibly alter the table.
+- Later: add Stripe support for optional supporter features.
