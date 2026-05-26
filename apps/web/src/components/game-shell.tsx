@@ -15,7 +15,7 @@ export function GameShell() {
 
   return (
     <div>
-      <div className="fixed left-1/2 top-3 z-50 flex -translate-x-1/2 rounded-md border border-white/10 bg-black/56 p-1 shadow-2xl backdrop-blur">
+      <div className="hud-glass fixed left-1/2 top-3 z-50 flex -translate-x-1/2 rounded-full border border-white/10 p-1 backdrop-blur">
         <ModeButton mode="local" activeMode={mode} onSelect={setMode} />
         <ModeButton mode="online" activeMode={mode} onSelect={setMode} />
       </div>
@@ -39,7 +39,7 @@ function ModeButton({
     <Button
       variant={active ? "primary" : "secondary"}
       size="sm"
-      className={cn("h-8 px-3", !active && "border-transparent bg-transparent")}
+      className={cn("h-8 rounded-full px-3", !active && "border-transparent bg-transparent")}
       onClick={() => onSelect(mode)}
     >
       {mode === "local" ? <MonitorSmartphone className="size-4" /> : <Radio className="size-4" />}
