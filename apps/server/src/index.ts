@@ -30,6 +30,7 @@ import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
 
+import { sanitizeChatMessage } from "./chat.js";
 import {
   completePersistedMatch,
   createPersistedMatch,
@@ -70,7 +71,6 @@ const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
-const MAX_CHAT_MESSAGE_LENGTH = 240;
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 
@@ -664,20 +664,6 @@ function isPlayerInRoom(room: Room, socketId: string): boolean {
 function normalizeGuestId(guestId: string | undefined): string | null {
   const normalized = guestId?.trim();
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 80);
-}
-
-function sanitizeChatMessage(body: string): string | null {
-  const trimmed = body.replace(/\s+/g, " ").trim().slice(0, MAX_CHAT_MESSAGE_LENGTH);
-
-  if (trimmed === "") {
-    return null;
-  }
-
-  const blockedWords = ["fuck", "shit", "bitch", "asshole", "slur"];
-  return blockedWords.reduce(
-    (message, word) => message.replace(new RegExp(`\\b${word}\\b`, "gi"), "****"),
-    trimmed
-  );
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {
