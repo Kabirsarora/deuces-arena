@@ -17,6 +17,7 @@ import type {
   InterServerEvents,
   PublicChatMessage,
   PublicCoachEvaluationRecord,
+  PublicCosmetic,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -37,6 +38,7 @@ import { sanitizeChatMessage } from "./chat.js";
 import {
   completePersistedMatch,
   createPersistedMatch,
+  getPersistedCosmetics,
   getPersistedGuestProfile,
   getPersistedLeaderboard,
   getPersistedMatchHistory,
@@ -78,6 +80,38 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
+const STARTER_COSMETICS: readonly PublicCosmetic[] = [
+  {
+    id: "starter-classic-red-card-back",
+    slug: "classic-red-card-back",
+    kind: "CARD_BACK",
+    name: "Classic Red",
+    description: "A clean starter card back for every table.",
+    rarity: "common",
+    isSupporter: false,
+    previewUrl: null
+  },
+  {
+    id: "starter-midnight-felt-table",
+    slug: "midnight-felt-table",
+    kind: "TABLE_THEME",
+    name: "Midnight Felt",
+    description: "The default dark table theme.",
+    rarity: "common",
+    isSupporter: false,
+    previewUrl: null
+  },
+  {
+    id: "starter-founder-gold-border",
+    slug: "founder-gold-border",
+    kind: "PROFILE_BORDER",
+    name: "Founder Gold",
+    description: "A future supporter profile border with no gameplay advantage.",
+    rarity: "supporter",
+    isSupporter: true,
+    previewUrl: null
+  }
+];
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 
@@ -96,6 +130,10 @@ app.get("/health", (_request, response) => {
 
 app.get("/lobby", (_request, response) => {
   response.json(publicLobbyState());
+});
+
+app.get("/cosmetics", async (_request, response) => {
+  response.json(await publicCosmetics());
 });
 
 const httpServer = createServer(app);
@@ -313,6 +351,10 @@ io.on("connection", (socket) => {
 
   socket.on("leaderboard:list", async (payload, callback) => {
     callback(ok(await publicLeaderboard(payload.limit)));
+  });
+
+  socket.on("cosmetics:list", async (callback) => {
+    callback(ok(await publicCosmetics()));
   });
 
   socket.on("profile:history", async (payload, callback) => {
@@ -900,6 +942,10 @@ async function publicLeaderboard(
       averagePlacement:
         profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
     }));
+}
+
+async function publicCosmetics(): Promise<readonly PublicCosmetic[]> {
+  return (await getPersistedCosmetics()) ?? STARTER_COSMETICS;
 }
 
 async function publicMatchHistory(

@@ -8,6 +8,7 @@ import type {
   CreateRoomPayload,
   JoinRoomPayload,
   PublicChatMessage,
+  PublicCosmetic,
   PublicLobbyState,
   PublicMoveEvaluation,
   PublicRoomState,
@@ -53,6 +54,29 @@ afterAll(async () => {
 });
 
 describe("realtime rooms", () => {
+  it("serves the cosmetic catalog over REST and Socket.IO", async () => {
+    const socket = await connectTestSocket();
+    const socketCatalog = await listCosmetics(socket);
+
+    expect(socketCatalog.ok).toBe(true);
+
+    if (!socketCatalog.ok) {
+      return;
+    }
+
+    expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("classic-red-card-back");
+    expect(socketCatalog.data.some((cosmetic) => cosmetic.isSupporter)).toBe(true);
+
+    const restResponse = await fetch(`${serverUrl}/cosmetics`);
+
+    expect(restResponse.ok).toBe(true);
+
+    const restCatalog = (await restResponse.json()) as PublicCosmetic[];
+    expect(restCatalog.map((cosmetic) => cosmetic.slug)).toEqual(
+      socketCatalog.data.map((cosmetic) => cosmetic.slug)
+    );
+  });
+
   it("creates rooms and exposes them through lobby activity", async () => {
     const host = await connectTestSocket();
     const createdRoom = await createRoom(host, {
@@ -363,6 +387,14 @@ function setReady(
 function sendChat(socket: TestSocket, payload: ChatPayload): Promise<ServerAck<PublicChatMessage>> {
   return new Promise((resolve) => {
     socket.emit("chat:send", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function listCosmetics(socket: TestSocket): Promise<ServerAck<readonly PublicCosmetic[]>> {
+  return new Promise((resolve) => {
+    socket.emit("cosmetics:list", (ack) => {
       resolve(ack);
     });
   });

@@ -10,6 +10,7 @@ import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
   PublicCoachEvaluationRecord,
+  PublicCosmetic,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicMatchHistoryItem
@@ -189,6 +190,48 @@ export async function getPersistedLeaderboard(
     );
   } catch (error) {
     console.error("Unable to read leaderboard.", error);
+    return null;
+  }
+}
+
+export async function getPersistedCosmetics(): Promise<readonly PublicCosmetic[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const cosmetics = await db.prisma.cosmetic.findMany({
+      where: {
+        isActive: true
+      },
+      orderBy: [
+        {
+          kind: "asc"
+        },
+        {
+          rarity: "asc"
+        },
+        {
+          name: "asc"
+        }
+      ],
+      select: {
+        id: true,
+        slug: true,
+        kind: true,
+        name: true,
+        description: true,
+        rarity: true,
+        isSupporter: true,
+        previewUrl: true
+      }
+    });
+
+    return cosmetics;
+  } catch (error) {
+    console.error("Unable to read cosmetics.", error);
     return null;
   }
 }
