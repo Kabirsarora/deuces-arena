@@ -10,6 +10,7 @@ import {
 import type {
   ClientToServerEvents,
   PublicChatMessage,
+  PublicCosmetic,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -34,6 +35,7 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  Palette,
   Play,
   Send,
   Sparkles,
@@ -60,6 +62,7 @@ export function OnlineRoomPanel() {
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
+  const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
@@ -121,6 +124,7 @@ export function OnlineRoomPanel() {
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
       refreshMatchHistory(socket, setMatchHistory);
+      refreshCosmetics(socket, setCosmetics);
       const session = loadRoomSession();
 
       if (session !== null) {
@@ -425,6 +429,7 @@ export function OnlineRoomPanel() {
             currentRoomCode={room?.roomCode ?? null}
           />
           <LeaderboardSummary entries={leaderboard} />
+          <CosmeticsSummary cosmetics={cosmetics} />
 
           <div className="grid gap-2">
             <Button onClick={createRoom} disabled={!connected}>
@@ -678,6 +683,17 @@ function refreshMatchHistory(
   });
 }
 
+function refreshCosmetics(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setCosmetics: (cosmetics: readonly PublicCosmetic[]) => void
+): void {
+  socket.emit("cosmetics:list", (ack) => {
+    if (ack.ok) {
+      setCosmetics(ack.data);
+    }
+  });
+}
+
 function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
   return (
     <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -861,6 +877,93 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
       )}
     </section>
   );
+}
+
+function CosmeticsSummary({ cosmetics }: { readonly cosmetics: readonly PublicCosmetic[] }) {
+  const visibleCosmetics = cosmetics.slice(0, 4);
+
+  return (
+    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
+        <span className="flex items-center gap-2">
+          <Palette className="size-4 text-[var(--gold)]" />
+          Cosmetics
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
+          {cosmetics.length}
+        </span>
+      </summary>
+
+      <div className="mt-3 grid gap-2">
+        {visibleCosmetics.length === 0 ? (
+          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+            Cosmetic catalog loads from the realtime server.
+          </p>
+        ) : (
+          visibleCosmetics.map((cosmetic) => (
+            <div
+              key={cosmetic.id}
+              className="flex items-center gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
+            >
+              <CosmeticPreview cosmetic={cosmetic} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold">{cosmetic.name}</p>
+                <p className="text-[11px] text-zinc-400">{formatCosmeticKind(cosmetic.kind)}</p>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase",
+                  cosmetic.isSupporter
+                    ? "bg-[var(--gold)]/18 text-[var(--gold)]"
+                    : "bg-white/8 text-zinc-300"
+                )}
+              >
+                {cosmetic.isSupporter ? "Supporter" : cosmetic.rarity}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </details>
+  );
+}
+
+function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
+  if (cosmetic.kind === "CARD_BACK") {
+    return (
+      <div className="grid h-12 w-9 shrink-0 place-items-center rounded-md border border-white/20 bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] shadow-lg">
+        <div className="h-7 w-4 rounded-sm border border-white/45" />
+      </div>
+    );
+  }
+
+  if (cosmetic.kind === "TABLE_THEME") {
+    return (
+      <div className="h-10 w-12 shrink-0 rounded-[50%] border border-emerald-200/25 bg-[radial-gradient(circle,#134e4a,#042f2e_70%)] shadow-lg" />
+    );
+  }
+
+  if (cosmetic.kind === "PROFILE_BORDER") {
+    return (
+      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[var(--gold)] bg-black/30 shadow-lg">
+        <Sparkles className="size-4 text-[var(--gold)]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-white/15 bg-white/8">
+      <Palette className="size-4 text-zinc-300" />
+    </div>
+  );
+}
+
+function formatCosmeticKind(kind: PublicCosmetic["kind"]): string {
+  return kind
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function ProfileMetric({
