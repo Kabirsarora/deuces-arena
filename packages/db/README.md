@@ -13,5 +13,6 @@ Prisma ORM 7 reads the connection URL from `prisma.config.ts`. Keep `DATABASE_UR
 ```bash
 npm run db:generate --workspace @deuces-arena/db
 npm run db:migrate --workspace @deuces-arena/db
+npm run db:seed --workspace @deuces-arena/db
 npm run db:studio --workspace @deuces-arena/db
 ```
