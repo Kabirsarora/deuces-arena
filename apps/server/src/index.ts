@@ -463,6 +463,8 @@ httpServer.listen(PORT, () => {
   console.log(`Deuces Arena server listening on http://localhost:${PORT}`);
 });
 
+export { app, httpServer, io };
+
 function createRoom(playerName: string, socketId: string, guestId: string | undefined): Room {
   const code = createRoomCode();
   const room: Room = {
