@@ -31,6 +31,16 @@ export type PersistedMatch = {
   readonly ratingBeforeByPlayerId: Readonly<Record<string, number>>;
 };
 
+export type EquipCosmeticResult =
+  | {
+      readonly ok: true;
+      readonly profile: PublicGuestProfile;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned";
+    };
+
 let dbModulePromise: Promise<typeof DbModule> | null = null;
 
 export async function createPersistedMatch(
@@ -285,6 +295,100 @@ export async function getPersistedCosmetics(): Promise<readonly PublicCosmetic[]
   } catch (error) {
     console.error("Unable to read cosmetics.", error);
     return null;
+  }
+}
+
+export async function equipPersistedCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<EquipCosmeticResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: {
+        guestId
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (user === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    const unlock = await db.prisma.userCosmeticUnlock.findFirst({
+      where: {
+        userId: user.id,
+        cosmeticId,
+        cosmetic: {
+          isActive: true
+        }
+      },
+      select: {
+        cosmetic: {
+          select: {
+            kind: true
+          }
+        }
+      }
+    });
+
+    if (unlock === null) {
+      return {
+        ok: false,
+        reason: "cosmetic-not-owned"
+      };
+    }
+
+    await db.prisma.userEquippedCosmetic.upsert({
+      where: {
+        userId_kind: {
+          userId: user.id,
+          kind: unlock.cosmetic.kind
+        }
+      },
+      create: {
+        userId: user.id,
+        cosmeticId,
+        kind: unlock.cosmetic.kind
+      },
+      update: {
+        cosmeticId,
+        equippedAt: new Date()
+      }
+    });
+
+    const profile = await getPersistedGuestProfile(guestId);
+
+    if (profile === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    return {
+      ok: true,
+      profile
+    };
+  } catch (error) {
+    console.error("Unable to equip cosmetic.", error);
+    return {
+      ok: false,
+      reason: "profile-not-found"
+    };
   }
 }
 

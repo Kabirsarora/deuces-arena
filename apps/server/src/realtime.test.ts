@@ -93,6 +93,22 @@ describe("realtime rooms", () => {
     );
   });
 
+  it("rejects cosmetic equip requests when persistence is unavailable", async () => {
+    const socket = await connectTestSocket();
+    const equipAck = await equipCosmetic(socket, {
+      guestId: "guest-profile-cosmetics",
+      cosmeticId: "starter-classic-red-card-back"
+    });
+
+    expect(equipAck.ok).toBe(false);
+
+    if (equipAck.ok) {
+      return;
+    }
+
+    expect(equipAck.error).toContain("database");
+  });
+
   it("creates rooms and exposes them through lobby activity", async () => {
     const host = await connectTestSocket();
     const createdRoom = await createRoom(host, {
@@ -419,6 +435,17 @@ function listCosmetics(socket: TestSocket): Promise<ServerAck<readonly PublicCos
 function getProfile(socket: TestSocket, guestId: string): Promise<ServerAck<PublicGuestProfile>> {
   return new Promise((resolve) => {
     socket.emit("profile:get", { guestId }, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function equipCosmetic(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly cosmeticId: string }
+): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("cosmetics:equip", payload, (ack) => {
       resolve(ack);
     });
   });

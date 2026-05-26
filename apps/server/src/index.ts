@@ -38,6 +38,7 @@ import { sanitizeChatMessage } from "./chat.js";
 import {
   completePersistedMatch,
   createPersistedMatch,
+  equipPersistedCosmetic,
   getPersistedCosmetics,
   getPersistedGuestProfile,
   getPersistedLeaderboard,
@@ -355,6 +356,25 @@ io.on("connection", (socket) => {
 
   socket.on("cosmetics:list", async (callback) => {
     callback(ok(await publicCosmetics()));
+  });
+
+  socket.on("cosmetics:equip", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const cosmeticId = payload.cosmeticId.trim();
+
+    if (guestId === null || cosmeticId === "") {
+      callback(fail("Cosmetic not found."));
+      return;
+    }
+
+    const result = await equipPersistedCosmetic(guestId, cosmeticId);
+
+    if (result.ok) {
+      callback(ok(result.profile));
+      return;
+    }
+
+    callback(fail(getEquipCosmeticError(result.reason)));
   });
 
   socket.on("profile:history", async (payload, callback) => {
@@ -948,6 +968,20 @@ async function publicLeaderboard(
 
 async function publicCosmetics(): Promise<readonly PublicCosmetic[]> {
   return (await getPersistedCosmetics()) ?? STARTER_COSMETICS;
+}
+
+function getEquipCosmeticError(
+  reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned"
+): string {
+  if (reason === "database-unavailable") {
+    return "Cosmetic equipment requires a connected database.";
+  }
+
+  if (reason === "profile-not-found") {
+    return "Guest profile not found.";
+  }
+
+  return "You have not unlocked this cosmetic.";
 }
 
 async function publicMatchHistory(

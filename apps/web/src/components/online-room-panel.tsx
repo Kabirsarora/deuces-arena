@@ -373,6 +373,24 @@ export function OnlineRoomPanel() {
     );
   }
 
+  function equipCosmetic(cosmetic: PublicCosmetic) {
+    socketRef.current?.emit(
+      "cosmetics:equip",
+      {
+        guestId: getOrCreateGuestId(),
+        cosmeticId: cosmetic.id
+      },
+      (ack) => {
+        if (ack.ok) {
+          setProfile(ack.data);
+          setMessage(`${cosmetic.name} equipped.`);
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
     setSelectedCardIds((current) =>
@@ -431,7 +449,7 @@ export function OnlineRoomPanel() {
             currentRoomCode={room?.roomCode ?? null}
           />
           <LeaderboardSummary entries={leaderboard} />
-          <CosmeticsSummary cosmetics={cosmetics} profile={profile} />
+          <CosmeticsSummary cosmetics={cosmetics} profile={profile} onEquip={equipCosmetic} />
 
           <div className="grid gap-2">
             <Button onClick={createRoom} disabled={!connected}>
@@ -883,10 +901,12 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
 
 function CosmeticsSummary({
   cosmetics,
-  profile
+  profile,
+  onEquip
 }: {
   readonly cosmetics: readonly PublicCosmetic[];
   readonly profile: PublicGuestProfile | null;
+  readonly onEquip: (cosmetic: PublicCosmetic) => void;
 }) {
   const visibleCosmetics = cosmetics.slice(0, 4);
   const unlockedIds = new Set(profile?.unlocks.map((unlock) => unlock.cosmetic.id) ?? []);
@@ -924,31 +944,56 @@ function CosmeticsSummary({
                   {formatCosmeticKind(cosmetic.kind)} · {getCosmeticOwnershipLabel(cosmetic)}
                 </p>
               </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase",
-                  equippedIds.has(cosmetic.id)
-                    ? "bg-emerald-400/15 text-emerald-200"
-                    : unlockedIds.has(cosmetic.id)
-                      ? "bg-[var(--aqua)]/16 text-[var(--aqua)]"
-                      : cosmetic.isSupporter
-                        ? "bg-[var(--gold)]/18 text-[var(--gold)]"
-                        : "bg-white/8 text-zinc-300"
-                )}
-              >
-                {equippedIds.has(cosmetic.id)
-                  ? "Equipped"
-                  : unlockedIds.has(cosmetic.id)
-                    ? "Owned"
-                    : cosmetic.isSupporter
-                      ? "Supporter"
-                      : cosmetic.rarity}
-              </span>
+              <CosmeticAction
+                cosmetic={cosmetic}
+                owned={unlockedIds.has(cosmetic.id)}
+                equipped={equippedIds.has(cosmetic.id)}
+                onEquip={onEquip}
+              />
             </div>
           ))
         )}
       </div>
     </details>
+  );
+}
+
+function CosmeticAction({
+  cosmetic,
+  owned,
+  equipped,
+  onEquip
+}: {
+  readonly cosmetic: PublicCosmetic;
+  readonly owned: boolean;
+  readonly equipped: boolean;
+  readonly onEquip: (cosmetic: PublicCosmetic) => void;
+}) {
+  if (equipped) {
+    return (
+      <span className="shrink-0 rounded-full bg-emerald-400/15 px-2 py-1 text-[10px] font-black uppercase text-emerald-200">
+        Equipped
+      </span>
+    );
+  }
+
+  if (owned) {
+    return (
+      <Button className="h-7 shrink-0 px-2 text-[10px]" size="sm" onClick={() => onEquip(cosmetic)}>
+        Equip
+      </Button>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase",
+        cosmetic.isSupporter ? "bg-[var(--gold)]/18 text-[var(--gold)]" : "bg-white/8 text-zinc-300"
+      )}
+    >
+      {cosmetic.isSupporter ? "Supporter" : cosmetic.rarity}
+    </span>
   );
 }
 

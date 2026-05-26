@@ -234,6 +234,10 @@ export type ClientToServerEvents = {
     callback: (ack: ServerAck<readonly PublicLeaderboardEntry[]>) => void
   ) => void;
   "cosmetics:list": (callback: (ack: ServerAck<readonly PublicCosmetic[]>) => void) => void;
+  "cosmetics:equip": (
+    payload: { readonly guestId: string; readonly cosmeticId: string },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
   "profile:history": (
     payload: { readonly guestId: string; readonly limit?: number },
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
