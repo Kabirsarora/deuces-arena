@@ -2,6 +2,14 @@ import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-eng
 
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
+export type CosmeticKind =
+  | "CARD_BACK"
+  | "TABLE_THEME"
+  | "AVATAR"
+  | "PROFILE_BORDER"
+  | "EMOTE"
+  | "WIN_ANIMATION";
+export type CosmeticUnlockSource = "EARNED" | "SUPPORTER" | "PROMOTIONAL" | "ADMIN_GRANT";
 
 export type PublicPlayerStats = {
   readonly rating: number;
@@ -17,6 +25,29 @@ export type PublicGuestProfile = PublicPlayerStats & {
 export type PublicLeaderboardEntry = PublicPlayerStats & {
   readonly guestId: string;
   readonly displayName: string | null;
+};
+
+export type PublicCosmetic = {
+  readonly id: string;
+  readonly slug: string;
+  readonly kind: CosmeticKind;
+  readonly name: string;
+  readonly description: string | null;
+  readonly rarity: string;
+  readonly isSupporter: boolean;
+  readonly previewUrl: string | null;
+};
+
+export type PublicCosmeticUnlock = {
+  readonly cosmetic: PublicCosmetic;
+  readonly source: CosmeticUnlockSource;
+  readonly earnedAt: string;
+};
+
+export type PublicEquippedCosmetic = {
+  readonly kind: CosmeticKind;
+  readonly cosmetic: PublicCosmetic;
+  readonly equippedAt: string;
 };
 
 export type PublicMatchHistoryPlayer = {

@@ -6,6 +6,8 @@ This package should stay reusable by the server, scripts, analytics tools, and f
 
 The first schema stores match/player/move history in a way that can support replays, ranked stats, and future ML training exports. It intentionally leaves simulation and model score fields nullable until those systems exist.
 
+Cosmetic tables are data-only foundations for non-pay-to-win unlocks such as card backs, table themes, avatars, profile borders, emotes, and win animations. They support earned, supporter, promotional, and admin-granted unlock sources without changing gameplay power.
+
 Prisma ORM 7 reads the connection URL from `prisma.config.ts`. Keep `DATABASE_URL` out of `schema.prisma` so CLI commands such as `prisma generate`, `prisma migrate dev`, and `prisma studio` use the same config path.
 
 ```bash

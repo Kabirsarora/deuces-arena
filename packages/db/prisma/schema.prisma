@@ -29,6 +29,22 @@ enum MoveKind {
   PASS
 }
 
+enum CosmeticKind {
+  CARD_BACK
+  TABLE_THEME
+  AVATAR
+  PROFILE_BORDER
+  EMOTE
+  WIN_ANIMATION
+}
+
+enum CosmeticUnlockSource {
+  EARNED
+  SUPPORTER
+  PROMOTIONAL
+  ADMIN_GRANT
+}
+
 model User {
   id              String        @id @default(cuid())
   username        String        @unique
@@ -43,6 +59,8 @@ model User {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   matchPlayers    MatchPlayer[]
+  cosmeticUnlocks UserCosmeticUnlock[]
+  equippedCosmetics UserEquippedCosmetic[]
 
   @@index([rating])
 }
@@ -135,4 +153,52 @@ model CoachEvaluation {
   @@index([matchId, turnNumber])
   @@index([matchPlayerId])
   @@index([roomCode, createdAt])
+}
+
+model Cosmetic {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  kind        CosmeticKind
+  name        String
+  description String?
+  rarity      String         @default("common")
+  isSupporter Boolean        @default(false)
+  isActive    Boolean        @default(true)
+  previewUrl  String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  unlocks     UserCosmeticUnlock[]
+  equippedBy  UserEquippedCosmetic[]
+
+  @@index([kind, isActive])
+  @@index([isSupporter])
+}
+
+model UserCosmeticUnlock {
+  id          String               @id @default(cuid())
+  userId      String
+  cosmeticId  String
+  source      CosmeticUnlockSource @default(EARNED)
+  earnedAt    DateTime             @default(now())
+  metadata    Json?
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic    Cosmetic             @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cosmeticId])
+  @@index([cosmeticId])
+  @@index([userId, source])
+}
+
+model UserEquippedCosmetic {
+  id          String       @id @default(cuid())
+  userId      String
+  cosmeticId  String
+  kind        CosmeticKind
+  equippedAt  DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic    Cosmetic     @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([cosmeticId])
 }

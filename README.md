@@ -11,7 +11,7 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 - Socket.IO rooms with server-authoritative move validation, reconnect support, ready states, leave-room flow, invite links, bot fill, table chat, live lobby discovery, open-room counts, connected-user counts, and replay export.
 - Guest profiles with match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, stores the analysis in replay exports, and can persist those records for future AI coach training/evaluation.
-- Prisma/PostgreSQL schema and initial migration for users, matches, match players, move history, coach evaluations, replay labels, and future AI/model scores.
+- Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks, replay labels, and future AI/model scores.
 - Early ML package for random self-play sample generation and JSONL export of persisted coach evaluations without pretending baseline bots are trained AI.
 
 ## Local Setup
