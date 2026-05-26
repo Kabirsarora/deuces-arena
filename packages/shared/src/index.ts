@@ -92,6 +92,17 @@ export type PublicMoveEvaluation = {
   readonly averagePlacement: number;
 };
 
+export type PublicCoachEvaluationRecord = {
+  readonly id: string;
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly turnNumber: number;
+  readonly createdAt: string;
+  readonly handBefore: readonly Card[];
+  readonly currentTrickBefore: CurrentTrick | null;
+  readonly evaluations: readonly PublicMoveEvaluation[];
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly status: RoomStatus;
@@ -113,6 +124,7 @@ export type RoomReplayExport = {
   readonly placements: readonly string[];
   readonly turnNumber: number;
   readonly events: readonly GameEvent[];
+  readonly coachEvaluations: readonly PublicCoachEvaluationRecord[];
 };
 
 export type CreateRoomPayload = {

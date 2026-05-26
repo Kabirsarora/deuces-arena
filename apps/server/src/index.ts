@@ -16,6 +16,7 @@ import type {
   ClientToServerEvents,
   InterServerEvents,
   PublicChatMessage,
+  PublicCoachEvaluationRecord,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -65,6 +66,7 @@ type Room = {
   readonly createdAt: Date;
   players: RoomPlayer[];
   chatMessages: PublicChatMessage[];
+  coachEvaluations: PublicCoachEvaluationRecord[];
   game: GameState | null;
   persistedMatch: PersistedMatch | null;
   statsApplied: boolean;
@@ -74,6 +76,7 @@ const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
+const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 
@@ -412,7 +415,28 @@ io.on("connection", (socket) => {
       return;
     }
 
-    callback(ok(publicMoveEvaluations(room.game, player.id, payload.rollouts, payload.maxMoves)));
+    const evaluations = publicMoveEvaluations(
+      room.game,
+      player.id,
+      payload.rollouts,
+      payload.maxMoves
+    );
+    const gamePlayer = getGamePlayer(room.game, player.id);
+    const record: PublicCoachEvaluationRecord = {
+      id: `coach-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      playerId: player.id,
+      playerName: player.name,
+      turnNumber: room.game.turnNumber,
+      createdAt: new Date().toISOString(),
+      handBefore: gamePlayer.hand,
+      currentTrickBefore: room.game.currentTrick,
+      evaluations
+    };
+
+    room.coachEvaluations = [...room.coachEvaluations, record].slice(
+      -MAX_COACH_EVALUATIONS_PER_ROOM
+    );
+    callback(ok(evaluations));
   });
 
   socket.on("disconnect", () => {
@@ -444,6 +468,7 @@ function createRoom(playerName: string, socketId: string, guestId: string | unde
     createdAt: new Date(),
     players: [createHumanPlayer(playerName, socketId, 0, guestId)],
     chatMessages: [],
+    coachEvaluations: [],
     game: null,
     persistedMatch: null,
     statsApplied: false
@@ -657,7 +682,8 @@ function replayExportForRoom(room: Room): RoomReplayExport {
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     placements: room.game?.placements ?? [],
     turnNumber: room.game?.turnNumber ?? 0,
-    events: room.game?.events ?? []
+    events: room.game?.events ?? [],
+    coachEvaluations: room.coachEvaluations
   };
 }
 
