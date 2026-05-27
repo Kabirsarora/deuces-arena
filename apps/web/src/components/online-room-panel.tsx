@@ -50,11 +50,17 @@ import {
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 
+import { SignInWithGoogleButton, SignOutButton } from "@/components/auth-buttons";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
+type AuthUser = {
+  readonly name: string | null;
+  readonly email: string | null;
+  readonly image: string | null;
+};
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
@@ -68,7 +74,7 @@ const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label:
   { key: "spade", label: "Spades" }
 ];
 
-export function OnlineRoomPanel() {
+export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -559,6 +565,7 @@ export function OnlineRoomPanel() {
       <OnlineLobbyHub
         connected={connected}
         playerName={playerName}
+        authUser={authUser}
         profile={profile}
         profileDisplayName={profileDisplayName}
         profileAvatarKey={profileAvatarKey}
@@ -719,6 +726,7 @@ export function OnlineRoomPanel() {
 function OnlineLobbyHub({
   connected,
   playerName,
+  authUser,
   profile,
   profileDisplayName,
   profileAvatarKey,
@@ -753,6 +761,7 @@ function OnlineLobbyHub({
 }: {
   readonly connected: boolean;
   readonly playerName: string;
+  readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
   readonly profileDisplayName: string;
   readonly profileAvatarKey: ProfileAvatarKey;
@@ -920,6 +929,7 @@ function OnlineLobbyHub({
           <aside className="grid content-start gap-4">
             <MinimalProfileCard
               playerName={playerName}
+              authUser={authUser}
               profile={profile}
               profileDisplayName={profileDisplayName}
               profileAvatarKey={profileAvatarKey}
@@ -1285,6 +1295,7 @@ function HubRankedCard({
 
 function MinimalProfileCard({
   playerName,
+  authUser,
   profile,
   profileDisplayName,
   profileAvatarKey,
@@ -1294,6 +1305,7 @@ function MinimalProfileCard({
   onProfileSave
 }: {
   readonly playerName: string;
+  readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
   readonly profileDisplayName: string;
   readonly profileAvatarKey: ProfileAvatarKey;
@@ -1302,6 +1314,8 @@ function MinimalProfileCard({
   readonly onProfileAvatarKeyChange: (value: ProfileAvatarKey) => void;
   readonly onProfileSave: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const accountName = authUser?.name ?? authUser?.email ?? null;
+
   return (
     <section className="online-panel p-5">
       <div className="flex items-center gap-3">
@@ -1310,6 +1324,23 @@ function MinimalProfileCard({
           <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
           <p className="text-sm text-zinc-400">{profile?.rating ?? 1000} rating</p>
         </div>
+      </div>
+      <div className="mt-4 rounded-[1rem] border border-white/10 bg-black/20 p-3">
+        {authUser === null ? (
+          <>
+            <p className="text-xs font-bold uppercase text-zinc-500">Guest profile</p>
+            <p className="mt-1 text-sm text-zinc-300">
+              Sign in to keep rating, match history, and cosmetics across devices.
+            </p>
+            <SignInWithGoogleButton className="mt-3 h-10 w-full" />
+          </>
+        ) : (
+          <>
+            <p className="text-xs font-bold uppercase text-emerald-300">Signed in</p>
+            <p className="mt-1 truncate text-sm font-bold text-zinc-200">{accountName}</p>
+            <SignOutButton className="mt-3 h-10 w-full" />
+          </>
+        )}
       </div>
       <label className="mt-4 block text-sm font-black">
         Name
@@ -2456,8 +2487,6 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
         getTableThemeClass(tableTheme)
       )}
     >
-      <div className="absolute inset-4 rounded-[44%/18%] border border-white/8" />
-      <div className="absolute inset-12 rounded-full border border-white/8" />
       <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-bold uppercase text-zinc-300 backdrop-blur">
         <CircleDot className="size-3 text-[var(--aqua)]" />
         {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
