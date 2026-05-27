@@ -906,13 +906,17 @@ function applyGuestStats(room: Room, game: GameState): void {
   }
 
   const placements = inferPlacements(game);
-  const ratingChanges = calculatePlacementRatingChanges(
-    room.players.map((player) => ({
-      playerId: player.id,
-      ratingBefore: player.guestId === null ? 1000 : getOrCreateGuestProfile(player.guestId).rating,
-      placement: toPlacement(placements.indexOf(player.id) + 1)
-    }))
-  );
+  const ratingChanges =
+    room.mode === "RANKED"
+      ? calculatePlacementRatingChanges(
+          room.players.map((player) => ({
+            playerId: player.id,
+            ratingBefore:
+              player.guestId === null ? 1000 : getOrCreateGuestProfile(player.guestId).rating,
+            placement: toPlacement(placements.indexOf(player.id) + 1)
+          }))
+        )
+      : [];
 
   for (const player of room.players) {
     if (player.guestId === null) {

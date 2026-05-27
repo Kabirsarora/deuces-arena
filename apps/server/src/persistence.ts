@@ -28,6 +28,7 @@ type PersistableRoomPlayer = {
 export type PersistedMatch = {
   readonly matchId: string;
   readonly roomCode: string;
+  readonly mode: MatchMode;
   readonly matchPlayerIds: Readonly<Record<string, string>>;
   readonly userIds: Readonly<Record<string, string>>;
   readonly ratingBeforeByPlayerId: Readonly<Record<string, number>>;
@@ -125,6 +126,7 @@ export async function createPersistedMatch(
     return {
       matchId: match.id,
       roomCode,
+      mode,
       matchPlayerIds: Object.fromEntries(
         match.players.flatMap((matchPlayer) => {
           const roomPlayer = players[matchPlayer.playerSeat];
@@ -679,7 +681,10 @@ export async function completePersistedMatch(
 
   const summaries = summarizeGame(game);
   const placementByPlayerId = getPlacementByPlayerId(game);
-  const ratingChanges = calculatePersistedRatingChanges(persistedMatch, game);
+  const shouldApplyRating = persistedMatch.mode === "RANKED";
+  const ratingChanges = shouldApplyRating
+    ? calculatePersistedRatingChanges(persistedMatch, game)
+    : [];
 
   try {
     await db.prisma.$transaction([
@@ -706,9 +711,10 @@ export async function completePersistedMatch(
             },
             data: {
               placement: placementByPlayerId[summary.playerId] ?? null,
-              ratingAfter:
-                ratingChanges.find((change) => change.playerId === summary.playerId)?.ratingAfter ??
-                null,
+              ratingAfter: shouldApplyRating
+                ? (ratingChanges.find((change) => change.playerId === summary.playerId)
+                    ?.ratingAfter ?? null)
+                : null,
               cardsRemaining: summary.cardsRemaining,
               bombsPlayed: summary.bombsPlayed,
               averageMoveCount: summary.movesPlayed
@@ -716,12 +722,14 @@ export async function completePersistedMatch(
           })
         ];
       }),
-      ...ratingChanges.flatMap((change) => {
-        const userId = persistedMatch.userIds[change.playerId];
+      ...Object.entries(persistedMatch.userIds).flatMap(([playerId, userId]) => {
+        const placement = placementByPlayerId[playerId];
 
-        if (userId === undefined) {
+        if (placement !== 1 && placement !== 2 && placement !== 3 && placement !== 4) {
           return [];
         }
+
+        const ratingChange = ratingChanges.find((change) => change.playerId === playerId);
 
         return [
           db.prisma.user.update({
@@ -729,18 +737,22 @@ export async function completePersistedMatch(
               id: userId
             },
             data: {
-              rating: change.ratingAfter,
+              ...(shouldApplyRating && ratingChange !== undefined
+                ? {
+                    rating: ratingChange.ratingAfter
+                  }
+                : {}),
               gamesPlayed: {
                 increment: 1
               },
               wins: {
-                increment: change.placement === 1 ? 1 : 0
+                increment: placement === 1 ? 1 : 0
               },
               losses: {
-                increment: change.placement === 4 ? 1 : 0
+                increment: placement === 4 ? 1 : 0
               },
               placementTotal: {
-                increment: change.placement
+                increment: placement
               }
             }
           })
