@@ -873,18 +873,18 @@ function OnlineLobbyHub({
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
 
   return (
-    <main className="min-h-screen bg-[#2f80d9] px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="online-hub mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/25 shadow-2xl lg:grid-cols-[8.5rem_minmax(0,1fr)]">
+    <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
+      <section className="online-hub mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl lg:grid-cols-[7.5rem_minmax(0,1fr)]">
         <OnlineHubRail activeMode={hubMode} onModeChange={onHubModeChange} />
 
-        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-10">
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
           <section className="flex min-h-0 flex-col">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-black uppercase tracking-wide text-blue-100/85">
+                <p className="text-xs font-black uppercase tracking-wide text-[var(--aqua)]">
                   Deuces Arena
                 </p>
-                <h1 className="text-3xl font-black sm:text-4xl">Play Deuces</h1>
+                <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -898,7 +898,7 @@ function OnlineLobbyHub({
               </div>
             </header>
 
-            <div className="mb-5 grid grid-cols-3 gap-2 rounded-[0.9rem] bg-blue-950/35 p-1.5">
+            <div className="mb-5 grid grid-cols-3 gap-2 rounded-full border border-white/10 bg-black/30 p-1.5">
               <HubModeButton
                 mode="bots"
                 activeMode={hubMode}
@@ -962,7 +962,7 @@ function OnlineLobbyHub({
                 >
                   <div className="flex gap-2">
                     <input
-                      className="h-12 min-w-0 flex-1 rounded-xl border border-white/20 bg-blue-950/28 px-4 text-sm font-bold uppercase outline-none placeholder:text-blue-100/65 focus:border-white"
+                      className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-black/25 px-4 text-sm font-bold uppercase outline-none placeholder:text-zinc-500 focus:border-[var(--gold)]"
                       placeholder="Room code"
                       value={joinCode}
                       onChange={(event) => onJoinCodeChange(event.target.value)}
@@ -978,8 +978,11 @@ function OnlineLobbyHub({
                   </div>
                   <OpenRoomStrip
                     rooms={openRooms}
+                    openRoomCount={activity?.openRooms ?? 0}
+                    playingCount={activity?.playersInActiveGames ?? 0}
                     connected={connected}
                     onJoinOpenRoom={onJoinOpenRoom}
+                    onCreateRoom={onCreateRoom}
                   />
                 </HubPlayCard>
               ) : null}
@@ -994,7 +997,7 @@ function OnlineLobbyHub({
               ) : null}
             </div>
 
-            <p className="mt-auto pt-5 text-sm font-semibold text-blue-50/85">{message}</p>
+            <p className="mt-auto pt-5 text-sm font-semibold text-zinc-300">{message}</p>
           </section>
 
           <aside className="grid content-start gap-4">
@@ -1011,8 +1014,8 @@ function OnlineLobbyHub({
 
             <section className="online-panel p-5 text-center">
               <Crown className="mx-auto mb-3 size-12 text-yellow-200" />
-              <h2 className="text-xl font-black">Supporter Cosmetics</h2>
-              <p className="mt-2 text-sm text-blue-50/75">
+              <h2 className="text-xl font-black">Cosmetics</h2>
+              <p className="mt-2 text-sm text-zinc-400">
                 Card backs, table themes, avatars, and badges. Never pay-to-win.
               </p>
             </section>
@@ -1045,8 +1048,8 @@ function OnlineHubRail({
   readonly onModeChange: (mode: OnlineHubMode) => void;
 }) {
   return (
-    <nav className="hidden bg-blue-950/28 p-4 lg:grid lg:content-start lg:gap-4">
-      <div className="mb-2 grid h-16 place-items-center rounded-2xl bg-white/12 text-sm font-black">
+    <nav className="hidden border-r border-white/10 bg-black/22 p-3 lg:grid lg:content-start lg:gap-3">
+      <div className="mb-2 grid h-16 place-items-center rounded-[1.4rem] border border-white/10 bg-white/8 text-sm font-black">
         DA
       </div>
       <RailButton
@@ -1085,8 +1088,10 @@ function RailButton({
   return (
     <button
       className={cn(
-        "grid justify-items-center gap-2 rounded-2xl px-3 py-4 text-sm font-black transition",
-        active ? "bg-white/18 text-white" : "text-blue-50/75 hover:bg-white/10 hover:text-white"
+        "grid justify-items-center gap-2 rounded-[1.35rem] px-3 py-4 text-sm font-black transition",
+        active
+          ? "bg-[var(--table)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
+          : "text-zinc-400 hover:bg-white/8 hover:text-white"
       )}
       type="button"
       onClick={onClick}
@@ -1115,8 +1120,10 @@ function HubModeButton({
   return (
     <button
       className={cn(
-        "flex min-h-16 items-center justify-center gap-3 rounded-xl text-sm font-black transition sm:text-lg",
-        active ? "bg-[#4a94f2] text-white shadow-lg" : "text-blue-50/80 hover:bg-white/10"
+        "flex min-h-14 items-center justify-center gap-3 rounded-full text-sm font-black transition sm:text-base",
+        active
+          ? "bg-[var(--table)] text-white shadow-lg"
+          : "text-zinc-400 hover:bg-white/8 hover:text-white"
       )}
       type="button"
       onClick={() => onSelect(mode)}
@@ -1147,12 +1154,12 @@ function HubPlayCard({
   return (
     <section className="online-panel p-5 sm:p-7">
       <div className="mb-5 flex items-center gap-5">
-        <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white/18 text-white">
+        <div className="grid size-20 shrink-0 place-items-center rounded-full border border-white/10 bg-[var(--table)]/80 text-white">
           {icon}
         </div>
         <div className="min-w-0">
           <h2 className="text-2xl font-black">{title}</h2>
-          <p className="mt-1 text-sm font-semibold text-blue-50/75">{meta}</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-400">{meta}</p>
         </div>
       </div>
       {children}
@@ -1179,13 +1186,13 @@ function CompactRange({
   readonly onChange: (value: number) => void;
 }) {
   return (
-    <label className="rounded-xl bg-blue-950/22 p-4 text-sm font-bold">
+    <label className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
       <span className="mb-2 flex justify-between gap-2">
         {label}
         <span>{value}</span>
       </span>
       <input
-        className="w-full accent-white"
+        className="w-full accent-[var(--gold)]"
         type="range"
         min={min}
         max={max}
@@ -1209,18 +1216,18 @@ function CompactTimerControl({
   readonly onSecondsChange: (seconds: number) => void;
 }) {
   return (
-    <div className="rounded-xl bg-blue-950/22 p-4 text-sm font-bold">
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
       <label className="flex items-center justify-between gap-3">
         Timer
         <input
-          className="size-4 accent-white"
+          className="size-4 accent-[var(--gold)]"
           type="checkbox"
           checked={enabled}
           onChange={(event) => onEnabledChange(event.target.checked)}
         />
       </label>
       <input
-        className="mt-3 w-full accent-white"
+        className="mt-3 w-full accent-[var(--gold)]"
         type="range"
         min="15"
         max="90"
@@ -1229,43 +1236,81 @@ function CompactTimerControl({
         disabled={!enabled}
         onChange={(event) => onSecondsChange(Number(event.target.value))}
       />
-      <p className="mt-1 text-blue-50/70">{seconds}s per turn</p>
+      <p className="mt-1 text-zinc-400">{seconds}s per turn</p>
     </div>
   );
 }
 
 function OpenRoomStrip({
   rooms,
+  openRoomCount,
+  playingCount,
   connected,
-  onJoinOpenRoom
+  onJoinOpenRoom,
+  onCreateRoom
 }: {
   readonly rooms: readonly PublicOpenRoom[];
+  readonly openRoomCount: number;
+  readonly playingCount: number;
   readonly connected: boolean;
   readonly onJoinOpenRoom: (room: PublicOpenRoom) => void;
+  readonly onCreateRoom: () => void;
 }) {
   if (rooms.length === 0) {
-    return <p className="mt-4 text-sm font-semibold text-blue-50/75">No open rooms right now.</p>;
+    return (
+      <div className="mt-5">
+        <button
+          className="room-table-preview group w-full px-5 py-8 text-center"
+          type="button"
+          disabled={!connected}
+          onClick={onCreateRoom}
+        >
+          <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-black/30 text-[var(--gold)]">
+            <Play className="size-6" />
+          </span>
+          <span className="block text-xl font-black">Open a Table</span>
+          <span className="mt-1 block text-sm text-zinc-300">
+            No public casual rooms yet. Create one and share the code.
+          </span>
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="mt-4 grid gap-2">
-      {rooms.slice(0, 3).map((room) => (
-        <button
-          key={room.roomCode}
-          className="flex items-center justify-between gap-3 rounded-xl bg-blue-950/22 px-4 py-3 text-left transition hover:bg-blue-950/32 disabled:opacity-60"
-          type="button"
-          disabled={!connected}
-          onClick={() => onJoinOpenRoom(room)}
-        >
-          <span>
-            <span className="block font-black">{room.hostName}'s table</span>
-            <span className="text-sm text-blue-50/70">
-              {room.seatedPlayers}/{room.maxPlayers} seated · {room.roomCode}
+    <div className="mt-5">
+      <div className="mb-3 flex items-center justify-between gap-3 text-sm text-zinc-400">
+        <span>{openRoomCount} open tables</span>
+        <span>{playingCount} players in games</span>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {rooms.slice(0, 3).map((room) => (
+          <button
+            key={room.roomCode}
+            className="room-table-preview group min-h-44 px-5 py-5 text-left transition disabled:opacity-60"
+            type="button"
+            disabled={!connected}
+            onClick={() => onJoinOpenRoom(room)}
+          >
+            <span className="flex h-full flex-col justify-between">
+              <span>
+                <span className="block text-lg font-black">{room.hostName}'s table</span>
+                <span className="mt-1 block text-sm text-zinc-300">
+                  {room.seatedPlayers}/{room.maxPlayers} seated · {room.roomCode}
+                </span>
+              </span>
+              <span className="mt-8 flex items-center justify-between gap-3">
+                <span className="rounded-full bg-black/24 px-3 py-1 text-xs font-bold text-zinc-200">
+                  {room.readyPlayers}/{room.seatedPlayers} ready
+                </span>
+                <span className="grid size-10 place-items-center rounded-full bg-[var(--gold)] text-black transition group-hover:scale-105">
+                  <DoorOpen className="size-5 shrink-0" />
+                </span>
+              </span>
             </span>
-          </span>
-          <DoorOpen className="size-5 shrink-0" />
-        </button>
-      ))}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1294,12 +1339,12 @@ function HubRankedCard({
   return (
     <section className="online-panel p-5 sm:p-7">
       <div className="mb-5 flex items-center gap-5">
-        <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white/18">
+        <div className="grid size-20 shrink-0 place-items-center rounded-full border border-white/10 bg-[var(--table)]/80">
           <Trophy className="size-12" />
         </div>
         <div>
           <h2 className="text-2xl font-black">Ranked Match</h2>
-          <p className="mt-1 text-sm font-semibold text-blue-50/75">
+          <p className="mt-1 text-sm font-semibold text-zinc-400">
             4 humans · no bots · {DEFAULT_RANKED_TIMER_SECONDS}s timer
           </p>
         </div>
@@ -1346,24 +1391,24 @@ function MinimalProfileCard({
         <ProfileAvatar avatarKey={profile?.avatarKey ?? profileAvatarKey} />
         <div className="min-w-0">
           <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
-          <p className="text-sm text-blue-50/70">{profile?.rating ?? 1000} rating</p>
+          <p className="text-sm text-zinc-400">{profile?.rating ?? 1000} rating</p>
         </div>
       </div>
       <label className="mt-4 block text-sm font-black">
         Name
         <input
-          className="mt-2 h-11 w-full rounded-xl border border-white/15 bg-blue-950/22 px-3 text-sm outline-none focus:border-white"
+          className="mt-2 h-11 w-full rounded-full border border-white/10 bg-black/24 px-3 text-sm outline-none focus:border-[var(--gold)]"
           value={playerName}
           onChange={(event) => onPlayerNameChange(event.target.value)}
         />
       </label>
       <details className="mt-3">
-        <summary className="cursor-pointer list-none text-sm font-black text-blue-50/85">
+        <summary className="cursor-pointer list-none text-sm font-black text-zinc-300">
           Edit profile
         </summary>
         <form className="mt-3 grid gap-2" onSubmit={onProfileSave}>
           <input
-            className="h-10 rounded-xl border border-white/15 bg-blue-950/22 px-3 text-sm outline-none focus:border-white"
+            className="h-10 rounded-full border border-white/10 bg-black/24 px-3 text-sm outline-none focus:border-[var(--gold)]"
             value={profileDisplayName}
             maxLength={18}
             onChange={(event) => onProfileDisplayNameChange(event.target.value)}
@@ -1375,8 +1420,8 @@ function MinimalProfileCard({
                 className={cn(
                   "grid h-9 place-items-center rounded-full border text-sm transition",
                   profileAvatarKey === option.key
-                    ? "border-white bg-white/18"
-                    : "border-white/12 bg-blue-950/18"
+                    ? "border-[var(--gold)] bg-[var(--gold)]/15"
+                    : "border-white/10 bg-black/18"
                 )}
                 type="button"
                 title={option.label}
