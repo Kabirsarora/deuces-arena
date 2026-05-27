@@ -28,9 +28,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
   BookOpen,
+  Bot,
   CheckCircle2,
   CircleDot,
   Copy,
+  Crown,
   Download,
   DoorOpen,
   Gauge,
@@ -46,11 +48,13 @@ import {
   Trophy,
   Users
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+type OnlineHubMode = "bots" | "casual" | "ranked";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
@@ -71,6 +75,7 @@ export function OnlineRoomPanel() {
   const [playerName, setPlayerName] = useState("Player");
   const [profileDisplayName, setProfileDisplayName] = useState("Player");
   const [profileAvatarKey, setProfileAvatarKey] = useState<ProfileAvatarKey>("diamond");
+  const [hubMode, setHubMode] = useState<OnlineHubMode>("bots");
   const [joinCode, setJoinCode] = useState("");
   const [room, setRoom] = useState<PublicRoomState | null>(null);
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
@@ -248,6 +253,39 @@ export function OnlineRoomPanel() {
         guestId: getOrCreateGuestId()
       },
       handleRoomAck("Room created.")
+    );
+  }
+
+  function createBotGame() {
+    socketRef.current?.emit(
+      "room:create",
+      {
+        playerName,
+        guestId: getOrCreateGuestId()
+      },
+      (createAck) => {
+        if (!createAck.ok) {
+          setMessage(createAck.error);
+          return;
+        }
+
+        setRoom(createAck.data);
+        saveRoomSession(createAck.data);
+        syncRoomCodeToUrl(createAck.data.roomCode);
+
+        socketRef.current?.emit(
+          "room:start",
+          {
+            roomCode: createAck.data.roomCode,
+            botCount: 3,
+            timer: {
+              enabled: lobbyTimerEnabled,
+              secondsPerTurn: turnTimerSeconds
+            }
+          },
+          handleRoomAck("Started a bot table.")
+        );
+      }
     );
   }
 
@@ -515,6 +553,46 @@ export function OnlineRoomPanel() {
     };
   }
 
+  if (room === null) {
+    return (
+      <OnlineLobbyHub
+        connected={connected}
+        playerName={playerName}
+        profile={profile}
+        profileDisplayName={profileDisplayName}
+        profileAvatarKey={profileAvatarKey}
+        hubMode={hubMode}
+        joinCode={joinCode}
+        lobby={lobby}
+        rankedQueue={rankedQueue}
+        leaderboard={leaderboard}
+        matchHistory={matchHistory}
+        cosmetics={cosmetics}
+        botSeats={botSeats}
+        maxBotSeats={availableBotSeats}
+        timerEnabled={lobbyTimerEnabled}
+        timerSeconds={turnTimerSeconds}
+        message={message}
+        onPlayerNameChange={setPlayerName}
+        onProfileDisplayNameChange={setProfileDisplayName}
+        onProfileAvatarKeyChange={setProfileAvatarKey}
+        onProfileSave={updateProfileIdentity}
+        onHubModeChange={setHubMode}
+        onJoinCodeChange={setJoinCode}
+        onCreateRoom={createRoom}
+        onCreateBotGame={createBotGame}
+        onJoinRoom={joinRoom}
+        onJoinOpenRoom={joinOpenRoom}
+        onJoinRanked={joinRankedQueue}
+        onLeaveRanked={leaveRankedQueue}
+        onBotSeatsChange={setBotSeats}
+        onTimerEnabledChange={setLobbyTimerEnabled}
+        onTimerSecondsChange={setTurnTimerSeconds}
+        onEquipCosmetic={equipCosmetic}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen px-3 py-10 text-white sm:px-5 lg:px-8">
       <section className="mx-auto grid w-full max-w-[96rem] gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
@@ -718,6 +796,602 @@ export function OnlineRoomPanel() {
         </section>
       </section>
     </main>
+  );
+}
+
+function OnlineLobbyHub({
+  connected,
+  playerName,
+  profile,
+  profileDisplayName,
+  profileAvatarKey,
+  hubMode,
+  joinCode,
+  lobby,
+  rankedQueue,
+  leaderboard,
+  matchHistory,
+  cosmetics,
+  botSeats,
+  maxBotSeats,
+  timerEnabled,
+  timerSeconds,
+  message,
+  onPlayerNameChange,
+  onProfileDisplayNameChange,
+  onProfileAvatarKeyChange,
+  onProfileSave,
+  onHubModeChange,
+  onJoinCodeChange,
+  onCreateRoom,
+  onCreateBotGame,
+  onJoinRoom,
+  onJoinOpenRoom,
+  onJoinRanked,
+  onLeaveRanked,
+  onBotSeatsChange,
+  onTimerEnabledChange,
+  onTimerSecondsChange,
+  onEquipCosmetic
+}: {
+  readonly connected: boolean;
+  readonly playerName: string;
+  readonly profile: PublicGuestProfile | null;
+  readonly profileDisplayName: string;
+  readonly profileAvatarKey: ProfileAvatarKey;
+  readonly hubMode: OnlineHubMode;
+  readonly joinCode: string;
+  readonly lobby: PublicLobbyState | null;
+  readonly rankedQueue: PublicRankedQueueState | null;
+  readonly leaderboard: readonly PublicLeaderboardEntry[];
+  readonly matchHistory: readonly PublicMatchHistoryItem[];
+  readonly cosmetics: readonly PublicCosmetic[];
+  readonly botSeats: number;
+  readonly maxBotSeats: number;
+  readonly timerEnabled: boolean;
+  readonly timerSeconds: number;
+  readonly message: string;
+  readonly onPlayerNameChange: (value: string) => void;
+  readonly onProfileDisplayNameChange: (value: string) => void;
+  readonly onProfileAvatarKeyChange: (value: ProfileAvatarKey) => void;
+  readonly onProfileSave: (event: FormEvent<HTMLFormElement>) => void;
+  readonly onHubModeChange: (mode: OnlineHubMode) => void;
+  readonly onJoinCodeChange: (value: string) => void;
+  readonly onCreateRoom: () => void;
+  readonly onCreateBotGame: () => void;
+  readonly onJoinRoom: () => void;
+  readonly onJoinOpenRoom: (room: PublicOpenRoom) => void;
+  readonly onJoinRanked: () => void;
+  readonly onLeaveRanked: () => void;
+  readonly onBotSeatsChange: (count: number) => void;
+  readonly onTimerEnabledChange: (enabled: boolean) => void;
+  readonly onTimerSecondsChange: (seconds: number) => void;
+  readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
+}) {
+  const activity = lobby?.activity;
+  const openRooms = lobby?.openRooms ?? [];
+  const selectedBotSeats = Math.min(botSeats, maxBotSeats);
+
+  return (
+    <main className="min-h-screen bg-[#2f80d9] px-3 py-8 text-white sm:px-5 lg:px-8">
+      <section className="online-hub mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/25 shadow-2xl lg:grid-cols-[8.5rem_minmax(0,1fr)]">
+        <OnlineHubRail activeMode={hubMode} onModeChange={onHubModeChange} />
+
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_22rem] lg:p-10">
+          <section className="flex min-h-0 flex-col">
+            <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-blue-100/85">
+                  Deuces Arena
+                </p>
+                <h1 className="text-3xl font-black sm:text-4xl">Play Deuces</h1>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-black",
+                    connected ? "bg-emerald-300 text-emerald-950" : "bg-red-300 text-red-950"
+                  )}
+                >
+                  {connected ? "Online" : "Offline"}
+                </span>
+              </div>
+            </header>
+
+            <div className="mb-5 grid grid-cols-3 gap-2 rounded-[0.9rem] bg-blue-950/35 p-1.5">
+              <HubModeButton
+                mode="bots"
+                activeMode={hubMode}
+                icon={<Bot className="size-6" />}
+                label="Bots"
+                onSelect={onHubModeChange}
+              />
+              <HubModeButton
+                mode="casual"
+                activeMode={hubMode}
+                icon={<Users className="size-6" />}
+                label="Casual"
+                onSelect={onHubModeChange}
+              />
+              <HubModeButton
+                mode="ranked"
+                activeMode={hubMode}
+                icon={<Trophy className="size-6" />}
+                label="Ranked"
+                onSelect={onHubModeChange}
+              />
+            </div>
+
+            <div className="grid gap-4">
+              {hubMode === "bots" ? (
+                <HubPlayCard
+                  icon={<Bot className="size-12" />}
+                  title="Play vs. Bots"
+                  meta={`${selectedBotSeats} bots · ${timerEnabled ? `${timerSeconds}s timer` : "no timer"}`}
+                  actionLabel="Start Bot Game"
+                  disabled={!connected}
+                  onAction={onCreateBotGame}
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <CompactRange
+                      label="Bot seats"
+                      value={selectedBotSeats}
+                      min={1}
+                      max={Math.max(1, maxBotSeats)}
+                      disabled={!connected}
+                      onChange={onBotSeatsChange}
+                    />
+                    <CompactTimerControl
+                      enabled={timerEnabled}
+                      seconds={timerSeconds}
+                      onEnabledChange={onTimerEnabledChange}
+                      onSecondsChange={onTimerSecondsChange}
+                    />
+                  </div>
+                </HubPlayCard>
+              ) : null}
+
+              {hubMode === "casual" ? (
+                <HubPlayCard
+                  icon={<Users className="size-12" />}
+                  title="Casual Rooms"
+                  meta={`${activity?.openRooms ?? 0} open · ${activity?.playersInActiveGames ?? 0} playing`}
+                  actionLabel="Create Room"
+                  disabled={!connected}
+                  onAction={onCreateRoom}
+                >
+                  <div className="flex gap-2">
+                    <input
+                      className="h-12 min-w-0 flex-1 rounded-xl border border-white/20 bg-blue-950/28 px-4 text-sm font-bold uppercase outline-none placeholder:text-blue-100/65 focus:border-white"
+                      placeholder="Room code"
+                      value={joinCode}
+                      onChange={(event) => onJoinCodeChange(event.target.value)}
+                    />
+                    <Button
+                      className="h-12 px-5"
+                      variant="secondary"
+                      disabled={!connected || joinCode.trim() === ""}
+                      onClick={onJoinRoom}
+                    >
+                      Join
+                    </Button>
+                  </div>
+                  <OpenRoomStrip
+                    rooms={openRooms}
+                    connected={connected}
+                    onJoinOpenRoom={onJoinOpenRoom}
+                  />
+                </HubPlayCard>
+              ) : null}
+
+              {hubMode === "ranked" ? (
+                <HubRankedCard
+                  queue={rankedQueue}
+                  connected={connected}
+                  onJoin={onJoinRanked}
+                  onLeave={onLeaveRanked}
+                />
+              ) : null}
+            </div>
+
+            <p className="mt-auto pt-5 text-sm font-semibold text-blue-50/85">{message}</p>
+          </section>
+
+          <aside className="grid content-start gap-4">
+            <MinimalProfileCard
+              playerName={playerName}
+              profile={profile}
+              profileDisplayName={profileDisplayName}
+              profileAvatarKey={profileAvatarKey}
+              onPlayerNameChange={onPlayerNameChange}
+              onProfileDisplayNameChange={onProfileDisplayNameChange}
+              onProfileAvatarKeyChange={onProfileAvatarKeyChange}
+              onProfileSave={onProfileSave}
+            />
+
+            <section className="online-panel p-5 text-center">
+              <Crown className="mx-auto mb-3 size-12 text-yellow-200" />
+              <h2 className="text-xl font-black">Supporter Cosmetics</h2>
+              <p className="mt-2 text-sm text-blue-50/75">
+                Card backs, table themes, avatars, and badges. Never pay-to-win.
+              </p>
+            </section>
+
+            <details className="online-panel p-4">
+              <summary className="cursor-pointer list-none text-sm font-black">More</summary>
+              <div className="mt-3 grid gap-3">
+                <LeaderboardSummary entries={leaderboard} />
+                <MatchHistorySummary entries={matchHistory} />
+                <RulesSummary />
+                <CosmeticsSummary
+                  cosmetics={cosmetics}
+                  profile={profile}
+                  onEquip={onEquipCosmetic}
+                />
+              </div>
+            </details>
+          </aside>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function OnlineHubRail({
+  activeMode,
+  onModeChange
+}: {
+  readonly activeMode: OnlineHubMode;
+  readonly onModeChange: (mode: OnlineHubMode) => void;
+}) {
+  return (
+    <nav className="hidden bg-blue-950/28 p-4 lg:grid lg:content-start lg:gap-4">
+      <div className="mb-2 grid h-16 place-items-center rounded-2xl bg-white/12 text-sm font-black">
+        DA
+      </div>
+      <RailButton
+        active={activeMode === "bots"}
+        icon={<Bot className="size-6" />}
+        label="Bots"
+        onClick={() => onModeChange("bots")}
+      />
+      <RailButton
+        active={activeMode === "casual"}
+        icon={<Users className="size-6" />}
+        label="Rooms"
+        onClick={() => onModeChange("casual")}
+      />
+      <RailButton
+        active={activeMode === "ranked"}
+        icon={<Trophy className="size-6" />}
+        label="Ranked"
+        onClick={() => onModeChange("ranked")}
+      />
+    </nav>
+  );
+}
+
+function RailButton({
+  active,
+  icon,
+  label,
+  onClick
+}: {
+  readonly active: boolean;
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "grid justify-items-center gap-2 rounded-2xl px-3 py-4 text-sm font-black transition",
+        active ? "bg-white/18 text-white" : "text-blue-50/75 hover:bg-white/10 hover:text-white"
+      )}
+      type="button"
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function HubModeButton({
+  mode,
+  activeMode,
+  icon,
+  label,
+  onSelect
+}: {
+  readonly mode: OnlineHubMode;
+  readonly activeMode: OnlineHubMode;
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly onSelect: (mode: OnlineHubMode) => void;
+}) {
+  const active = mode === activeMode;
+
+  return (
+    <button
+      className={cn(
+        "flex min-h-16 items-center justify-center gap-3 rounded-xl text-sm font-black transition sm:text-lg",
+        active ? "bg-[#4a94f2] text-white shadow-lg" : "text-blue-50/80 hover:bg-white/10"
+      )}
+      type="button"
+      onClick={() => onSelect(mode)}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function HubPlayCard({
+  icon,
+  title,
+  meta,
+  actionLabel,
+  disabled,
+  children,
+  onAction
+}: {
+  readonly icon: ReactNode;
+  readonly title: string;
+  readonly meta: string;
+  readonly actionLabel: string;
+  readonly disabled: boolean;
+  readonly children: ReactNode;
+  readonly onAction: () => void;
+}) {
+  return (
+    <section className="online-panel p-5 sm:p-7">
+      <div className="mb-5 flex items-center gap-5">
+        <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white/18 text-white">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-black">{title}</h2>
+          <p className="mt-1 text-sm font-semibold text-blue-50/75">{meta}</p>
+        </div>
+      </div>
+      {children}
+      <Button className="mt-6 h-14 w-full text-lg" disabled={disabled} onClick={onAction}>
+        {actionLabel}
+      </Button>
+    </section>
+  );
+}
+
+function CompactRange({
+  label,
+  value,
+  min,
+  max,
+  disabled,
+  onChange
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly disabled: boolean;
+  readonly onChange: (value: number) => void;
+}) {
+  return (
+    <label className="rounded-xl bg-blue-950/22 p-4 text-sm font-bold">
+      <span className="mb-2 flex justify-between gap-2">
+        {label}
+        <span>{value}</span>
+      </span>
+      <input
+        className="w-full accent-white"
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  );
+}
+
+function CompactTimerControl({
+  enabled,
+  seconds,
+  onEnabledChange,
+  onSecondsChange
+}: {
+  readonly enabled: boolean;
+  readonly seconds: number;
+  readonly onEnabledChange: (enabled: boolean) => void;
+  readonly onSecondsChange: (seconds: number) => void;
+}) {
+  return (
+    <div className="rounded-xl bg-blue-950/22 p-4 text-sm font-bold">
+      <label className="flex items-center justify-between gap-3">
+        Timer
+        <input
+          className="size-4 accent-white"
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => onEnabledChange(event.target.checked)}
+        />
+      </label>
+      <input
+        className="mt-3 w-full accent-white"
+        type="range"
+        min="15"
+        max="90"
+        step="15"
+        value={seconds}
+        disabled={!enabled}
+        onChange={(event) => onSecondsChange(Number(event.target.value))}
+      />
+      <p className="mt-1 text-blue-50/70">{seconds}s per turn</p>
+    </div>
+  );
+}
+
+function OpenRoomStrip({
+  rooms,
+  connected,
+  onJoinOpenRoom
+}: {
+  readonly rooms: readonly PublicOpenRoom[];
+  readonly connected: boolean;
+  readonly onJoinOpenRoom: (room: PublicOpenRoom) => void;
+}) {
+  if (rooms.length === 0) {
+    return <p className="mt-4 text-sm font-semibold text-blue-50/75">No open rooms right now.</p>;
+  }
+
+  return (
+    <div className="mt-4 grid gap-2">
+      {rooms.slice(0, 3).map((room) => (
+        <button
+          key={room.roomCode}
+          className="flex items-center justify-between gap-3 rounded-xl bg-blue-950/22 px-4 py-3 text-left transition hover:bg-blue-950/32 disabled:opacity-60"
+          type="button"
+          disabled={!connected}
+          onClick={() => onJoinOpenRoom(room)}
+        >
+          <span>
+            <span className="block font-black">{room.hostName}'s table</span>
+            <span className="text-sm text-blue-50/70">
+              {room.seatedPlayers}/{room.maxPlayers} seated · {room.roomCode}
+            </span>
+          </span>
+          <DoorOpen className="size-5 shrink-0" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HubRankedCard({
+  queue,
+  connected,
+  onJoin,
+  onLeave
+}: {
+  readonly queue: PublicRankedQueueState | null;
+  readonly connected: boolean;
+  readonly onJoin: () => void;
+  readonly onLeave: () => void;
+}) {
+  const joined = queue?.joined ?? false;
+  const queuedPlayers = queue?.queuedPlayers ?? 0;
+  const requiredPlayers = queue?.requiredPlayers ?? 4;
+  const etaLabel =
+    queue?.etaSeconds === null || queue === null
+      ? "ETA pending"
+      : queue.etaSeconds === 0
+        ? "Matching now"
+        : `~${queue.etaSeconds}s ETA`;
+
+  return (
+    <section className="online-panel p-5 sm:p-7">
+      <div className="mb-5 flex items-center gap-5">
+        <div className="grid size-20 shrink-0 place-items-center rounded-full bg-white/18">
+          <Trophy className="size-12" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-black">Ranked Match</h2>
+          <p className="mt-1 text-sm font-semibold text-blue-50/75">
+            4 humans · no bots · {DEFAULT_RANKED_TIMER_SECONDS}s timer
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <ProfileMetric label="Queued" value={`${queuedPlayers}/${requiredPlayers}`} />
+        <ProfileMetric label="ETA" value={etaLabel} />
+        <ProfileMetric label="Rating" value="ELO" />
+      </div>
+      <Button
+        className="mt-6 h-14 w-full text-lg"
+        disabled={!connected}
+        variant={joined ? "secondary" : "primary"}
+        onClick={joined ? onLeave : onJoin}
+      >
+        {joined ? "Leave Queue" : "Find Ranked Match"}
+      </Button>
+    </section>
+  );
+}
+
+function MinimalProfileCard({
+  playerName,
+  profile,
+  profileDisplayName,
+  profileAvatarKey,
+  onPlayerNameChange,
+  onProfileDisplayNameChange,
+  onProfileAvatarKeyChange,
+  onProfileSave
+}: {
+  readonly playerName: string;
+  readonly profile: PublicGuestProfile | null;
+  readonly profileDisplayName: string;
+  readonly profileAvatarKey: ProfileAvatarKey;
+  readonly onPlayerNameChange: (value: string) => void;
+  readonly onProfileDisplayNameChange: (value: string) => void;
+  readonly onProfileAvatarKeyChange: (value: ProfileAvatarKey) => void;
+  readonly onProfileSave: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="online-panel p-5">
+      <div className="flex items-center gap-3">
+        <ProfileAvatar avatarKey={profile?.avatarKey ?? profileAvatarKey} />
+        <div className="min-w-0">
+          <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
+          <p className="text-sm text-blue-50/70">{profile?.rating ?? 1000} rating</p>
+        </div>
+      </div>
+      <label className="mt-4 block text-sm font-black">
+        Name
+        <input
+          className="mt-2 h-11 w-full rounded-xl border border-white/15 bg-blue-950/22 px-3 text-sm outline-none focus:border-white"
+          value={playerName}
+          onChange={(event) => onPlayerNameChange(event.target.value)}
+        />
+      </label>
+      <details className="mt-3">
+        <summary className="cursor-pointer list-none text-sm font-black text-blue-50/85">
+          Edit profile
+        </summary>
+        <form className="mt-3 grid gap-2" onSubmit={onProfileSave}>
+          <input
+            className="h-10 rounded-xl border border-white/15 bg-blue-950/22 px-3 text-sm outline-none focus:border-white"
+            value={profileDisplayName}
+            maxLength={18}
+            onChange={(event) => onProfileDisplayNameChange(event.target.value)}
+          />
+          <div className="grid grid-cols-4 gap-1">
+            {AVATAR_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                className={cn(
+                  "grid h-9 place-items-center rounded-full border text-sm transition",
+                  profileAvatarKey === option.key
+                    ? "border-white bg-white/18"
+                    : "border-white/12 bg-blue-950/18"
+                )}
+                type="button"
+                title={option.label}
+                onClick={() => onProfileAvatarKeyChange(option.key)}
+              >
+                {getAvatarSymbol(option.key)}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" type="submit">
+            Save
+          </Button>
+        </form>
+      </details>
+    </section>
   );
 }
 
