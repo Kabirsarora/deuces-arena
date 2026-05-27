@@ -54,6 +54,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
+type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
@@ -85,6 +86,7 @@ export function OnlineRoomPanel() {
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
+  const [activeTablePanel, setActiveTablePanel] = useState<ActiveTablePanel | null>(null);
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
@@ -623,13 +625,17 @@ export function OnlineRoomPanel() {
   }
 
   return (
-    <main className="min-h-screen px-3 py-4 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid w-full max-w-[100rem] gap-3">
+    <main className="min-h-screen px-3 py-3 text-white sm:px-5 lg:px-8">
+      <section className="mx-auto grid w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
         <ActiveRoomBar
           room={room}
           connected={connected}
           isYourTurn={isYourTurn}
           message={message}
+          activePanel={activeTablePanel}
+          onTogglePanel={(panel) =>
+            setActiveTablePanel((currentPanel) => (currentPanel === panel ? null : panel))
+          }
           onCopyRoomCode={() => {
             if (room === null) {
               return;
@@ -646,63 +652,64 @@ export function OnlineRoomPanel() {
             void navigator.clipboard?.writeText(getRoomInviteUrl(room.roomCode));
             setMessage("Invite link copied.");
           }}
-          onExportReplay={exportReplay}
           onLeaveRoom={leaveRoom}
         />
 
-        <OnlineTable room={room} />
-
-        <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <section className="hand-dock border border-white/10 p-3 shadow-2xl backdrop-blur">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold">Your Hand</p>
-                <p className="text-xs text-zinc-400">
-                  {isYourTurn
-                    ? `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                    : "Waiting for your turn"}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
-                  Pass
-                </Button>
-                <Button onClick={playSelected} disabled={!isYourTurn || !canPlaySelected}>
-                  <Send className="size-4" />
-                  Play
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex min-h-32 items-end overflow-x-auto px-1 pb-2 pt-5">
-              <div className="flex items-end gap-1 sm:gap-2">
-                {(room?.yourHand ?? []).map((card) => {
-                  const selected = selectedCardIds.includes(getCardId(card));
-
-                  return (
-                    <motion.button
-                      key={getCardId(card)}
-                      type="button"
-                      className="shrink-0 rounded-md disabled:cursor-default"
-                      animate={{ y: selected ? -18 : 0 }}
-                      onClick={() => toggleCard(card)}
-                      disabled={!isYourTurn}
-                    >
-                      <OnlineCard card={card} selected={selected} />
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-
-          <OnlineMoveTracker
+        <section className="relative min-h-[28rem] lg:min-h-0">
+          <OnlineTable room={room} />
+          <ActiveTableDrawer
+            panel={activeTablePanel}
             room={room}
             moveEvaluations={moveEvaluations}
             canEvaluate={isYourTurn}
+            onClose={() => setActiveTablePanel(null)}
+            onExportReplay={exportReplay}
             onEvaluateMoves={evaluateMoves}
             onSendChat={sendChat}
           />
+        </section>
+
+        <section className="hand-dock border border-white/10 p-3 shadow-2xl backdrop-blur">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold">Your Hand</p>
+              <p className="text-xs text-zinc-400">
+                {isYourTurn
+                  ? `${selectedCards.length} selected · ${legalMoves.length} legal options`
+                  : "Waiting for your turn"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
+                Pass
+              </Button>
+              <Button onClick={playSelected} disabled={!isYourTurn || !canPlaySelected}>
+                <Send className="size-4" />
+                Play
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
+            <div className="flex items-end gap-1 sm:gap-2">
+              {(room?.yourHand ?? []).map((card) => {
+                const selected = selectedCardIds.includes(getCardId(card));
+
+                return (
+                  <motion.button
+                    key={getCardId(card)}
+                    type="button"
+                    className="shrink-0 rounded-md disabled:cursor-default"
+                    animate={{ y: selected ? -18 : 0 }}
+                    onClick={() => toggleCard(card)}
+                    disabled={!isYourTurn}
+                  >
+                    <OnlineCard card={card} selected={selected} />
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
         </section>
       </section>
     </main>
@@ -1355,18 +1362,20 @@ function ActiveRoomBar({
   connected,
   isYourTurn,
   message,
+  activePanel,
+  onTogglePanel,
   onCopyRoomCode,
   onCopyInvite,
-  onExportReplay,
   onLeaveRoom
 }: {
   readonly room: PublicRoomState | null;
   readonly connected: boolean;
   readonly isYourTurn: boolean;
   readonly message: string;
+  readonly activePanel: ActiveTablePanel | null;
+  readonly onTogglePanel: (panel: ActiveTablePanel) => void;
   readonly onCopyRoomCode: () => void;
   readonly onCopyInvite: () => void;
-  readonly onExportReplay: () => void;
   readonly onLeaveRoom: () => void;
 }) {
   return (
@@ -1396,13 +1405,37 @@ function ActiveRoomBar({
             {room.roomCode}
           </button>
         ) : null}
+        <TablePanelButton
+          panel="players"
+          activePanel={activePanel}
+          icon={<Users className="size-4" />}
+          label="Stats"
+          onToggle={onTogglePanel}
+        />
+        <TablePanelButton
+          panel="replay"
+          activePanel={activePanel}
+          icon={<History className="size-4" />}
+          label="Replay"
+          onToggle={onTogglePanel}
+        />
+        <TablePanelButton
+          panel="coach"
+          activePanel={activePanel}
+          icon={<Gauge className="size-4" />}
+          label="Coach"
+          onToggle={onTogglePanel}
+        />
+        <TablePanelButton
+          panel="chat"
+          activePanel={activePanel}
+          icon={<MessageCircle className="size-4" />}
+          label="Chat"
+          onToggle={onTogglePanel}
+        />
         <Button size="sm" variant="secondary" onClick={onCopyInvite} disabled={room === null}>
           <Copy className="size-4" />
           Invite
-        </Button>
-        <Button size="sm" variant="secondary" onClick={onExportReplay} disabled={room === null}>
-          <Download className="size-4" />
-          Replay
         </Button>
         <Button size="sm" variant="secondary" onClick={onLeaveRoom} disabled={room === null}>
           <DoorOpen className="size-4" />
@@ -1410,6 +1443,29 @@ function ActiveRoomBar({
         </Button>
       </div>
     </header>
+  );
+}
+
+function TablePanelButton({
+  panel,
+  activePanel,
+  icon,
+  label,
+  onToggle
+}: {
+  readonly panel: ActiveTablePanel;
+  readonly activePanel: ActiveTablePanel | null;
+  readonly icon: ReactNode;
+  readonly label: string;
+  readonly onToggle: (panel: ActiveTablePanel) => void;
+}) {
+  const active = panel === activePanel;
+
+  return (
+    <Button size="sm" variant={active ? "primary" : "secondary"} onClick={() => onToggle(panel)}>
+      {icon}
+      {label}
+    </Button>
   );
 }
 
@@ -2093,16 +2149,22 @@ function ProfileMetric({
   );
 }
 
-function OnlineMoveTracker({
+function ActiveTableDrawer({
+  panel,
   room,
   moveEvaluations,
   canEvaluate,
+  onClose,
+  onExportReplay,
   onEvaluateMoves,
   onSendChat
 }: {
+  readonly panel: ActiveTablePanel | null;
   readonly room: PublicRoomState | null;
   readonly moveEvaluations: readonly PublicMoveEvaluation[];
   readonly canEvaluate: boolean;
+  readonly onClose: () => void;
+  readonly onExportReplay: () => void;
   readonly onEvaluateMoves: () => void;
   readonly onSendChat: (body: string) => void;
 }) {
@@ -2110,88 +2172,112 @@ function OnlineMoveTracker({
     .slice(-6)
     .reverse();
 
+  if (panel === null) {
+    return null;
+  }
+
+  const title =
+    panel === "players"
+      ? "Table Stats"
+      : panel === "replay"
+        ? "Replay Log"
+        : panel === "coach"
+          ? "Move Coach"
+          : "Table Chat";
+
   return (
-    <aside className="hud-glass flex min-h-0 flex-col rounded-[1.25rem] border border-white/10 p-3 backdrop-blur">
-      <div className="flex items-center justify-between gap-2">
+    <aside className="hud-glass absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[min(24rem,calc(100%-1.5rem))] overflow-y-auto rounded-[1.25rem] border border-white/10 p-3 shadow-2xl backdrop-blur-xl">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-sm font-bold">
-            <History className="size-4 text-[var(--aqua)]" />
-            Table Tools
+          <p className="text-sm font-black">{title}</p>
+          <p className="text-xs text-zinc-400">
+            {room === null ? "No active room" : `${formatMatchMode(room.mode)} · ${room.status}`}
           </p>
-          <p className="text-xs text-zinc-400">{room?.recentEvents.length ?? 0} synced events</p>
         </div>
-        <div className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {room === null ? "idle" : `${formatMatchMode(room.mode)} · ${room.status}`}
-        </div>
+        <Button size="sm" variant="secondary" onClick={onClose}>
+          Close
+        </Button>
       </div>
 
-      <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
-          Players
-          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-normal text-zinc-400">
-            {room?.players.length ?? 0}
-          </span>
-        </summary>
-        <div className="mt-2 grid grid-cols-2 gap-2">
+      {panel === "players" ? (
+        <div className="grid gap-2">
           {(room?.players ?? []).map((player) => (
             <OnlinePlayerStat key={player.id} player={player} />
           ))}
         </div>
-      </details>
+      ) : null}
 
-      <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
-          Replay Log
-          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-normal text-zinc-400">
-            Open
-          </span>
-        </summary>
-        <div className="mt-2 min-h-0 flex-1 overflow-hidden rounded-[0.9rem] border border-white/10 bg-black/20">
-          {recentEvents.length === 0 ? (
-            <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
-              Accepted moves will stream here.
-            </div>
-          ) : (
-            <ol className="max-h-52 overflow-y-auto p-2">
-              {recentEvents.map((event) => (
-                <li
-                  key={`${event.turnNumber}-${event.playerId}`}
-                  className="mb-2 rounded-[0.9rem] border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-bold">
-                        {getRoomPlayerName(room, event.playerId)}
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-300">
-                        {event.kind === "pass"
-                          ? "Passed"
-                          : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                      #{event.turnNumber + 1}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
-                    <Activity className="size-3" />
-                    {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      </details>
+      {panel === "replay" ? (
+        <ReplayLog room={room} events={recentEvents} onExportReplay={onExportReplay} />
+      ) : null}
 
-      <MoveLab
-        evaluations={moveEvaluations}
-        disabled={!canEvaluate}
-        onEvaluateMoves={onEvaluateMoves}
-      />
+      {panel === "coach" ? (
+        <MoveLab
+          evaluations={moveEvaluations}
+          disabled={!canEvaluate}
+          onEvaluateMoves={onEvaluateMoves}
+        />
+      ) : null}
 
-      <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
+      {panel === "chat" ? (
+        <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
+      ) : null}
     </aside>
+  );
+}
+
+function ReplayLog({
+  room,
+  events,
+  onExportReplay
+}: {
+  readonly room: PublicRoomState | null;
+  readonly events: ReturnType<typeof createReplayTimeline>;
+  readonly onExportReplay: () => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      <Button size="sm" variant="secondary" disabled={room === null} onClick={onExportReplay}>
+        <Download className="size-4" />
+        Export Replay
+      </Button>
+      <div className="min-h-0 overflow-hidden rounded-[0.9rem] border border-white/10 bg-black/20">
+        {events.length === 0 ? (
+          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
+            Accepted moves will stream here.
+          </div>
+        ) : (
+          <ol className="max-h-80 overflow-y-auto p-2">
+            {events.map((event) => (
+              <li
+                key={`${event.turnNumber}-${event.playerId}`}
+                className="mb-2 rounded-[0.9rem] border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold">
+                      {getRoomPlayerName(room, event.playerId)}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-300">
+                      {event.kind === "pass"
+                        ? "Passed"
+                        : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                    #{event.turnNumber + 1}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
+                  <Activity className="size-3" />
+                  {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2366,7 +2452,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   return (
     <section
       className={cn(
-        "table-felt table-oval relative min-h-[34rem] overflow-hidden border border-white/10 p-3 sm:min-h-[40rem] lg:min-h-[calc(100vh-17rem)] lg:p-5",
+        "table-felt table-oval relative h-full min-h-[28rem] overflow-hidden border border-white/10 p-3 sm:min-h-[34rem] lg:min-h-0 lg:p-5",
         getTableThemeClass(tableTheme)
       )}
     >
@@ -2392,7 +2478,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
         ))
       )}
 
-      <div className="relative z-10 grid min-h-[30rem] place-items-center text-center sm:min-h-[34rem] lg:min-h-[calc(100vh-22rem)]">
+      <div className="relative z-10 grid h-full min-h-[26rem] place-items-center text-center sm:min-h-[30rem] lg:min-h-0">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
           <p className="text-xs font-semibold uppercase text-zinc-400">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
