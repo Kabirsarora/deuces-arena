@@ -537,7 +537,7 @@ export function OnlineRoomPanel() {
         </aside>
 
         <section className="grid gap-3">
-          <div className="grid gap-3 xl:grid-cols-[1fr_18rem]">
+          <div className="grid gap-3">
             <OnlineTable room={room} />
             <OnlineMoveTracker
               room={room}
@@ -1336,7 +1336,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   return (
     <section
       className={cn(
-        "table-felt table-oval relative min-h-[32rem] overflow-hidden border border-white/10 p-4",
+        "table-felt table-oval relative min-h-[42rem] overflow-hidden border border-white/10 p-4",
         getTableThemeClass(tableTheme)
       )}
     >

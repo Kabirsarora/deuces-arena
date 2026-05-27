@@ -33,9 +33,7 @@ const PLAYER_NAMES: Record<string, string> = {
 const BOT_DELAY_MS = 620;
 
 export function LocalGameTable() {
-  const [game, setGame] = useState<GameState>(() =>
-    createInitialGame(PLAYER_IDS, shuffleDeck(createSeededRandom(20260526)))
-  );
+  const [game, setGame] = useState<GameState>(() => createInitialGame(PLAYER_IDS, shuffleDeck()));
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [message, setMessage] = useState(
     "Win by shedding every card before the table catches you."
@@ -176,7 +174,7 @@ export function LocalGameTable() {
             activePlayerId={game.activePlayerId}
             className="hidden lg:col-start-1 lg:row-start-2 lg:flex"
           />
-          <div className="grid gap-3 lg:col-start-2 lg:row-start-2 xl:grid-cols-[1fr_18rem]">
+          <div className="grid gap-3 lg:col-start-2 lg:row-start-2">
             <TableCenter game={game} message={message} />
             <MoveTracker game={game} />
           </div>
@@ -408,7 +406,7 @@ function TableCenter({
   return (
     <section
       className={cn(
-        "table-felt table-oval relative grid min-h-[20rem] place-items-center overflow-hidden border border-[var(--felt-line)] p-4",
+        "table-felt table-oval relative grid min-h-[34rem] place-items-center overflow-hidden border border-[var(--felt-line)] p-4",
         className
       )}
     >
@@ -625,15 +623,6 @@ function shuffleDeck(random: () => number = Math.random): Card[] {
   }
 
   return deck;
-}
-
-function createSeededRandom(seed: number): () => number {
-  let state = seed;
-
-  return () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 0x100000000;
-  };
 }
 
 function describeMove(playerId: string, move: Move): string {
