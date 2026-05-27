@@ -387,7 +387,7 @@ export function OnlineRoomPanel() {
 
       const replay = {
         exportedAt: new Date().toISOString(),
-        mode: "online-room",
+        source: "online-room",
         ...ack.data,
         timeline: createReplayTimeline(ack.data.events)
       };
@@ -1463,6 +1463,18 @@ function formatCosmeticKind(kind: PublicCosmetic["kind"]): string {
     .join(" ");
 }
 
+function formatMatchMode(mode: PublicRoomState["mode"]): string {
+  if (mode === "RANKED") {
+    return "Ranked";
+  }
+
+  if (mode === "LOCAL_DEMO") {
+    return "Demo";
+  }
+
+  return "Casual";
+}
+
 function ProfileMetric({
   label,
   value
@@ -1506,7 +1518,7 @@ function OnlineMoveTracker({
           <p className="text-xs text-zinc-400">{room?.recentEvents.length ?? 0} synced events</p>
         </div>
         <div className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {room?.status ?? "idle"}
+          {room === null ? "idle" : `${formatMatchMode(room.mode)} · ${room.status}`}
         </div>
       </div>
 

@@ -337,6 +337,7 @@ describe("realtime rooms", () => {
     const roomCodes = new Set(states.map((state) => state.roomCode));
 
     expect(roomCodes.size).toBe(1);
+    expect(states[0]?.mode).toBe("RANKED");
     expect(states[0]?.players).toHaveLength(4);
     expect(states[0]?.players.every((player) => player.kind === "human")).toBe(true);
     expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);

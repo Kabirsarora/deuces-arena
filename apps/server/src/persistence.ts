@@ -9,6 +9,7 @@ import {
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
+  MatchMode,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
   PublicGuestProfile,
@@ -82,7 +83,8 @@ let dbModulePromise: Promise<typeof DbModule> | null = null;
 
 export async function createPersistedMatch(
   roomCode: string,
-  players: readonly PersistableRoomPlayer[]
+  players: readonly PersistableRoomPlayer[],
+  mode: MatchMode = "CASUAL"
 ): Promise<PersistedMatch | null> {
   const db = await getDb();
 
@@ -94,7 +96,7 @@ export async function createPersistedMatch(
     const usersByPlayerId = await getUsersByPlayerId(db, players);
     const match = await db.prisma.match.create({
       data: {
-        mode: "CASUAL",
+        mode,
         status: "IN_PROGRESS",
         roomCode,
         players: {

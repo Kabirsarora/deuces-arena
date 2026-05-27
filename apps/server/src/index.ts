@@ -15,6 +15,7 @@ import {
 import type {
   ClientToServerEvents,
   InterServerEvents,
+  MatchMode,
   PublicChatMessage,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
@@ -73,6 +74,7 @@ type GuestProfile = {
 
 type Room = {
   readonly code: string;
+  readonly mode: MatchMode;
   readonly createdAt: Date;
   players: RoomPlayer[];
   chatMessages: PublicChatMessage[];
@@ -296,7 +298,7 @@ io.on("connection", (socket) => {
       room.players.map((player) => player.id),
       shuffleDeck()
     );
-    room.persistedMatch = await createPersistedMatch(room.code, room.players);
+    room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
     resetTurnTimer(room);
 
     callback(ok(publicStateForSocket(room, socket.id)));
@@ -662,9 +664,10 @@ function createRoom(playerName: string, socketId: string, guestId: string | unde
   return room;
 }
 
-function createEmptyRoom(): Room {
+function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
   return {
     code: createRoomCode(),
+    mode,
     createdAt: new Date(),
     players: [],
     chatMessages: [],
@@ -939,6 +942,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
 
   return {
     roomCode: room.code,
+    mode: room.mode,
     status: room.game?.status ?? "waiting",
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     activePlayerId: room.game?.activePlayerId ?? null,
@@ -956,6 +960,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
 function replayExportForRoom(room: Room): RoomReplayExport {
   return {
     roomCode: room.code,
+    mode: room.mode,
     status: room.game?.status ?? "waiting",
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     placements: room.game?.placements ?? [],
@@ -1094,7 +1099,7 @@ async function maybeStartRankedMatch(): Promise<void> {
 }
 
 async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): Promise<void> {
-  const room = createEmptyRoom();
+  const room = createEmptyRoom("RANKED");
   room.players = queuedPlayers.map((player, index) => ({
     ...createHumanPlayer(player.playerName, player.socketId, index, player.guestId ?? undefined),
     ready: true
@@ -1107,7 +1112,7 @@ async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): P
     room.players.map((player) => player.id),
     shuffleDeck()
   );
-  room.persistedMatch = await createPersistedMatch(room.code, room.players);
+  room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
   resetTurnTimer(room);
   rooms.set(room.code, room);
 
@@ -1355,7 +1360,7 @@ function toInMemoryMatchHistoryItem(room: Room, guestId: string): PublicMatchHis
   return {
     matchId: room.persistedMatch?.matchId ?? room.code,
     roomCode: room.code,
-    mode: "CASUAL",
+    mode: room.mode,
     completedAt: room.createdAt.toISOString(),
     placement: placements.indexOf(player.id) + 1,
     ratingBefore: null,

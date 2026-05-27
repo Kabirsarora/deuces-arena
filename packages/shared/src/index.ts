@@ -2,6 +2,7 @@ import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-eng
 
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
+export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
 export type CosmeticKind =
   | "CARD_BACK"
   | "TABLE_THEME"
@@ -65,7 +66,7 @@ export type PublicMatchHistoryPlayer = {
 export type PublicMatchHistoryItem = {
   readonly matchId: string;
   readonly roomCode: string | null;
-  readonly mode: "CASUAL" | "RANKED" | "LOCAL_DEMO";
+  readonly mode: MatchMode;
   readonly completedAt: string | null;
   readonly placement: number | null;
   readonly ratingBefore: number | null;
@@ -150,6 +151,7 @@ export type PublicCoachEvaluationRecord = {
 
 export type PublicRoomState = {
   readonly roomCode: string;
+  readonly mode: MatchMode;
   readonly status: RoomStatus;
   readonly players: readonly PublicRoomPlayer[];
   readonly activePlayerId: string | null;
@@ -171,6 +173,7 @@ export type PublicTurnTimerState = {
 
 export type RoomReplayExport = {
   readonly roomCode: string;
+  readonly mode: MatchMode;
   readonly status: RoomStatus;
   readonly players: readonly PublicRoomPlayer[];
   readonly placements: readonly string[];
