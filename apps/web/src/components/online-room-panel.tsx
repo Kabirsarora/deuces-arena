@@ -25,6 +25,7 @@ import type {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  BookOpen,
   CheckCircle2,
   CircleDot,
   Copy,
@@ -38,6 +39,7 @@ import {
   Palette,
   Play,
   Send,
+  Settings,
   Sparkles,
   Trophy,
   Users
@@ -66,6 +68,8 @@ export function OnlineRoomPanel() {
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
+  const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
+  const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
   const selectedCards = useMemo(
@@ -454,6 +458,14 @@ export function OnlineRoomPanel() {
             currentRoomCode={room?.roomCode ?? null}
           />
           <LeaderboardSummary entries={leaderboard} />
+          <LobbySettingsSummary
+            timerEnabled={lobbyTimerEnabled}
+            timerSeconds={turnTimerSeconds}
+            disabled={room?.status === "in-progress"}
+            onTimerEnabledChange={setLobbyTimerEnabled}
+            onTimerSecondsChange={setTurnTimerSeconds}
+          />
+          <RulesSummary />
           <CosmeticsSummary cosmetics={cosmetics} profile={profile} onEquip={equipCosmetic} />
 
           <div className="grid gap-2">
@@ -916,6 +928,102 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
         </ol>
       )}
     </section>
+  );
+}
+
+function LobbySettingsSummary({
+  timerEnabled,
+  timerSeconds,
+  disabled,
+  onTimerEnabledChange,
+  onTimerSecondsChange
+}: {
+  readonly timerEnabled: boolean;
+  readonly timerSeconds: number;
+  readonly disabled: boolean;
+  readonly onTimerEnabledChange: (enabled: boolean) => void;
+  readonly onTimerSecondsChange: (seconds: number) => void;
+}) {
+  return (
+    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
+        <span className="flex items-center gap-2">
+          <Settings className="size-4 text-[var(--aqua)]" />
+          Lobby Settings
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
+          Casual
+        </span>
+      </summary>
+
+      <div className="mt-3 grid gap-3">
+        <label className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
+          <span>
+            <span className="block font-bold text-zinc-200">Turn timer</span>
+            <span className="text-zinc-400">Server enforcement comes next.</span>
+          </span>
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--gold)]"
+            checked={timerEnabled}
+            disabled={disabled}
+            onChange={(event) => onTimerEnabledChange(event.target.checked)}
+          />
+        </label>
+
+        <label className="block rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
+          <span className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-bold text-zinc-200">Seconds per turn</span>
+            <span className="font-black text-[var(--gold)]">{timerSeconds}s</span>
+          </span>
+          <input
+            type="range"
+            min="15"
+            max="90"
+            step="15"
+            value={timerSeconds}
+            disabled={disabled || !timerEnabled}
+            className="w-full accent-[var(--gold)]"
+            onChange={(event) => onTimerSecondsChange(Number(event.target.value))}
+          />
+        </label>
+      </div>
+    </details>
+  );
+}
+
+function RulesSummary() {
+  const rules = [
+    "3 of diamonds starts and must be in the first play.",
+    "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
+    "Players may pass even when they can beat the current play.",
+    "A bomb is four of a kind plus one kicker and can beat normal hands.",
+    "After a bomb, only a stronger bomb can answer."
+  ];
+
+  return (
+    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
+        <span className="flex items-center gap-2">
+          <BookOpen className="size-4 text-[var(--gold)]" />
+          Rules
+        </span>
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
+          Deuces
+        </span>
+      </summary>
+
+      <ul className="mt-3 grid gap-2">
+        {rules.map((rule) => (
+          <li
+            key={rule}
+            className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
+          >
+            {rule}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
