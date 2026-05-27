@@ -75,6 +75,14 @@ type Room = {
   game: GameState | null;
   persistedMatch: PersistedMatch | null;
   statsApplied: boolean;
+  timer: RoomTimerSettings;
+  turnDeadlineAt: Date | null;
+  timerTimeout: NodeJS.Timeout | null;
+};
+
+type RoomTimerSettings = {
+  readonly enabled: boolean;
+  readonly secondsPerTurn: number;
 };
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -82,6 +90,7 @@ const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
+const DEFAULT_TIMER_SECONDS = 45;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
     id: "starter-classic-red-card-back",
@@ -259,16 +268,18 @@ io.on("connection", (socket) => {
     }
 
     fillRoomWithBots(room);
+    room.timer = normalizeTimerSettings(payload.timer);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
       shuffleDeck()
     );
     room.persistedMatch = await createPersistedMatch(room.code, room.players);
+    resetTurnTimer(room);
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
-    scheduleBotTurn(room);
+    scheduleAutomatedTurn(room);
   });
 
   socket.on("room:ready", (payload, callback) => {
@@ -422,10 +433,11 @@ io.on("connection", (socket) => {
 
     room.game = result.state;
     persistLastMove(room);
+    resetTurnTimer(room);
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
-    scheduleBotTurn(room);
+    scheduleAutomatedTurn(room);
   });
 
   socket.on("chat:send", (payload, callback) => {
@@ -561,7 +573,13 @@ function createRoom(playerName: string, socketId: string, guestId: string | unde
     coachEvaluations: [],
     game: null,
     persistedMatch: null,
-    statsApplied: false
+    statsApplied: false,
+    timer: {
+      enabled: false,
+      secondsPerTurn: DEFAULT_TIMER_SECONDS
+    },
+    turnDeadlineAt: null,
+    timerTimeout: null
   };
   rooms.set(code, room);
   return room;
@@ -583,6 +601,7 @@ function leaveRoom(room: Room, playerId: string): void {
     room.players = room.players.filter((player) => player.id !== playerId);
 
     if (room.players.length === 0) {
+      clearTurnTimer(room);
       rooms.delete(room.code);
       emitLobbyState();
       return;
@@ -657,41 +676,106 @@ function fillRoomWithBots(room: Room): void {
   }
 }
 
-function scheduleBotTurn(room: Room): void {
+function normalizeTimerSettings(
+  timer: { readonly enabled: boolean; readonly secondsPerTurn: number } | undefined
+): RoomTimerSettings {
+  return {
+    enabled: timer?.enabled ?? false,
+    secondsPerTurn: clampInteger(timer?.secondsPerTurn ?? DEFAULT_TIMER_SECONDS, 1, 120)
+  };
+}
+
+function resetTurnTimer(room: Room): void {
+  clearTurnTimer(room);
+
+  if (room.game === null || room.game.status === "complete" || !room.timer.enabled) {
+    room.turnDeadlineAt = null;
+    return;
+  }
+
+  room.turnDeadlineAt = new Date(Date.now() + room.timer.secondsPerTurn * 1000);
+}
+
+function clearTurnTimer(room: Room): void {
+  if (room.timerTimeout !== null) {
+    clearTimeout(room.timerTimeout);
+    room.timerTimeout = null;
+  }
+}
+
+function publicTurnTimer(room: Room) {
+  if (!room.timer.enabled) {
+    return null;
+  }
+
+  return {
+    enabled: true,
+    secondsPerTurn: room.timer.secondsPerTurn,
+    deadlineAt: room.turnDeadlineAt?.toISOString() ?? null
+  };
+}
+
+function scheduleAutomatedTurn(room: Room): void {
   if (room.game === null || room.game.status === "complete") {
+    clearTurnTimer(room);
     return;
   }
 
   const activePlayer = room.players.find((player) => player.id === room.game?.activePlayerId);
 
-  if (activePlayer?.kind !== "bot") {
+  if (activePlayer === undefined) {
     return;
   }
 
-  setTimeout(() => {
-    if (room.game === null || room.game.activePlayerId !== activePlayer.id) {
-      return;
-    }
+  if (activePlayer.kind === "bot") {
+    const botTimeout = setTimeout(
+      () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
+      700
+    );
+    botTimeout.unref();
+    return;
+  }
 
-    const botState = getGamePlayer(room.game, activePlayer.id);
-    const decision = chooseBotMove({
-      hand: botState.hand,
-      context: {
-        isFirstMove: room.game.turnNumber === 0,
-        currentTrick: room.game.currentTrick
-      },
-      strategy: "simple-heuristic"
-    });
-    const result = applyMove(room.game, activePlayer.id, decision.move);
+  if (!room.timer.enabled || room.turnDeadlineAt === null) {
+    return;
+  }
 
-    if (result.ok) {
-      room.game = result.state;
-      persistLastMove(room);
-      emitRoomState(room);
-      emitLobbyState();
-      scheduleBotTurn(room);
-    }
-  }, 700);
+  clearTurnTimer(room);
+  room.timerTimeout = setTimeout(
+    () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
+    Math.max(0, room.turnDeadlineAt.getTime() - Date.now())
+  );
+  room.timerTimeout.unref();
+}
+
+function applyAutomatedMove(
+  room: Room,
+  playerId: string,
+  strategy: "lowest-legal" | "simple-heuristic"
+): void {
+  if (room.game === null || room.game.activePlayerId !== playerId) {
+    return;
+  }
+
+  const playerState = getGamePlayer(room.game, playerId);
+  const decision = chooseBotMove({
+    hand: playerState.hand,
+    context: {
+      isFirstMove: room.game.turnNumber === 0,
+      currentTrick: room.game.currentTrick
+    },
+    strategy
+  });
+  const result = applyMove(room.game, playerId, decision.move);
+
+  if (result.ok) {
+    room.game = result.state;
+    persistLastMove(room);
+    resetTurnTimer(room);
+    emitRoomState(room);
+    emitLobbyState();
+    scheduleAutomatedTurn(room);
+  }
 }
 
 function persistLastMove(room: Room): void {
@@ -760,6 +844,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     placements: room.game?.placements ?? [],
     recentEvents: room.game?.events.slice(-12) ?? [],
     recentChat: room.chatMessages.slice(-20),
+    turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
     yourHand: hand
   };

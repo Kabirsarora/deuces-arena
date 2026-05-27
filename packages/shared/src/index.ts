@@ -147,8 +147,15 @@ export type PublicRoomState = {
   readonly placements: readonly string[];
   readonly recentEvents: readonly GameEvent[];
   readonly recentChat: readonly PublicChatMessage[];
+  readonly turnTimer: PublicTurnTimerState | null;
   readonly yourPlayerId: string | null;
   readonly yourHand: readonly Card[];
+};
+
+export type PublicTurnTimerState = {
+  readonly enabled: boolean;
+  readonly secondsPerTurn: number;
+  readonly deadlineAt: string | null;
 };
 
 export type RoomReplayExport = {
@@ -211,7 +218,13 @@ export type ClientToServerEvents = {
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
   "room:start": (
-    payload: { readonly roomCode: string },
+    payload: {
+      readonly roomCode: string;
+      readonly timer?: {
+        readonly enabled: boolean;
+        readonly secondsPerTurn: number;
+      };
+    },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
   "room:ready": (

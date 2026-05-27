@@ -242,7 +242,13 @@ export function OnlineRoomPanel() {
 
     socketRef.current?.emit(
       "room:start",
-      { roomCode: room.roomCode },
+      {
+        roomCode: room.roomCode,
+        timer: {
+          enabled: lobbyTimerEnabled,
+          secondsPerTurn: turnTimerSeconds
+        }
+      },
       handleRoomAck("Game started.")
     );
   }
@@ -1440,6 +1446,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
+  const timerLabel = formatTurnTimer(room);
 
   return (
     <section
@@ -1476,6 +1483,11 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
               ? "Open table"
               : room.currentTrick.hand.type}
           </h2>
+          {timerLabel !== null ? (
+            <p className="mt-2 rounded-full border border-white/10 bg-black/24 px-3 py-1 text-xs font-bold text-[var(--gold)]">
+              {timerLabel}
+            </p>
+          ) : null}
           <div className="mt-4 flex min-h-24 flex-wrap justify-center gap-2">
             <AnimatePresence mode="popLayout">
               {room?.currentTrick === null || room === null ? (
@@ -1607,6 +1619,23 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
   }
 
   return "";
+}
+
+function formatTurnTimer(room: PublicRoomState | null): string | null {
+  if (room?.turnTimer === null || room === null) {
+    return null;
+  }
+
+  if (room.turnTimer.deadlineAt === null) {
+    return `${room.turnTimer.secondsPerTurn}s timer`;
+  }
+
+  const secondsLeft = Math.max(
+    0,
+    Math.ceil((new Date(room.turnTimer.deadlineAt).getTime() - Date.now()) / 1000)
+  );
+
+  return `${secondsLeft}s to move`;
 }
 
 function OnlineCard({

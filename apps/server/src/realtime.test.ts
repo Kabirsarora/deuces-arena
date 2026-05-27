@@ -219,6 +219,39 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players).toHaveLength(4);
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(2);
     expect(startedRoom.data.yourHand).toHaveLength(13);
+    expect(startedRoom.data.turnTimer).toBeNull();
+  });
+
+  it("starts rooms with optional turn timer metadata", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Timer Host",
+      guestId: "guest-timer-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      timer: {
+        enabled: true,
+        secondsPerTurn: 30
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.turnTimer?.enabled).toBe(true);
+    expect(startedRoom.data.turnTimer?.secondsPerTurn).toBe(30);
+    expect(startedRoom.data.turnTimer?.deadlineAt).not.toBeNull();
   });
 
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
@@ -408,7 +441,13 @@ function joinRoom(
 
 function startRoom(
   socket: TestSocket,
-  payload: { readonly roomCode: string }
+  payload: {
+    readonly roomCode: string;
+    readonly timer?: {
+      readonly enabled: boolean;
+      readonly secondsPerTurn: number;
+    };
+  }
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {
     socket.emit("room:start", payload, (ack) => {
