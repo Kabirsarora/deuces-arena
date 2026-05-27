@@ -17,6 +17,7 @@ import type {
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicOpenRoom,
+  PublicRankedQueueState,
   PublicRoomPlayer,
   PublicRoomState,
   ServerAck,
@@ -54,6 +55,7 @@ const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000"
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
 const MAX_PLAYERS_PER_ROOM = 4;
+const DEFAULT_RANKED_TIMER_SECONDS = 45;
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -65,6 +67,7 @@ export function OnlineRoomPanel() {
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
+  const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
@@ -130,6 +133,7 @@ export function OnlineRoomPanel() {
       refreshProfile(socket, setProfile);
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
+      refreshRankedQueue(socket, setRankedQueue);
       refreshMatchHistory(socket, setMatchHistory);
       refreshCosmetics(socket, setCosmetics);
       const session = loadRoomSession();
@@ -152,6 +156,9 @@ export function OnlineRoomPanel() {
     });
     socket.on("lobby:state", (state) => {
       setLobby(state);
+    });
+    socket.on("ranked:state", (state) => {
+      setRankedQueue(state);
     });
     socket.on("chat:message", (chatMessage) => {
       setRoom((currentRoom) =>
@@ -231,6 +238,35 @@ export function OnlineRoomPanel() {
   function joinOpenRoom(openRoom: PublicOpenRoom) {
     setJoinCode(openRoom.roomCode);
     joinRoomByCode(openRoom.roomCode);
+  }
+
+  function joinRankedQueue() {
+    socketRef.current?.emit(
+      "ranked:join",
+      {
+        playerName,
+        guestId: getOrCreateGuestId()
+      },
+      (ack) => {
+        if (ack.ok) {
+          setRankedQueue(ack.data);
+          setMessage("Joined ranked queue. Waiting for 4 human players.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
+  function leaveRankedQueue() {
+    socketRef.current?.emit("ranked:leave", (ack) => {
+      if (ack.ok) {
+        setRankedQueue(ack.data);
+        setMessage("Left ranked queue.");
+      } else {
+        setMessage(ack.error);
+      }
+    });
   }
 
   function joinRoomByCode(roomCode: string) {
@@ -473,6 +509,13 @@ export function OnlineRoomPanel() {
             connected={connected}
             onJoinRoom={joinOpenRoom}
             currentRoomCode={room?.roomCode ?? null}
+          />
+          <RankedQueueSummary
+            queue={rankedQueue}
+            connected={connected}
+            inRoom={room !== null}
+            onJoin={joinRankedQueue}
+            onLeave={leaveRankedQueue}
           />
           <LeaderboardSummary entries={leaderboard} />
           <LobbySettingsSummary
@@ -742,6 +785,17 @@ function refreshLobby(
   });
 }
 
+function refreshRankedQueue(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setRankedQueue: (state: PublicRankedQueueState) => void
+): void {
+  socket.emit("ranked:get", (ack) => {
+    if (ack.ok) {
+      setRankedQueue(ack.data);
+    }
+  });
+}
+
 function refreshMatchHistory(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   setMatchHistory: (entries: readonly PublicMatchHistoryItem[]) => void
@@ -907,6 +961,57 @@ function LobbySummary({
           ))
         )}
       </div>
+    </section>
+  );
+}
+
+function RankedQueueSummary({
+  queue,
+  connected,
+  inRoom,
+  onJoin,
+  onLeave
+}: {
+  readonly queue: PublicRankedQueueState | null;
+  readonly connected: boolean;
+  readonly inRoom: boolean;
+  readonly onJoin: () => void;
+  readonly onLeave: () => void;
+}) {
+  const joined = queue?.joined ?? false;
+  const queuedPlayers = queue?.queuedPlayers ?? 0;
+  const requiredPlayers = queue?.requiredPlayers ?? 4;
+  const etaLabel =
+    queue?.etaSeconds === null || queue === null
+      ? "ETA pending"
+      : queue.etaSeconds === 0
+        ? "Matching now"
+        : `~${queue.etaSeconds}s ETA`;
+
+  return (
+    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-bold">
+          <Trophy className="size-4 text-[var(--gold)]" />
+          Ranked Queue
+        </p>
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
+          {queuedPlayers}/{requiredPlayers}
+        </span>
+      </div>
+
+      <div className="mb-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300">
+        4 humans · no bots · {DEFAULT_RANKED_TIMER_SECONDS}s timer · {etaLabel}
+      </div>
+
+      <Button
+        className="w-full"
+        variant={joined ? "secondary" : "primary"}
+        disabled={!connected || (!joined && inRoom)}
+        onClick={joined ? onLeave : onJoin}
+      >
+        {joined ? "Leave Ranked Queue" : "Find Ranked Match"}
+      </Button>
     </section>
   );
 }

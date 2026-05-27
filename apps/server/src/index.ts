@@ -24,6 +24,7 @@ import type {
   PublicLobbyState,
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
+  PublicRankedQueueState,
   PublicRoomPlayer,
   PublicRoomState,
   RoomReplayExport,
@@ -85,12 +86,20 @@ type RoomTimerSettings = {
   readonly secondsPerTurn: number;
 };
 
+type RankedQueuedPlayer = {
+  readonly socketId: string;
+  readonly playerName: string;
+  readonly guestId: string | null;
+  readonly joinedAt: Date;
+};
+
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
+const RANKED_REQUIRED_PLAYERS = 4;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
     id: "starter-classic-red-card-back",
@@ -126,6 +135,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
+let rankedQueue: RankedQueuedPlayer[] = [];
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGINS }));
@@ -161,6 +171,7 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 
 io.on("connection", (socket) => {
   socket.on("room:create", (payload, callback) => {
+    removeRankedQueueEntry(socket.id);
     const room = createRoom(payload.playerName, socket.id, payload.guestId);
     const player = room.players[0];
 
@@ -181,6 +192,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("room:join", (payload, callback) => {
+    removeRankedQueueEntry(socket.id);
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
     if (room === undefined) {
@@ -415,6 +427,40 @@ io.on("connection", (socket) => {
     callback(ok(publicLobbyState()));
   });
 
+  socket.on("ranked:get", (callback) => {
+    callback(ok(publicRankedQueueState(socket.id)));
+  });
+
+  socket.on("ranked:join", async (payload, callback) => {
+    if (socket.data.roomCode !== undefined) {
+      callback(fail("Leave your current room before joining ranked."));
+      return;
+    }
+
+    if (!rankedQueue.some((entry) => entry.socketId === socket.id)) {
+      rankedQueue = [
+        ...rankedQueue,
+        {
+          socketId: socket.id,
+          playerName: payload.playerName.trim() || "Ranked Player",
+          guestId: normalizeGuestId(payload.guestId),
+          joinedAt: new Date()
+        }
+      ];
+    }
+
+    callback(ok(publicRankedQueueState(socket.id)));
+    emitRankedQueueState();
+    await maybeStartRankedMatch();
+    emitRankedQueueState();
+  });
+
+  socket.on("ranked:leave", (callback) => {
+    removeRankedQueueEntry(socket.id);
+    callback(ok(publicRankedQueueState(socket.id)));
+    emitRankedQueueState();
+  });
+
   socket.on("game:move", (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -528,6 +574,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    removeRankedQueueEntry(socket.id);
+    emitRankedQueueState();
+
     const roomCode = socket.data.roomCode;
     const playerId = socket.data.playerId;
 
@@ -571,11 +620,17 @@ function closeServer(signal: NodeJS.Signals): void {
 }
 
 function createRoom(playerName: string, socketId: string, guestId: string | undefined): Room {
-  const code = createRoomCode();
-  const room: Room = {
-    code,
+  const room = createEmptyRoom();
+  room.players = [createHumanPlayer(playerName, socketId, 0, guestId)];
+  rooms.set(room.code, room);
+  return room;
+}
+
+function createEmptyRoom(): Room {
+  return {
+    code: createRoomCode(),
     createdAt: new Date(),
-    players: [createHumanPlayer(playerName, socketId, 0, guestId)],
+    players: [],
     chatMessages: [],
     coachEvaluations: [],
     game: null,
@@ -588,8 +643,6 @@ function createRoom(playerName: string, socketId: string, guestId: string | unde
     turnDeadlineAt: null,
     timerTimeout: null
   };
-  rooms.set(code, room);
-  return room;
 }
 
 function addHumanPlayer(
@@ -914,6 +967,12 @@ function emitLobbyState(): void {
   io.emit("lobby:state", publicLobbyState());
 }
 
+function emitRankedQueueState(): void {
+  for (const entry of rankedQueue) {
+    io.to(entry.socketId).emit("ranked:state", publicRankedQueueState(entry.socketId));
+  }
+}
+
 function emitRoomStatesForGuest(guestId: string): void {
   for (const room of rooms.values()) {
     if (room.players.some((player) => player.guestId === guestId)) {
@@ -972,6 +1031,70 @@ function publicLobbyState(): PublicLobbyState {
     },
     openRooms
   };
+}
+
+function publicRankedQueueState(socketId: string): PublicRankedQueueState {
+  const queuedPlayers = rankedQueue.length;
+  const playersNeeded = Math.max(0, RANKED_REQUIRED_PLAYERS - queuedPlayers);
+
+  return {
+    queuedPlayers,
+    requiredPlayers: RANKED_REQUIRED_PLAYERS,
+    etaSeconds: playersNeeded === 0 ? 0 : playersNeeded * 20,
+    joined: rankedQueue.some((entry) => entry.socketId === socketId)
+  };
+}
+
+function removeRankedQueueEntry(socketId: string): void {
+  rankedQueue = rankedQueue.filter((entry) => entry.socketId !== socketId);
+}
+
+async function maybeStartRankedMatch(): Promise<void> {
+  while (rankedQueue.length >= RANKED_REQUIRED_PLAYERS) {
+    const matchedPlayers = rankedQueue.slice(0, RANKED_REQUIRED_PLAYERS);
+    rankedQueue = rankedQueue.slice(RANKED_REQUIRED_PLAYERS);
+    await createRankedRoom(matchedPlayers);
+  }
+}
+
+async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): Promise<void> {
+  const room = createEmptyRoom();
+  room.players = queuedPlayers.map((player, index) => ({
+    ...createHumanPlayer(player.playerName, player.socketId, index, player.guestId ?? undefined),
+    ready: true
+  }));
+  room.timer = {
+    enabled: true,
+    secondsPerTurn: DEFAULT_TIMER_SECONDS
+  };
+  room.game = createInitialGame(
+    room.players.map((player) => player.id),
+    shuffleDeck()
+  );
+  room.persistedMatch = await createPersistedMatch(room.code, room.players);
+  resetTurnTimer(room);
+  rooms.set(room.code, room);
+
+  for (const player of room.players) {
+    if (player.socketId === null) {
+      continue;
+    }
+
+    const matchedSocket = io.sockets.sockets.get(player.socketId);
+    matchedSocket?.join(room.code);
+
+    if (matchedSocket !== undefined) {
+      matchedSocket.data = {
+        playerId: player.id,
+        roomCode: room.code
+      };
+      matchedSocket.emit("room:state", publicStateForSocket(room, matchedSocket.id));
+    }
+  }
+
+  emitRoomState(room);
+  emitLobbyState();
+  scheduleAutomatedTurn(room);
 }
 
 function getGamePlayer(game: GameState, playerId: string): PlayerState {

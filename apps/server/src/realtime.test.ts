@@ -12,6 +12,7 @@ import type {
   PublicGuestProfile,
   PublicLobbyState,
   PublicMoveEvaluation,
+  PublicRankedQueueState,
   PublicRoomState,
   RoomReplayExport,
   ServerAck,
@@ -294,6 +295,35 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(3);
   });
 
+  it("matches ranked queues with four humans and no bots", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const matchedStates = players.map((socket) => waitForRoomState(socket));
+
+    const joins = await Promise.all(
+      players.map((socket, index) =>
+        joinRanked(socket, {
+          playerName: `Ranked ${index + 1}`,
+          guestId: `guest-ranked-${index + 1}`
+        })
+      )
+    );
+
+    expect(joins.every((ack) => ack.ok)).toBe(true);
+
+    const states = await Promise.all(matchedStates);
+    const roomCodes = new Set(states.map((state) => state.roomCode));
+
+    expect(roomCodes.size).toBe(1);
+    expect(states[0]?.players).toHaveLength(4);
+    expect(states[0]?.players.every((player) => player.kind === "human")).toBe(true);
+    expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);
+  });
+
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
     const host = await connectTestSocket();
     const guest = await connectTestSocket();
@@ -497,6 +527,17 @@ function startRoom(
   });
 }
 
+function joinRanked(
+  socket: TestSocket,
+  payload: { readonly playerName: string; readonly guestId?: string }
+): Promise<ServerAck<PublicRankedQueueState>> {
+  return new Promise((resolve) => {
+    socket.emit("ranked:join", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
 function setReady(
   socket: TestSocket,
   payload: { readonly roomCode: string; readonly ready: boolean }
@@ -504,6 +545,14 @@ function setReady(
   return new Promise((resolve) => {
     socket.emit("room:ready", payload, (ack) => {
       resolve(ack);
+    });
+  });
+}
+
+function waitForRoomState(socket: TestSocket): Promise<PublicRoomState> {
+  return new Promise((resolve) => {
+    socket.once("room:state", (state) => {
+      resolve(state);
     });
   });
 }

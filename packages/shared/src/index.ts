@@ -99,6 +99,13 @@ export type PublicLobbyState = {
   readonly openRooms: readonly PublicOpenRoom[];
 };
 
+export type PublicRankedQueueState = {
+  readonly queuedPlayers: number;
+  readonly requiredPlayers: number;
+  readonly etaSeconds: number | null;
+  readonly joined: boolean;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -258,6 +265,12 @@ export type ClientToServerEvents = {
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
   ) => void;
   "lobby:get": (callback: (ack: ServerAck<PublicLobbyState>) => void) => void;
+  "ranked:get": (callback: (ack: ServerAck<PublicRankedQueueState>) => void) => void;
+  "ranked:join": (
+    payload: { readonly playerName: string; readonly guestId?: string },
+    callback: (ack: ServerAck<PublicRankedQueueState>) => void
+  ) => void;
+  "ranked:leave": (callback: (ack: ServerAck<PublicRankedQueueState>) => void) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
   "chat:send": (
     payload: ChatPayload,
@@ -272,6 +285,7 @@ export type ClientToServerEvents = {
 export type ServerToClientEvents = {
   "room:state": (state: PublicRoomState) => void;
   "lobby:state": (state: PublicLobbyState) => void;
+  "ranked:state": (state: PublicRankedQueueState) => void;
   "chat:message": (message: PublicChatMessage) => void;
   "game:error": (payload: { readonly message: string }) => void;
 };
