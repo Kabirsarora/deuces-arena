@@ -53,6 +53,7 @@ import { cn } from "@/lib/utils";
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
+const MAX_PLAYERS_PER_ROOM = 4;
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -68,6 +69,7 @@ export function OnlineRoomPanel() {
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
+  const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
@@ -100,9 +102,13 @@ export function OnlineRoomPanel() {
   const yourPlayer = room?.players.find((candidate) => candidate.id === room.yourPlayerId) ?? null;
   const connectedHumans =
     room?.players.filter((player) => player.kind === "human" && player.connected) ?? [];
+  const availableBotSeats =
+    room === null ? 3 : Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length);
+  const selectedBotSeats = Math.min(botSeats, availableBotSeats);
   const roomCanStart =
     room !== null &&
     room.status === "waiting" &&
+    room.players.length + selectedBotSeats >= MAX_PLAYERS_PER_ROOM &&
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
 
   useEffect(() => {
@@ -203,6 +209,10 @@ export function OnlineRoomPanel() {
     setMoveEvaluations([]);
   }, [room?.turnNumber, room?.roomCode]);
 
+  useEffect(() => {
+    setBotSeats((current) => Math.min(current, availableBotSeats));
+  }, [availableBotSeats]);
+
   function createRoom() {
     socketRef.current?.emit(
       "room:create",
@@ -244,6 +254,7 @@ export function OnlineRoomPanel() {
       "room:start",
       {
         roomCode: room.roomCode,
+        botCount: selectedBotSeats,
         timer: {
           enabled: lobbyTimerEnabled,
           secondsPerTurn: turnTimerSeconds
@@ -465,9 +476,12 @@ export function OnlineRoomPanel() {
           />
           <LeaderboardSummary entries={leaderboard} />
           <LobbySettingsSummary
+            botSeats={botSeats}
+            maxBotSeats={availableBotSeats}
             timerEnabled={lobbyTimerEnabled}
             timerSeconds={turnTimerSeconds}
             disabled={room?.status === "in-progress"}
+            onBotSeatsChange={setBotSeats}
             onTimerEnabledChange={setLobbyTimerEnabled}
             onTimerSecondsChange={setTurnTimerSeconds}
           />
@@ -536,7 +550,9 @@ export function OnlineRoomPanel() {
               </Button>
               <Button className="mt-2 w-full" onClick={startRoom} disabled={!roomCanStart}>
                 <Play className="size-4" />
-                {connectedHumans.length <= 1 ? "Start With Bots" : "Start When Ready"}
+                {selectedBotSeats > 0
+                  ? `Start With ${selectedBotSeats} Bot${selectedBotSeats === 1 ? "" : "s"}`
+                  : "Start Game"}
               </Button>
               <Button className="mt-2 w-full" variant="secondary" onClick={exportReplay}>
                 <Download className="size-4" />
@@ -938,15 +954,21 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
 }
 
 function LobbySettingsSummary({
+  botSeats,
+  maxBotSeats,
   timerEnabled,
   timerSeconds,
   disabled,
+  onBotSeatsChange,
   onTimerEnabledChange,
   onTimerSecondsChange
 }: {
+  readonly botSeats: number;
+  readonly maxBotSeats: number;
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly disabled: boolean;
+  readonly onBotSeatsChange: (count: number) => void;
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
 }) {
@@ -963,6 +985,26 @@ function LobbySettingsSummary({
       </summary>
 
       <div className="mt-3 grid gap-3">
+        <label className="block rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
+          <span className="mb-2 flex items-center justify-between gap-2">
+            <span>
+              <span className="block font-bold text-zinc-200">Bot seats</span>
+              <span className="text-zinc-400">Casual rooms still need 4 total players.</span>
+            </span>
+            <span className="font-black text-[var(--gold)]">{botSeats}</span>
+          </span>
+          <input
+            type="range"
+            min="0"
+            max={maxBotSeats}
+            step="1"
+            value={botSeats}
+            disabled={disabled}
+            className="w-full accent-[var(--gold)]"
+            onChange={(event) => onBotSeatsChange(Number(event.target.value))}
+          />
+        </label>
+
         <label className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
           <span>
             <span className="block font-bold text-zinc-200">Turn timer</span>

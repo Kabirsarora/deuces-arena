@@ -220,6 +220,7 @@ export type ClientToServerEvents = {
   "room:start": (
     payload: {
       readonly roomCode: string;
+      readonly botCount?: number;
       readonly timer?: {
         readonly enabled: boolean;
         readonly secondsPerTurn: number;

@@ -267,7 +267,14 @@ io.on("connection", (socket) => {
       return;
     }
 
-    fillRoomWithBots(room);
+    const botCount = normalizeBotCount(payload.botCount, room.players.length);
+
+    if (room.players.length + botCount < MAX_PLAYERS_PER_ROOM) {
+      callback(fail("A game needs 4 seated players. Add more humans or bots."));
+      return;
+    }
+
+    fillRoomWithBots(room, botCount);
     room.timer = normalizeTimerSettings(payload.timer);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
@@ -659,8 +666,10 @@ function canStartRoom(room: Room): boolean {
   return connectedHumans.every((player) => player.ready);
 }
 
-function fillRoomWithBots(room: Room): void {
-  while (room.players.length < MAX_PLAYERS_PER_ROOM) {
+function fillRoomWithBots(room: Room, botCount: number): void {
+  let botsAdded = 0;
+
+  while (room.players.length < MAX_PLAYERS_PER_ROOM && botsAdded < botCount) {
     const seatIndex = room.players.length;
     room.players = [
       ...room.players,
@@ -673,7 +682,12 @@ function fillRoomWithBots(room: Room): void {
         ready: true
       }
     ];
+    botsAdded += 1;
   }
+}
+
+function normalizeBotCount(botCount: number | undefined, seatedPlayers: number): number {
+  return clampInteger(botCount ?? MAX_PLAYERS_PER_ROOM, 0, MAX_PLAYERS_PER_ROOM - seatedPlayers);
 }
 
 function normalizeTimerSettings(

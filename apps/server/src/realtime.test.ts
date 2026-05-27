@@ -254,6 +254,46 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.turnTimer?.deadlineAt).not.toBeNull();
   });
 
+  it("uses the requested casual bot count when starting rooms", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Bot Host",
+      guestId: "guest-bot-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const tooFewBots = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 1
+    });
+
+    expect(tooFewBots.ok).toBe(false);
+
+    if (tooFewBots.ok) {
+      return;
+    }
+
+    expect(tooFewBots.error).toContain("4 seated players");
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 3
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(3);
+  });
+
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
     const host = await connectTestSocket();
     const guest = await connectTestSocket();
@@ -443,6 +483,7 @@ function startRoom(
   socket: TestSocket,
   payload: {
     readonly roomCode: string;
+    readonly botCount?: number;
     readonly timer?: {
       readonly enabled: boolean;
       readonly secondsPerTurn: number;
