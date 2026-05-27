@@ -516,9 +516,9 @@ export function OnlineRoomPanel() {
   }
 
   return (
-    <main className="min-h-screen px-3 py-16 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid w-full max-w-7xl gap-3 lg:grid-cols-[24rem_1fr]">
-        <aside className="hud-glass rounded-[1.5rem] border border-white/10 p-4 backdrop-blur">
+    <main className="min-h-screen px-3 py-10 text-white sm:px-5 lg:px-8">
+      <section className="mx-auto grid w-full max-w-[96rem] gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <aside className="hud-glass order-2 rounded-[1.5rem] border border-white/10 p-4 backdrop-blur lg:order-2">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase text-[var(--aqua)]">Online Rooms</p>
@@ -661,7 +661,7 @@ export function OnlineRoomPanel() {
           </p>
         </aside>
 
-        <section className="grid gap-3">
+        <section className="order-1 grid gap-3 lg:order-1">
           <div className="grid gap-3">
             <OnlineTable room={room} />
             <OnlineMoveTracker
@@ -1508,7 +1508,7 @@ function OnlineMoveTracker({
     .reverse();
 
   return (
-    <aside className="hud-glass flex min-h-64 flex-col rounded-[1.25rem] border border-white/10 p-3 backdrop-blur">
+    <aside className="hud-glass flex min-h-0 flex-col rounded-[1.25rem] border border-white/10 p-3 backdrop-blur">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="flex items-center gap-2 text-sm font-bold">
@@ -1672,16 +1672,16 @@ function RoomChat({
   }
 
   return (
-    <div className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-xs font-bold">
+    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
+        <span className="flex items-center gap-2">
           <MessageCircle className="size-3.5 text-[var(--gold)]" />
           Table Chat
-        </p>
+        </span>
         <span className="text-[10px] text-zinc-500">{messages.length} recent</span>
-      </div>
+      </summary>
 
-      <div className="max-h-28 overflow-y-auto pr-1">
+      <div className="mt-2 max-h-28 overflow-y-auto pr-1">
         {messages.length === 0 ? (
           <p className="py-3 text-center text-xs text-zinc-500">No messages yet.</p>
         ) : (
@@ -1709,7 +1709,7 @@ function RoomChat({
           <Send className="size-4" />
         </Button>
       </form>
-    </div>
+    </details>
   );
 }
 
@@ -1745,19 +1745,27 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
   const timerLabel = formatTurnTimer(room);
+  const currentLeadName =
+    room?.currentTrick === null || room === null
+      ? null
+      : getRoomPlayerName(room, room.currentTrick.lastPlayedByPlayerId);
 
   return (
     <section
       className={cn(
-        "table-felt table-oval relative min-h-[42rem] overflow-hidden border border-white/10 p-4",
+        "table-felt table-oval relative min-h-[34rem] overflow-hidden border border-white/10 p-3 sm:min-h-[40rem] lg:min-h-[calc(100vh-14rem)] lg:p-5",
         getTableThemeClass(tableTheme)
       )}
     >
       <div className="absolute inset-4 rounded-[44%/18%] border border-white/8" />
-      <div className="absolute inset-10 rounded-full border border-white/8" />
+      <div className="absolute inset-12 rounded-full border border-white/8" />
+      <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-bold uppercase text-zinc-300 backdrop-blur">
+        <CircleDot className="size-3 text-[var(--aqua)]" />
+        {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
+      </div>
 
       {players.length === 0 ? (
-        <div className="absolute inset-x-5 top-5 z-10 rounded-full border border-dashed border-white/15 bg-black/18 px-4 py-3 text-center text-sm text-zinc-300">
+        <div className="absolute inset-x-6 top-16 z-10 rounded-full border border-dashed border-white/15 bg-black/18 px-4 py-3 text-center text-sm text-zinc-300">
           Create or join a room to take a seat.
         </div>
       ) : (
@@ -1773,24 +1781,26 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
           ))
       )}
 
-      <div className="relative z-10 grid min-h-[28rem] place-items-center text-center">
-        <div>
-          <p className="text-xs font-semibold uppercase text-zinc-400">Current Trick</p>
-          <h2 className="mt-1 text-xl font-black">
+      <div className="relative z-10 grid min-h-[30rem] place-items-center text-center sm:min-h-[34rem] lg:min-h-[calc(100vh-19rem)]">
+        <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
+          <p className="text-xs font-semibold uppercase text-zinc-400">
+            {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
+          </p>
+          <h2 className="mt-1 text-2xl font-black">
             {room?.currentTrick === null || room === null
               ? "Open table"
-              : room.currentTrick.hand.type}
+              : formatHandType(room.currentTrick.hand.type)}
           </h2>
           {timerLabel !== null ? (
-            <p className="mt-2 rounded-full border border-white/10 bg-black/24 px-3 py-1 text-xs font-bold text-[var(--gold)]">
+            <p className="mx-auto mt-2 w-fit rounded-full border border-white/10 bg-black/24 px-3 py-1 text-xs font-bold text-[var(--gold)]">
               {timerLabel}
             </p>
           ) : null}
-          <div className="mt-4 flex min-h-24 flex-wrap justify-center gap-2">
+          <div className="mt-5 flex min-h-28 flex-wrap justify-center gap-2">
             <AnimatePresence mode="popLayout">
               {room?.currentTrick === null || room === null ? (
                 <motion.div
-                  className="rounded-full border border-dashed border-white/18 bg-black/18 px-5 py-6 text-sm text-zinc-300"
+                  className="rounded-full border border-dashed border-white/18 bg-black/18 px-7 py-7 text-sm text-zinc-300"
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
@@ -1806,7 +1816,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
           </div>
 
           {room?.status === "complete" ? (
-            <div className="mt-5 rounded-full border border-[var(--gold)] bg-black/28 px-4 py-3">
+            <div className="mx-auto mt-5 w-fit rounded-full border border-[var(--gold)] bg-black/28 px-4 py-3">
               <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
                 <Sparkles className="size-4" />
                 {getRoomPlayerName(room, room.placements[0] ?? "")} wins
@@ -1831,16 +1841,16 @@ function OnlineSeat({
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = [
-    "left-1/2 top-4 -translate-x-1/2",
-    "left-4 top-1/2 -translate-y-1/2",
-    "right-4 top-1/2 -translate-y-1/2",
-    "bottom-4 left-1/2 -translate-x-1/2"
+    "left-1/2 top-14 -translate-x-1/2",
+    "left-3 top-1/2 -translate-y-1/2 sm:left-5",
+    "right-3 top-1/2 -translate-y-1/2 sm:right-5",
+    "bottom-5 left-1/2 -translate-x-1/2"
   ][position];
 
   return (
     <div
       className={cn(
-        "seat-panel absolute z-20 flex w-[min(17rem,calc(100%-2rem))] items-center justify-between gap-3 border px-3 py-2",
+        "seat-panel absolute z-20 flex w-[min(14rem,calc(100%-2rem))] items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
         seatPosition,
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
@@ -1849,17 +1859,27 @@ function OnlineSeat({
             : "border-white/10"
       )}
     >
-      <div className="min-w-0">
+      <div
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-black",
+          player.connected
+            ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
+            : "border-zinc-500/35 bg-zinc-500/12 text-zinc-300"
+        )}
+      >
+        {player.name.slice(0, 1).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{player.name}</p>
         <p className="text-xs text-zinc-400">
           {player.cardsRemaining} cards · {player.connected ? "online" : "away"}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center">
         <OnlineMiniCardStack count={Math.min(player.cardsRemaining, 3)} cardBack={cardBack} />
         <span
           className={cn(
-            "rounded-full px-2 py-1 text-[10px] font-black",
+            "hidden rounded-full px-2 py-1 text-[10px] font-black sm:block",
             player.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/7 text-zinc-300"
           )}
         >
