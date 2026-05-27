@@ -13,7 +13,8 @@ import type {
   PublicCosmetic,
   PublicGuestProfile,
   PublicLeaderboardEntry,
-  PublicMatchHistoryItem
+  PublicMatchHistoryItem,
+  ProfileAvatarKey
 } from "@deuces-arena/shared";
 
 type PersistableRoomPlayer = {
@@ -39,6 +40,16 @@ export type EquipCosmeticResult =
   | {
       readonly ok: false;
       readonly reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned";
+    };
+
+export type UpdateProfileResult =
+  | {
+      readonly ok: true;
+      readonly profile: PublicGuestProfile;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "database-unavailable";
     };
 
 type CosmeticProgressionStats = {
@@ -147,6 +158,8 @@ export async function getPersistedGuestProfile(
       },
       select: {
         guestId: true,
+        displayName: true,
+        avatarKey: true,
         rating: true,
         gamesPlayed: true,
         wins: true,
@@ -202,6 +215,8 @@ export async function getPersistedGuestProfile(
 
     return {
       guestId: user.guestId,
+      displayName: user.displayName,
+      avatarKey: toProfileAvatarKey(user.avatarKey),
       rating: user.rating,
       gamesPlayed: user.gamesPlayed,
       wins: user.wins,
@@ -220,6 +235,59 @@ export async function getPersistedGuestProfile(
   } catch (error) {
     console.error("Unable to read guest profile.", error);
     return null;
+  }
+}
+
+export async function updatePersistedGuestProfile(input: {
+  readonly guestId: string;
+  readonly displayName: string;
+  readonly avatarKey: ProfileAvatarKey;
+}): Promise<UpdateProfileResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    await db.prisma.user.upsert({
+      where: {
+        guestId: input.guestId
+      },
+      create: {
+        username: `guest:${input.guestId}`,
+        guestId: input.guestId,
+        displayName: input.displayName,
+        avatarKey: input.avatarKey
+      },
+      update: {
+        displayName: input.displayName,
+        avatarKey: input.avatarKey
+      }
+    });
+
+    const profile = await getPersistedGuestProfile(input.guestId);
+
+    if (profile === null) {
+      return {
+        ok: false,
+        reason: "database-unavailable"
+      };
+    }
+
+    return {
+      ok: true,
+      profile
+    };
+  } catch (error) {
+    console.error("Unable to update guest profile.", error);
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
   }
 }
 
@@ -853,6 +921,14 @@ function fromDbPlayerKind(kind: "HUMAN" | "BOT" | "GUEST"): "human" | "bot" | "g
   }
 
   return "human";
+}
+
+function toProfileAvatarKey(value: string): ProfileAvatarKey {
+  if (value === "club" || value === "heart" || value === "spade") {
+    return value;
+  }
+
+  return "diamond";
 }
 
 function getMoveHandType(event: GameEvent): string | null {

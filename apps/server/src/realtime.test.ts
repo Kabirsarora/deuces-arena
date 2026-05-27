@@ -82,6 +82,24 @@ describe("realtime rooms", () => {
     expect(profile.data.equippedCosmetics).toEqual([]);
   });
 
+  it("updates guest profile display name and avatar", async () => {
+    const socket = await connectTestSocket();
+    const profile = await updateProfile(socket, {
+      guestId: "guest-profile-editor",
+      displayName: "Arena Ace",
+      avatarKey: "spade"
+    });
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.displayName).toBe("Arena Ace");
+    expect(profile.data.avatarKey).toBe("spade");
+  });
+
   it("serves the cosmetic catalog over REST and Socket.IO", async () => {
     const socket = await connectTestSocket();
     const socketCatalog = await listCosmetics(socket);
@@ -576,6 +594,17 @@ function listCosmetics(socket: TestSocket): Promise<ServerAck<readonly PublicCos
 function getProfile(socket: TestSocket, guestId: string): Promise<ServerAck<PublicGuestProfile>> {
   return new Promise((resolve) => {
     socket.emit("profile:get", { guestId }, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function updateProfile(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly displayName: string; readonly avatarKey: "spade" }
+): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("profile:update", payload, (ack) => {
       resolve(ack);
     });
   });

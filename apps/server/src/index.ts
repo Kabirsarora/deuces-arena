@@ -27,6 +27,7 @@ import type {
   PublicRankedQueueState,
   PublicRoomPlayer,
   PublicRoomState,
+  ProfileAvatarKey,
   RoomReplayExport,
   ServerAck,
   ServerToClientEvents,
@@ -47,6 +48,7 @@ import {
   getPersistedMatchHistory,
   persistCoachEvaluation,
   persistMoveEvent,
+  updatePersistedGuestProfile,
   type PersistedMatch
 } from "./persistence.js";
 
@@ -61,6 +63,8 @@ type RoomPlayer = {
 
 type GuestProfile = {
   readonly guestId: string;
+  displayName: string | null;
+  avatarKey: ProfileAvatarKey;
   rating: number;
   gamesPlayed: number;
   wins: number;
@@ -381,6 +385,38 @@ io.on("connection", (socket) => {
     }
 
     callback(ok(await publicGuestProfile(guestId)));
+  });
+
+  socket.on("profile:update", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const displayName = normalizeDisplayName(payload.displayName);
+    const avatarKey = normalizeAvatarKey(payload.avatarKey);
+
+    if (guestId === null) {
+      callback(fail("Guest profile not found."));
+      return;
+    }
+
+    if (displayName === null) {
+      callback(fail("Display name must be 2-18 characters."));
+      return;
+    }
+
+    const inMemoryProfile = getOrCreateGuestProfile(guestId);
+    inMemoryProfile.displayName = displayName;
+    inMemoryProfile.avatarKey = avatarKey;
+
+    const persistedProfile = await updatePersistedGuestProfile({
+      guestId,
+      displayName,
+      avatarKey
+    });
+    const profile = persistedProfile.ok
+      ? persistedProfile.profile
+      : await publicGuestProfile(guestId);
+
+    callback(ok(profile));
+    emitRoomStatesForGuest(guestId);
   });
 
   socket.on("leaderboard:list", async (payload, callback) => {
@@ -1130,6 +1166,24 @@ function normalizeGuestId(guestId: string | undefined): string | null {
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 80);
 }
 
+function normalizeDisplayName(displayName: string): string | null {
+  const normalized = displayName.replace(/\s+/g, " ").trim();
+
+  if (normalized.length < 2 || normalized.length > 18) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
+  if (avatarKey === "club" || avatarKey === "heart" || avatarKey === "spade") {
+    return avatarKey;
+  }
+
+  return "diamond";
+}
+
 function parseClientOrigins(value: string | undefined): string[] {
   const origins =
     value
@@ -1149,6 +1203,8 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
 
   const profile: GuestProfile = {
     guestId,
+    displayName: null,
+    avatarKey: "diamond",
     rating: 1000,
     gamesPlayed: 0,
     wins: 0,
@@ -1163,6 +1219,8 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
 
   if (persistedProfile !== null) {
     const profile = getOrCreateGuestProfile(guestId);
+    profile.displayName = persistedProfile.displayName;
+    profile.avatarKey = persistedProfile.avatarKey;
     profile.rating = persistedProfile.rating;
     profile.gamesPlayed = persistedProfile.gamesPlayed;
     profile.wins = persistedProfile.wins;
@@ -1179,6 +1237,8 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
 
   return {
     guestId,
+    displayName: profile.displayName,
+    avatarKey: profile.avatarKey,
     rating: profile.rating,
     gamesPlayed: profile.gamesPlayed,
     wins: profile.wins,

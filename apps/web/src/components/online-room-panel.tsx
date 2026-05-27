@@ -20,6 +20,7 @@ import type {
   PublicRankedQueueState,
   PublicRoomPlayer,
   PublicRoomState,
+  ProfileAvatarKey,
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
@@ -56,12 +57,20 @@ const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
 const MAX_PLAYERS_PER_ROOM = 4;
 const DEFAULT_RANKED_TIMER_SECONDS = 45;
+const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label: string }[] = [
+  { key: "diamond", label: "Diamonds" },
+  { key: "club", label: "Clubs" },
+  { key: "heart", label: "Hearts" },
+  { key: "spade", label: "Spades" }
+];
 
 export function OnlineRoomPanel() {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [playerName, setPlayerName] = useState("Player");
+  const [profileDisplayName, setProfileDisplayName] = useState("Player");
+  const [profileAvatarKey, setProfileAvatarKey] = useState<ProfileAvatarKey>("diamond");
   const [joinCode, setJoinCode] = useState("");
   const [room, setRoom] = useState<PublicRoomState | null>(null);
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
@@ -113,6 +122,15 @@ export function OnlineRoomPanel() {
     room.status === "waiting" &&
     room.players.length + selectedBotSeats >= MAX_PLAYERS_PER_ROOM &&
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
+
+  useEffect(() => {
+    if (profile === null) {
+      return;
+    }
+
+    setProfileDisplayName(profile.displayName ?? playerName);
+    setProfileAvatarKey(profile.avatarKey);
+  }, [playerName, profile]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -193,6 +211,8 @@ export function OnlineRoomPanel() {
 
     setProfile({
       guestId: getOrCreateGuestId(),
+      displayName: profile?.displayName ?? profileDisplayName,
+      avatarKey: profile?.avatarKey ?? profileAvatarKey,
       ...player.stats,
       unlocks: profile?.unlocks ?? [],
       equippedCosmetics: profile?.equippedCosmetics ?? []
@@ -267,6 +287,27 @@ export function OnlineRoomPanel() {
         setMessage(ack.error);
       }
     });
+  }
+
+  function updateProfileIdentity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    socketRef.current?.emit(
+      "profile:update",
+      {
+        guestId: getOrCreateGuestId(),
+        displayName: profileDisplayName,
+        avatarKey: profileAvatarKey
+      },
+      (ack) => {
+        if (ack.ok) {
+          setProfile(ack.data);
+          setPlayerName(ack.data.displayName ?? profileDisplayName);
+          setMessage("Profile updated.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
   }
 
   function joinRoomByCode(roomCode: string) {
@@ -502,7 +543,14 @@ export function OnlineRoomPanel() {
             />
           </label>
 
-          <ProfileSummary profile={profile} />
+          <ProfileSummary
+            profile={profile}
+            displayName={profileDisplayName}
+            avatarKey={profileAvatarKey}
+            onDisplayNameChange={setProfileDisplayName}
+            onAvatarKeyChange={setProfileAvatarKey}
+            onSave={updateProfileIdentity}
+          />
           <MatchHistorySummary entries={matchHistory} />
           <LobbySummary
             lobby={lobby}
@@ -818,18 +866,74 @@ function refreshCosmetics(
   });
 }
 
-function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | null }) {
+function ProfileSummary({
+  profile,
+  displayName,
+  avatarKey,
+  onDisplayNameChange,
+  onAvatarKeyChange,
+  onSave
+}: {
+  readonly profile: PublicGuestProfile | null;
+  readonly displayName: string;
+  readonly avatarKey: ProfileAvatarKey;
+  readonly onDisplayNameChange: (value: string) => void;
+  readonly onAvatarKeyChange: (value: ProfileAvatarKey) => void;
+  readonly onSave: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const savedName = profile?.displayName ?? "Guest Profile";
+
   return (
     <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-bold">
-          <Trophy className="size-4 text-[var(--gold)]" />
-          Guest Profile
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <ProfileAvatar avatarKey={profile?.avatarKey ?? avatarKey} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold">{savedName}</p>
+            <p className="text-[11px] text-zinc-500">Guest account</p>
+          </div>
+        </div>
         <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
           {profile?.rating ?? 1000}
         </span>
       </div>
+      <form
+        className="mb-3 rounded-[0.9rem] border border-white/10 bg-white/7 p-2"
+        onSubmit={onSave}
+      >
+        <label className="mb-1 block text-[11px] font-bold uppercase text-zinc-500">
+          Display name
+        </label>
+        <div className="flex gap-2">
+          <input
+            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none transition focus:border-[var(--gold)]"
+            value={displayName}
+            maxLength={18}
+            onChange={(event) => onDisplayNameChange(event.target.value)}
+          />
+          <Button className="h-10 px-3" type="submit" size="sm">
+            Save
+          </Button>
+        </div>
+        <div className="mt-2 grid grid-cols-4 gap-1">
+          {AVATAR_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              className={cn(
+                "grid h-9 place-items-center rounded-full border text-sm transition",
+                avatarKey === option.key
+                  ? "border-[var(--gold)] bg-[var(--gold)]/15"
+                  : "border-white/10 bg-black/20 hover:border-white/25"
+              )}
+              type="button"
+              title={option.label}
+              onClick={() => onAvatarKeyChange(option.key)}
+            >
+              {getAvatarSymbol(option.key)}
+            </button>
+          ))}
+        </div>
+      </form>
       <div className="grid grid-cols-3 gap-2 text-center">
         <ProfileMetric label="Games" value={profile?.gamesPlayed ?? 0} />
         <ProfileMetric label="Wins" value={profile?.wins ?? 0} />
@@ -848,6 +952,41 @@ function ProfileSummary({ profile }: { readonly profile: PublicGuestProfile | nu
       </div>
     </section>
   );
+}
+
+function ProfileAvatar({ avatarKey }: { readonly avatarKey: ProfileAvatarKey }) {
+  return (
+    <div
+      className={cn(
+        "grid size-10 shrink-0 place-items-center rounded-full border text-lg shadow-lg",
+        avatarKey === "heart"
+          ? "border-rose-200/40 bg-rose-500/15 text-rose-100"
+          : avatarKey === "spade"
+            ? "border-zinc-200/35 bg-zinc-100/10 text-zinc-100"
+            : avatarKey === "club"
+              ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
+              : "border-sky-200/35 bg-sky-400/12 text-sky-100"
+      )}
+    >
+      {getAvatarSymbol(avatarKey)}
+    </div>
+  );
+}
+
+function getAvatarSymbol(avatarKey: ProfileAvatarKey): string {
+  if (avatarKey === "club") {
+    return "C";
+  }
+
+  if (avatarKey === "heart") {
+    return "H";
+  }
+
+  if (avatarKey === "spade") {
+    return "S";
+  }
+
+  return "D";
 }
 
 function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMatchHistoryItem[] }) {

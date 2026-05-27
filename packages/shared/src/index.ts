@@ -18,8 +18,12 @@ export type PublicPlayerStats = {
   readonly averagePlacement: number | null;
 };
 
+export type ProfileAvatarKey = "diamond" | "club" | "heart" | "spade";
+
 export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
+  readonly displayName: string | null;
+  readonly avatarKey: ProfileAvatarKey;
   readonly unlocks: readonly PublicCosmeticUnlock[];
   readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };
@@ -249,6 +253,14 @@ export type ClientToServerEvents = {
   ) => void;
   "profile:get": (
     payload: { readonly guestId: string },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
+  "profile:update": (
+    payload: {
+      readonly guestId: string;
+      readonly displayName: string;
+      readonly avatarKey: ProfileAvatarKey;
+    },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
   ) => void;
   "leaderboard:list": (

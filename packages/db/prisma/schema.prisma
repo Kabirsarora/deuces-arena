@@ -50,6 +50,7 @@ model User {
   username        String        @unique
   guestId         String?       @unique
   displayName     String?
+  avatarKey       String        @default("diamond")
   rating          Int           @default(1000)
   gamesPlayed     Int           @default(0)
   wins            Int           @default(0)
