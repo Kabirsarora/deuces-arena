@@ -23,7 +23,13 @@ Web:
 ```bash
 NEXT_PUBLIC_APP_URL="https://your-web-app.example.com"
 NEXT_PUBLIC_SERVER_URL="https://your-server.example.com"
+AUTH_SECRET="generated-secret"
+AUTH_GOOGLE_ID="google-oauth-client-id"
+AUTH_GOOGLE_SECRET="google-oauth-client-secret"
 ```
+
+For Google OAuth, add the deployed callback URL in Google Cloud:
+`https://your-web-app.example.com/api/auth/callback/google`.
 
 Server:
 

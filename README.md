@@ -38,6 +38,11 @@ npm run dev --workspace @deuces-arena/server
 
 The web app defaults to `http://localhost:3000`; the realtime server defaults to `http://localhost:4000`.
 
+Google sign-in is optional for local development. Without auth credentials, the app still works with
+guest profiles stored by browser. To test Google sign-in, create a `.env.local` for `apps/web` with
+`AUTH_SECRET`, `AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET`, then configure the Google OAuth redirect
+URI as `http://localhost:3000/api/auth/callback/google`.
+
 Useful backend endpoints:
 
 - `GET /health`: service health and active room count.
