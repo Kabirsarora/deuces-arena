@@ -43,7 +43,6 @@ import {
   Palette,
   Play,
   Send,
-  Settings,
   Sparkles,
   Trophy,
   Users
@@ -624,163 +623,36 @@ export function OnlineRoomPanel() {
   }
 
   return (
-    <main className="min-h-screen px-3 py-10 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid w-full max-w-[96rem] gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
-        <aside className="hud-glass order-2 rounded-[1.5rem] border border-white/10 p-4 backdrop-blur lg:order-2">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase text-[var(--aqua)]">Online Rooms</p>
-              <h1 className="text-2xl font-black">Realtime Table</h1>
-            </div>
-            <span
-              className={cn(
-                "rounded-full px-2 py-1 text-xs font-bold",
-                connected ? "bg-emerald-400/15 text-emerald-200" : "bg-red-400/15 text-red-200"
-              )}
-            >
-              {connected ? "Online" : "Offline"}
-            </span>
-          </div>
+    <main className="min-h-screen px-3 py-4 text-white sm:px-5 lg:px-8">
+      <section className="mx-auto grid w-full max-w-[100rem] gap-3">
+        <ActiveRoomBar
+          room={room}
+          connected={connected}
+          isYourTurn={isYourTurn}
+          message={message}
+          onCopyRoomCode={() => {
+            if (room === null) {
+              return;
+            }
 
-          <label className="mb-3 block text-xs font-bold text-zinc-300">
-            Display name
-            <input
-              className="mt-1 h-10 w-full rounded-full border border-white/10 bg-white/8 px-3 text-sm text-white outline-none focus:border-[var(--gold)]"
-              value={playerName}
-              onChange={(event) => setPlayerName(event.target.value)}
-            />
-          </label>
+            void navigator.clipboard?.writeText(room.roomCode);
+            setMessage("Room code copied.");
+          }}
+          onCopyInvite={() => {
+            if (room === null) {
+              return;
+            }
 
-          <ProfileSummary
-            profile={profile}
-            displayName={profileDisplayName}
-            avatarKey={profileAvatarKey}
-            onDisplayNameChange={setProfileDisplayName}
-            onAvatarKeyChange={setProfileAvatarKey}
-            onSave={updateProfileIdentity}
-          />
-          <MatchHistorySummary entries={matchHistory} />
-          <LobbySummary
-            lobby={lobby}
-            connected={connected}
-            onJoinRoom={joinOpenRoom}
-            currentRoomCode={room?.roomCode ?? null}
-          />
-          <RankedQueueSummary
-            queue={rankedQueue}
-            connected={connected}
-            inRoom={room !== null}
-            onJoin={joinRankedQueue}
-            onLeave={leaveRankedQueue}
-          />
-          <LeaderboardSummary entries={leaderboard} />
-          <LobbySettingsSummary
-            botSeats={botSeats}
-            maxBotSeats={availableBotSeats}
-            timerEnabled={lobbyTimerEnabled}
-            timerSeconds={turnTimerSeconds}
-            disabled={room?.status === "in-progress"}
-            onBotSeatsChange={setBotSeats}
-            onTimerEnabledChange={setLobbyTimerEnabled}
-            onTimerSecondsChange={setTurnTimerSeconds}
-          />
-          <RulesSummary />
-          <CosmeticsSummary cosmetics={cosmetics} profile={profile} onEquip={equipCosmetic} />
+            void navigator.clipboard?.writeText(getRoomInviteUrl(room.roomCode));
+            setMessage("Invite link copied.");
+          }}
+          onExportReplay={exportReplay}
+          onLeaveRoom={leaveRoom}
+        />
 
-          <div className="grid gap-2">
-            <Button onClick={createRoom} disabled={!connected}>
-              <Users className="size-4" />
-              Create Room
-            </Button>
-            <div className="flex gap-2">
-              <input
-                className="h-10 min-w-0 flex-1 rounded-full border border-white/10 bg-white/8 px-3 text-sm uppercase text-white outline-none focus:border-[var(--gold)]"
-                placeholder="Room code"
-                value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value)}
-              />
-              <Button
-                variant="secondary"
-                onClick={joinRoom}
-                disabled={!connected || joinCode.trim() === ""}
-              >
-                Join
-              </Button>
-            </div>
-          </div>
+        <OnlineTable room={room} />
 
-          {room !== null ? (
-            <div className="mt-4 rounded-[1.25rem] border border-white/10 bg-white/7 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs text-zinc-400">Room code</p>
-                  <p className="font-mono text-lg font-black">{room.roomCode}</p>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(room.roomCode);
-                    setMessage("Room code copied.");
-                  }}
-                >
-                  <Copy className="size-4" />
-                </Button>
-              </div>
-              <Button
-                className="mt-3 w-full"
-                variant="secondary"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(getRoomInviteUrl(room.roomCode));
-                  setMessage("Invite link copied.");
-                }}
-              >
-                <Copy className="size-4" />
-                Copy Invite Link
-              </Button>
-              <Button
-                className="mt-2 w-full"
-                variant="secondary"
-                onClick={() => setReady(!yourPlayer?.ready)}
-                disabled
-              >
-                <CheckCircle2 className="size-4" />
-                {yourPlayer?.ready ? "Ready" : "Mark Ready"}
-              </Button>
-              <Button className="mt-2 w-full" onClick={startRoom} disabled={!roomCanStart}>
-                <Play className="size-4" />
-                {selectedBotSeats > 0
-                  ? `Start With ${selectedBotSeats} Bot${selectedBotSeats === 1 ? "" : "s"}`
-                  : "Start Game"}
-              </Button>
-              <Button className="mt-2 w-full" variant="secondary" onClick={exportReplay}>
-                <Download className="size-4" />
-                Export Replay
-              </Button>
-              <Button className="mt-2 w-full" variant="secondary" onClick={leaveRoom}>
-                <LogOut className="size-4" />
-                Leave Room
-              </Button>
-            </div>
-          ) : null}
-
-          <p className="mt-4 rounded-[1rem] border border-white/10 bg-black/20 px-3 py-2 text-sm text-zinc-300">
-            {message}
-          </p>
-        </aside>
-
-        <section className="order-1 grid gap-3 lg:order-1">
-          <div className="grid gap-3">
-            <OnlineTable room={room} />
-            <OnlineMoveTracker
-              room={room}
-              moveEvaluations={moveEvaluations}
-              canEvaluate={isYourTurn}
-              onEvaluateMoves={evaluateMoves}
-              onSendChat={sendChat}
-            />
-          </div>
-
+        <section className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <section className="hand-dock border border-white/10 p-3 shadow-2xl backdrop-blur">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -788,7 +660,7 @@ export function OnlineRoomPanel() {
                 <p className="text-xs text-zinc-400">
                   {isYourTurn
                     ? `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                    : "Waiting"}
+                    : "Waiting for your turn"}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -823,6 +695,14 @@ export function OnlineRoomPanel() {
               </div>
             </div>
           </section>
+
+          <OnlineMoveTracker
+            room={room}
+            moveEvaluations={moveEvaluations}
+            canEvaluate={isYourTurn}
+            onEvaluateMoves={evaluateMoves}
+            onSendChat={sendChat}
+          />
         </section>
       </section>
     </main>
@@ -1470,6 +1350,69 @@ function MinimalProfileCard({
   );
 }
 
+function ActiveRoomBar({
+  room,
+  connected,
+  isYourTurn,
+  message,
+  onCopyRoomCode,
+  onCopyInvite,
+  onExportReplay,
+  onLeaveRoom
+}: {
+  readonly room: PublicRoomState | null;
+  readonly connected: boolean;
+  readonly isYourTurn: boolean;
+  readonly message: string;
+  readonly onCopyRoomCode: () => void;
+  readonly onCopyInvite: () => void;
+  readonly onExportReplay: () => void;
+  readonly onLeaveRoom: () => void;
+}) {
+  return (
+    <header className="hud-glass flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 px-3 py-2 backdrop-blur">
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            "size-3 shrink-0 rounded-full",
+            connected ? "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.45)]" : "bg-red-300"
+          )}
+        />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black">
+            {room === null ? "Realtime Table" : `${formatMatchMode(room.mode)} Table`}
+          </p>
+          <p className="truncate text-xs text-zinc-400">{isYourTurn ? "Your move" : message}</p>
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        {room !== null ? (
+          <button
+            className="rounded-full border border-white/10 bg-white/7 px-3 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)]"
+            type="button"
+            onClick={onCopyRoomCode}
+          >
+            {room.roomCode}
+          </button>
+        ) : null}
+        <Button size="sm" variant="secondary" onClick={onCopyInvite} disabled={room === null}>
+          <Copy className="size-4" />
+          Invite
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onExportReplay} disabled={room === null}>
+          <Download className="size-4" />
+          Replay
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onLeaveRoom} disabled={room === null}>
+          <DoorOpen className="size-4" />
+          Leave
+        </Button>
+      </div>
+    </header>
+  );
+}
+
 function OnlineWaitingRoom({
   room,
   connected,
@@ -1813,94 +1756,6 @@ function refreshCosmetics(
   });
 }
 
-function ProfileSummary({
-  profile,
-  displayName,
-  avatarKey,
-  onDisplayNameChange,
-  onAvatarKeyChange,
-  onSave
-}: {
-  readonly profile: PublicGuestProfile | null;
-  readonly displayName: string;
-  readonly avatarKey: ProfileAvatarKey;
-  readonly onDisplayNameChange: (value: string) => void;
-  readonly onAvatarKeyChange: (value: ProfileAvatarKey) => void;
-  readonly onSave: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  const savedName = profile?.displayName ?? "Guest Profile";
-
-  return (
-    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <ProfileAvatar avatarKey={profile?.avatarKey ?? avatarKey} />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold">{savedName}</p>
-            <p className="text-[11px] text-zinc-500">Guest account</p>
-          </div>
-        </div>
-        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {profile?.rating ?? 1000}
-        </span>
-      </div>
-      <form
-        className="mb-3 rounded-[0.9rem] border border-white/10 bg-white/7 p-2"
-        onSubmit={onSave}
-      >
-        <label className="mb-1 block text-[11px] font-bold uppercase text-zinc-500">
-          Display name
-        </label>
-        <div className="flex gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm outline-none transition focus:border-[var(--gold)]"
-            value={displayName}
-            maxLength={18}
-            onChange={(event) => onDisplayNameChange(event.target.value)}
-          />
-          <Button className="h-10 px-3" type="submit" size="sm">
-            Save
-          </Button>
-        </div>
-        <div className="mt-2 grid grid-cols-4 gap-1">
-          {AVATAR_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              className={cn(
-                "grid h-9 place-items-center rounded-full border text-sm transition",
-                avatarKey === option.key
-                  ? "border-[var(--gold)] bg-[var(--gold)]/15"
-                  : "border-white/10 bg-black/20 hover:border-white/25"
-              )}
-              type="button"
-              title={option.label}
-              onClick={() => onAvatarKeyChange(option.key)}
-            >
-              {getAvatarSymbol(option.key)}
-            </button>
-          ))}
-        </div>
-      </form>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <ProfileMetric label="Games" value={profile?.gamesPlayed ?? 0} />
-        <ProfileMetric label="Wins" value={profile?.wins ?? 0} />
-        <ProfileMetric
-          label="Avg"
-          value={
-            profile?.averagePlacement === null || profile?.averagePlacement === undefined
-              ? "-"
-              : profile.averagePlacement.toFixed(2)
-          }
-        />
-      </div>
-      <div className="mt-2 flex items-center justify-between rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
-        <span className="text-zinc-400">Unlocked cosmetics</span>
-        <span className="font-black text-[var(--gold)]">{profile?.unlocks.length ?? 0}</span>
-      </div>
-    </section>
-  );
-}
-
 function ProfileAvatar({ avatarKey }: { readonly avatarKey: ProfileAvatarKey }) {
   return (
     <div
@@ -1990,118 +1845,6 @@ function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMat
   );
 }
 
-function LobbySummary({
-  lobby,
-  connected,
-  currentRoomCode,
-  onJoinRoom
-}: {
-  readonly lobby: PublicLobbyState | null;
-  readonly connected: boolean;
-  readonly currentRoomCode: string | null;
-  readonly onJoinRoom: (room: PublicOpenRoom) => void;
-}) {
-  const activity = lobby?.activity;
-  const openRooms = lobby?.openRooms ?? [];
-
-  return (
-    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-bold">
-          <CircleDot className="size-4 text-emerald-300" />
-          Live Lobby
-        </p>
-        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {activity?.connectedUsers ?? 0} online
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <ProfileMetric label="Open" value={activity?.openRooms ?? 0} />
-        <ProfileMetric label="Playing" value={activity?.playersInActiveGames ?? 0} />
-        <ProfileMetric label="Tables" value={activity?.activeRooms ?? 0} />
-      </div>
-
-      <div className="mt-2 grid gap-2">
-        {openRooms.length === 0 ? (
-          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
-            No open rooms right now.
-          </p>
-        ) : (
-          openRooms.slice(0, 3).map((openRoom) => (
-            <button
-              key={openRoom.roomCode}
-              type="button"
-              className="flex items-center justify-between gap-2 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2 text-left transition hover:border-[var(--gold)] hover:bg-white/10 disabled:cursor-default disabled:opacity-50"
-              disabled={!connected || currentRoomCode === openRoom.roomCode}
-              onClick={() => onJoinRoom(openRoom)}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-xs font-bold">{openRoom.hostName}'s table</p>
-                <p className="text-[11px] text-zinc-400">
-                  {openRoom.readyPlayers}/{openRoom.seatedPlayers} ready · {openRoom.roomCode}
-                </p>
-              </div>
-              <DoorOpen className="size-4 shrink-0 text-[var(--gold)]" />
-            </button>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function RankedQueueSummary({
-  queue,
-  connected,
-  inRoom,
-  onJoin,
-  onLeave
-}: {
-  readonly queue: PublicRankedQueueState | null;
-  readonly connected: boolean;
-  readonly inRoom: boolean;
-  readonly onJoin: () => void;
-  readonly onLeave: () => void;
-}) {
-  const joined = queue?.joined ?? false;
-  const queuedPlayers = queue?.queuedPlayers ?? 0;
-  const requiredPlayers = queue?.requiredPlayers ?? 4;
-  const etaLabel =
-    queue?.etaSeconds === null || queue === null
-      ? "ETA pending"
-      : queue.etaSeconds === 0
-        ? "Matching now"
-        : `~${queue.etaSeconds}s ETA`;
-
-  return (
-    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-bold">
-          <Trophy className="size-4 text-[var(--gold)]" />
-          Ranked Queue
-        </p>
-        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs text-zinc-300">
-          {queuedPlayers}/{requiredPlayers}
-        </span>
-      </div>
-
-      <div className="mb-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300">
-        4 humans · no bots · {DEFAULT_RANKED_TIMER_SECONDS}s timer · {etaLabel}
-      </div>
-
-      <Button
-        className="w-full"
-        variant={joined ? "secondary" : "primary"}
-        disabled={!connected || (!joined && inRoom)}
-        onClick={joined ? onLeave : onJoin}
-      >
-        {joined ? "Leave Ranked Queue" : "Find Ranked Match"}
-      </Button>
-    </section>
-  );
-}
-
 function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLeaderboardEntry[] }) {
   return (
     <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -2141,93 +1884,6 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
         </ol>
       )}
     </section>
-  );
-}
-
-function LobbySettingsSummary({
-  botSeats,
-  maxBotSeats,
-  timerEnabled,
-  timerSeconds,
-  disabled,
-  onBotSeatsChange,
-  onTimerEnabledChange,
-  onTimerSecondsChange
-}: {
-  readonly botSeats: number;
-  readonly maxBotSeats: number;
-  readonly timerEnabled: boolean;
-  readonly timerSeconds: number;
-  readonly disabled: boolean;
-  readonly onBotSeatsChange: (count: number) => void;
-  readonly onTimerEnabledChange: (enabled: boolean) => void;
-  readonly onTimerSecondsChange: (seconds: number) => void;
-}) {
-  return (
-    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
-        <span className="flex items-center gap-2">
-          <Settings className="size-4 text-[var(--aqua)]" />
-          Lobby Settings
-        </span>
-        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
-          Casual
-        </span>
-      </summary>
-
-      <div className="mt-3 grid gap-3">
-        <label className="block rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
-          <span className="mb-2 flex items-center justify-between gap-2">
-            <span>
-              <span className="block font-bold text-zinc-200">Bot seats</span>
-              <span className="text-zinc-400">Casual rooms still need 4 total players.</span>
-            </span>
-            <span className="font-black text-[var(--gold)]">{botSeats}</span>
-          </span>
-          <input
-            type="range"
-            min="0"
-            max={maxBotSeats}
-            step="1"
-            value={botSeats}
-            disabled={disabled}
-            className="w-full accent-[var(--gold)]"
-            onChange={(event) => onBotSeatsChange(Number(event.target.value))}
-          />
-        </label>
-
-        <label className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
-          <span>
-            <span className="block font-bold text-zinc-200">Turn timer</span>
-            <span className="text-zinc-400">Server enforcement comes next.</span>
-          </span>
-          <input
-            type="checkbox"
-            className="size-4 accent-[var(--gold)]"
-            checked={timerEnabled}
-            disabled={disabled}
-            onChange={(event) => onTimerEnabledChange(event.target.checked)}
-          />
-        </label>
-
-        <label className="block rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs">
-          <span className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-bold text-zinc-200">Seconds per turn</span>
-            <span className="font-black text-[var(--gold)]">{timerSeconds}s</span>
-          </span>
-          <input
-            type="range"
-            min="15"
-            max="90"
-            step="15"
-            value={timerSeconds}
-            disabled={disabled || !timerEnabled}
-            className="w-full accent-[var(--gold)]"
-            onChange={(event) => onTimerSecondsChange(Number(event.target.value))}
-          />
-        </label>
-      </div>
-    </details>
   );
 }
 
@@ -2689,6 +2345,16 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
 function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
+  const yourPlayerIndex = players.findIndex((player) => player.id === room?.yourPlayerId);
+  const seatedPlayers: readonly PublicRoomPlayer[] =
+    yourPlayerIndex === -1 || players.length < 4
+      ? players.slice(0, 4)
+      : [
+          players[(yourPlayerIndex + 1) % players.length],
+          players[(yourPlayerIndex + 2) % players.length],
+          players[(yourPlayerIndex + 3) % players.length],
+          players[yourPlayerIndex]
+        ].filter((player): player is PublicRoomPlayer => player !== undefined);
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
   const timerLabel = formatTurnTimer(room);
@@ -2700,7 +2366,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
   return (
     <section
       className={cn(
-        "table-felt table-oval relative min-h-[34rem] overflow-hidden border border-white/10 p-3 sm:min-h-[40rem] lg:min-h-[calc(100vh-14rem)] lg:p-5",
+        "table-felt table-oval relative min-h-[34rem] overflow-hidden border border-white/10 p-3 sm:min-h-[40rem] lg:min-h-[calc(100vh-17rem)] lg:p-5",
         getTableThemeClass(tableTheme)
       )}
     >
@@ -2716,19 +2382,17 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
           Create or join a room to take a seat.
         </div>
       ) : (
-        players
-          .slice(0, 4)
-          .map((player, index) => (
-            <OnlineSeat
-              key={player.id}
-              player={player}
-              active={room?.activePlayerId === player.id}
-              position={index}
-            />
-          ))
+        seatedPlayers.map((player, index) => (
+          <OnlineSeat
+            key={player.id}
+            player={player}
+            active={room?.activePlayerId === player.id}
+            position={index}
+          />
+        ))
       )}
 
-      <div className="relative z-10 grid min-h-[30rem] place-items-center text-center sm:min-h-[34rem] lg:min-h-[calc(100vh-19rem)]">
+      <div className="relative z-10 grid min-h-[30rem] place-items-center text-center sm:min-h-[34rem] lg:min-h-[calc(100vh-22rem)]">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
           <p className="text-xs font-semibold uppercase text-zinc-400">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
