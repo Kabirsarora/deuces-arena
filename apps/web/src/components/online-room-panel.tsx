@@ -593,6 +593,36 @@ export function OnlineRoomPanel() {
     );
   }
 
+  if (room.status === "waiting") {
+    return (
+      <OnlineWaitingRoom
+        room={room}
+        connected={connected}
+        message={message}
+        botSeats={selectedBotSeats}
+        maxBotSeats={availableBotSeats}
+        timerEnabled={lobbyTimerEnabled}
+        timerSeconds={turnTimerSeconds}
+        roomCanStart={roomCanStart}
+        yourReady={yourPlayer?.ready ?? false}
+        onCopyRoomCode={() => {
+          void navigator.clipboard?.writeText(room.roomCode);
+          setMessage("Room code copied.");
+        }}
+        onCopyInvite={() => {
+          void navigator.clipboard?.writeText(getRoomInviteUrl(room.roomCode));
+          setMessage("Invite link copied.");
+        }}
+        onReady={() => setReady(!yourPlayer?.ready)}
+        onStart={startRoom}
+        onLeave={leaveRoom}
+        onBotSeatsChange={setBotSeats}
+        onTimerEnabledChange={setLobbyTimerEnabled}
+        onTimerSecondsChange={setTurnTimerSeconds}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen px-3 py-10 text-white sm:px-5 lg:px-8">
       <section className="mx-auto grid w-full max-w-[96rem] gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
@@ -712,7 +742,7 @@ export function OnlineRoomPanel() {
                 className="mt-2 w-full"
                 variant="secondary"
                 onClick={() => setReady(!yourPlayer?.ready)}
-                disabled={room.status !== "waiting"}
+                disabled
               >
                 <CheckCircle2 className="size-4" />
                 {yourPlayer?.ready ? "Ready" : "Mark Ready"}
@@ -1437,6 +1467,204 @@ function MinimalProfileCard({
         </form>
       </details>
     </section>
+  );
+}
+
+function OnlineWaitingRoom({
+  room,
+  connected,
+  message,
+  botSeats,
+  maxBotSeats,
+  timerEnabled,
+  timerSeconds,
+  roomCanStart,
+  yourReady,
+  onCopyRoomCode,
+  onCopyInvite,
+  onReady,
+  onStart,
+  onLeave,
+  onBotSeatsChange,
+  onTimerEnabledChange,
+  onTimerSecondsChange
+}: {
+  readonly room: PublicRoomState;
+  readonly connected: boolean;
+  readonly message: string;
+  readonly botSeats: number;
+  readonly maxBotSeats: number;
+  readonly timerEnabled: boolean;
+  readonly timerSeconds: number;
+  readonly roomCanStart: boolean;
+  readonly yourReady: boolean;
+  readonly onCopyRoomCode: () => void;
+  readonly onCopyInvite: () => void;
+  readonly onReady: () => void;
+  readonly onStart: () => void;
+  readonly onLeave: () => void;
+  readonly onBotSeatsChange: (count: number) => void;
+  readonly onTimerEnabledChange: (enabled: boolean) => void;
+  readonly onTimerSecondsChange: (seconds: number) => void;
+}) {
+  const seatedHumans = room.players.filter((player) => player.kind === "human").length;
+  const seatsNeeded = Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length - botSeats);
+  const inviteUrl = getRoomInviteUrl(room.roomCode);
+
+  return (
+    <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <section className="waiting-room-table relative grid min-h-[38rem] place-items-center overflow-hidden px-5 py-10 text-center">
+          <div className="absolute left-1/2 top-5 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur">
+            <span className="flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase text-zinc-300">
+              <CircleDot className="size-3 text-[var(--aqua)]" />
+              Casual table
+            </span>
+            <button
+              className="rounded-full bg-white/8 px-3 py-1 font-mono text-xs font-black tracking-wider text-[var(--gold)] transition hover:bg-white/12"
+              type="button"
+              onClick={onCopyRoomCode}
+            >
+              {room.roomCode}
+            </button>
+          </div>
+
+          <WaitingSeats players={room.players} botSeats={botSeats} />
+
+          <div className="relative z-10 w-[min(38rem,92vw)] rounded-[1.5rem] border border-white/12 bg-black/42 px-5 py-5 text-white shadow-2xl backdrop-blur">
+            <p className="text-2xl font-black text-white">Waiting for players</p>
+            <p className="mt-1 text-sm font-bold text-zinc-300">
+              {seatedHumans} human{seatedHumans === 1 ? "" : "s"} seated ·{" "}
+              {botSeats > 0
+                ? `${botSeats} bot${botSeats === 1 ? "" : "s"} selected`
+                : `${seatsNeeded} seats open`}
+            </p>
+            <button
+              className="mt-4 flex w-full items-center justify-between gap-3 rounded-full border border-white/12 bg-white/8 py-2 pl-4 pr-2 text-left font-mono text-sm font-black text-zinc-100 transition hover:border-[var(--gold)]"
+              type="button"
+              onClick={onCopyInvite}
+            >
+              <span className="truncate">{inviteUrl}</span>
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--gold)] text-black">
+                <Copy className="size-4" />
+              </span>
+            </button>
+          </div>
+
+          <p className="absolute bottom-6 left-1/2 z-10 w-[min(40rem,90vw)] -translate-x-1/2 text-sm font-semibold text-zinc-300">
+            {message}
+          </p>
+        </section>
+
+        <aside className="online-panel grid content-start gap-3 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--aqua)]">Room Setup</p>
+              <h1 className="text-xl font-black">Casual Table</h1>
+            </div>
+            <span
+              className={cn(
+                "rounded-full px-2 py-1 text-xs font-black",
+                connected ? "bg-emerald-400/15 text-emerald-200" : "bg-red-400/15 text-red-200"
+              )}
+            >
+              {connected ? "Online" : "Offline"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <ProfileMetric label="Players" value={`${room.players.length}/4`} />
+            <ProfileMetric
+              label="Ready"
+              value={room.players.filter((player) => player.ready).length}
+            />
+          </div>
+
+          <CompactRange
+            label="Bot seats"
+            value={botSeats}
+            min={0}
+            max={maxBotSeats}
+            disabled={!connected}
+            onChange={onBotSeatsChange}
+          />
+          <CompactTimerControl
+            enabled={timerEnabled}
+            seconds={timerSeconds}
+            onEnabledChange={onTimerEnabledChange}
+            onSecondsChange={onTimerSecondsChange}
+          />
+
+          <Button className="h-12" variant={yourReady ? "secondary" : "primary"} onClick={onReady}>
+            <CheckCircle2 className="size-4" />
+            {yourReady ? "Ready" : "Mark Ready"}
+          </Button>
+          <Button className="h-12" disabled={!roomCanStart} onClick={onStart}>
+            <Play className="size-4" />
+            {botSeats > 0 ? `Start With ${botSeats} Bot${botSeats === 1 ? "" : "s"}` : "Start Game"}
+          </Button>
+          <Button className="h-12" variant="secondary" onClick={onLeave}>
+            <LogOut className="size-4" />
+            Leave Table
+          </Button>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function WaitingSeats({
+  players,
+  botSeats
+}: {
+  readonly players: readonly PublicRoomPlayer[];
+  readonly botSeats: number;
+}) {
+  const visibleSeats = [
+    ...players.map((player) => ({
+      id: player.id,
+      label: player.name,
+      detail: player.ready ? "ready" : player.kind,
+      kind: player.kind
+    })),
+    ...Array.from({ length: botSeats }).map((_, index) => ({
+      id: `bot-preview-${index}`,
+      label: `Bot ${index + 1}`,
+      detail: "queued",
+      kind: "bot" as const
+    }))
+  ].slice(0, 4);
+  const seatPositions = [
+    "left-1/2 top-[12%] -translate-x-1/2",
+    "right-[8%] top-1/2 -translate-y-1/2",
+    "left-1/2 bottom-[9%] -translate-x-1/2",
+    "left-[8%] top-1/2 -translate-y-1/2"
+  ];
+
+  return (
+    <>
+      {visibleSeats.map((seat, index) => (
+        <div
+          key={seat.id}
+          className={cn(
+            "seat-panel absolute z-10 flex min-w-44 items-center gap-3 border px-3 py-2 text-left",
+            seatPositions[index]
+          )}
+        >
+          <div className="grid size-10 shrink-0 place-items-center rounded-full border border-white/15 bg-black/30 text-sm font-black">
+            {seat.kind === "bot" ? (
+              <Bot className="size-5 text-[var(--aqua)]" />
+            ) : (
+              seat.label.slice(0, 1).toUpperCase()
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-black">{seat.label}</p>
+            <p className="text-xs text-zinc-400">{seat.detail}</p>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
