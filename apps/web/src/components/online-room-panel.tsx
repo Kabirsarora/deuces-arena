@@ -57,6 +57,7 @@ import { cn } from "@/lib/utils";
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
 type AuthUser = {
+  readonly profileId: string;
   readonly name: string | null;
   readonly email: string | null;
   readonly image: string | null;
@@ -160,11 +161,11 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
-      refreshProfile(socket, setProfile);
+      refreshProfile(socket, getActiveProfileId(), setProfile);
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
       refreshRankedQueue(socket, setRankedQueue);
-      refreshMatchHistory(socket, setMatchHistory);
+      refreshMatchHistory(socket, getActiveProfileId(), setMatchHistory);
       refreshCosmetics(socket, setCosmetics);
       const session = loadRoomSession();
 
@@ -222,7 +223,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     }
 
     setProfile({
-      guestId: getOrCreateGuestId(),
+      guestId: getActiveProfileId(),
       displayName: profile?.displayName ?? profileDisplayName,
       avatarKey: profile?.avatarKey ?? profileAvatarKey,
       ...player.stats,
@@ -235,12 +236,12 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
 
       if (lastCompletionRefreshRef.current !== completionKey) {
         lastCompletionRefreshRef.current = completionKey;
-        refreshProfile(socketRef.current, setProfile);
+        refreshProfile(socketRef.current, getActiveProfileId(), setProfile);
         refreshCosmetics(socketRef.current, setCosmetics);
       }
 
       refreshLeaderboard(socketRef.current, setLeaderboard);
-      refreshMatchHistory(socketRef.current, setMatchHistory);
+      refreshMatchHistory(socketRef.current, getActiveProfileId(), setMatchHistory);
     }
   }, [profile?.equippedCosmetics, profile?.unlocks, room]);
 
@@ -257,7 +258,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       "room:create",
       {
         playerName,
-        guestId: getOrCreateGuestId()
+        guestId: getActiveProfileId()
       },
       handleRoomAck("Room created.")
     );
@@ -268,7 +269,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       "room:create",
       {
         playerName,
-        guestId: getOrCreateGuestId()
+        guestId: getActiveProfileId()
       },
       (createAck) => {
         if (!createAck.ok) {
@@ -310,7 +311,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       "ranked:join",
       {
         playerName,
-        guestId: getOrCreateGuestId()
+        guestId: getActiveProfileId()
       },
       (ack) => {
         if (ack.ok) {
@@ -339,7 +340,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socketRef.current?.emit(
       "profile:update",
       {
-        guestId: getOrCreateGuestId(),
+        guestId: getActiveProfileId(),
         displayName: profileDisplayName,
         avatarKey: profileAvatarKey
       },
@@ -361,7 +362,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       {
         roomCode,
         playerName,
-        guestId: getOrCreateGuestId()
+        guestId: getActiveProfileId()
       },
       handleRoomAck("Joined room.")
     );
@@ -525,7 +526,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socketRef.current?.emit(
       "cosmetics:equip",
       {
-        guestId: getOrCreateGuestId(),
+        guestId: getActiveProfileId(),
         cosmeticId: cosmetic.id
       },
       (ack) => {
@@ -558,6 +559,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         setMessage(ack.error);
       }
     };
+  }
+
+  function getActiveProfileId(): string {
+    return authUser?.profileId ?? getOrCreateGuestId();
   }
 
   if (room === null) {
@@ -1779,9 +1784,10 @@ function getOrCreateGuestId(): string {
 
 function refreshProfile(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  profileId: string,
   setProfile: (profile: PublicGuestProfile) => void
 ): void {
-  socket.emit("profile:get", { guestId: getOrCreateGuestId() }, (ack) => {
+  socket.emit("profile:get", { guestId: profileId }, (ack) => {
     if (ack.ok) {
       setProfile(ack.data);
     }
@@ -1823,9 +1829,10 @@ function refreshRankedQueue(
 
 function refreshMatchHistory(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  profileId: string,
   setMatchHistory: (entries: readonly PublicMatchHistoryItem[]) => void
 ): void {
-  socket.emit("profile:history", { guestId: getOrCreateGuestId(), limit: 5 }, (ack) => {
+  socket.emit("profile:history", { guestId: profileId, limit: 5 }, (ack) => {
     if (ack.ok) {
       setMatchHistory(ack.data);
     }
