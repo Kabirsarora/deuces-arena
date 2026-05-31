@@ -723,36 +723,40 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
 
           <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
             <div className="flex items-end gap-1 sm:gap-2">
-              {(room?.yourHand ?? []).map((card) => {
-                const selected = selectedCardIds.includes(getCardId(card));
-                const playable = isYourTurn && playableCardIds.has(getCardId(card));
+              <AnimatePresence initial={false} mode="popLayout">
+                {(room?.yourHand ?? []).map((card) => {
+                  const selected = selectedCardIds.includes(getCardId(card));
+                  const playable = isYourTurn && playableCardIds.has(getCardId(card));
 
-                return (
-                  <motion.button
-                    key={getCardId(card)}
-                    type="button"
-                    className="shrink-0 rounded-md disabled:cursor-default"
-                    initial={{ opacity: 0, y: 42, scale: 0.96 }}
-                    animate={{ opacity: 1, y: selected ? -18 : 0, scale: selected ? 1.03 : 1 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 420,
-                      damping: 30
-                    }}
-                    {...(isYourTurn
-                      ? {
-                          whileHover: {
-                            y: selected ? -20 : -8
+                  return (
+                    <motion.button
+                      key={getCardId(card)}
+                      layout
+                      type="button"
+                      className="shrink-0 rounded-md disabled:cursor-default"
+                      initial={{ opacity: 0, y: 42, scale: 0.96 }}
+                      animate={{ opacity: 1, y: selected ? -18 : 0, scale: selected ? 1.03 : 1 }}
+                      exit={{ opacity: 0, y: -44, scale: 0.84, rotate: -5 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 30
+                      }}
+                      {...(isYourTurn
+                        ? {
+                            whileHover: {
+                              y: selected ? -20 : -8
+                            }
                           }
-                        }
-                      : {})}
-                    onClick={() => toggleCard(card)}
-                    disabled={!isYourTurn || !playable}
-                  >
-                    <OnlineCard card={card} selected={selected} playable={playable} />
-                  </motion.button>
-                );
-              })}
+                        : {})}
+                      onClick={() => toggleCard(card)}
+                      disabled={!isYourTurn || !playable}
+                    >
+                      <OnlineCard card={card} selected={selected} playable={playable} />
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           </div>
         </section>
