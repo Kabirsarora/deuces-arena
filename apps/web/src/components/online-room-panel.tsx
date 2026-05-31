@@ -27,7 +27,7 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import {
   Activity,
   ArrowLeft,
@@ -88,6 +88,7 @@ const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label:
   { mode: "sets", label: "Sets" },
   { mode: "manual", label: "Manual" }
 ];
+const MANUAL_CARD_DRAG_STEP_PX = 58;
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -644,15 +645,21 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       return;
     }
 
-    const cardIdToMove = selectedManualCardId;
+    moveCardInHand(selectedManualCardId, direction);
+  }
+
+  function moveCardInHand(cardIdToMove: string, direction: number) {
+    if (direction === 0) {
+      return;
+    }
 
     setHandSortMode("manual");
     setManualCardOrderIds((current) => {
       const normalizedOrder = normalizeManualCardOrder(current, room?.yourHand ?? []);
       const fromIndex = normalizedOrder.indexOf(cardIdToMove);
-      const toIndex = fromIndex + direction;
+      const toIndex = Math.max(0, Math.min(normalizedOrder.length - 1, fromIndex + direction));
 
-      if (fromIndex < 0 || toIndex < 0 || toIndex >= normalizedOrder.length) {
+      if (fromIndex < 0 || fromIndex === toIndex) {
         return normalizedOrder;
       }
 
@@ -667,6 +674,18 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
 
       return nextOrder;
     });
+  }
+
+  function handleManualCardDrag(card: Card, info: PanInfo) {
+    if (handSortMode !== "manual") {
+      return;
+    }
+
+    const dragSteps = Math.round(info.offset.x / MANUAL_CARD_DRAG_STEP_PX);
+
+    if (dragSteps !== 0) {
+      moveCardInHand(getCardId(card), dragSteps);
+    }
   }
 
   function handleRoomAck(successMessage: string) {
@@ -919,6 +938,11 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                         stiffness: 420,
                         damping: 30
                       }}
+                      drag={handSortMode === "manual" ? "x" : false}
+                      dragSnapToOrigin
+                      dragElastic={0.18}
+                      dragMomentum={false}
+                      onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
                       {...(isYourTurn
                         ? {
                             whileHover: {
