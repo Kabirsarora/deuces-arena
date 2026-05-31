@@ -2576,10 +2576,23 @@ function OnlineTable({
   const latestPass =
     lastEvent?.wasPass === true
       ? {
-          turnNumber: lastEvent.turnNumber,
+          eventKey: `${lastEvent.turnNumber}-${lastEvent.playerId}`,
           playerName: getRoomPlayerName(room, lastEvent.playerId)
         }
       : null;
+  const [visiblePassKey, setVisiblePassKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (latestPass === null) {
+      setVisiblePassKey(null);
+      return;
+    }
+
+    setVisiblePassKey(latestPass.eventKey);
+    const timeout = window.setTimeout(() => setVisiblePassKey(null), 1400);
+
+    return () => window.clearTimeout(timeout);
+  }, [latestPass?.eventKey]);
 
   return (
     <section
@@ -2594,9 +2607,9 @@ function OnlineTable({
       </div>
 
       <AnimatePresence>
-        {latestPass !== null ? (
+        {latestPass !== null && visiblePassKey === latestPass.eventKey ? (
           <motion.div
-            key={`${latestPass.turnNumber}-${latestPass.playerName}`}
+            key={latestPass.eventKey}
             className="absolute left-1/2 top-[18%] z-30 -translate-x-1/2 rounded-full border border-white/12 bg-black/55 px-5 py-2 text-sm font-black text-zinc-100 shadow-2xl backdrop-blur"
             initial={{ opacity: 0, y: 12, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
