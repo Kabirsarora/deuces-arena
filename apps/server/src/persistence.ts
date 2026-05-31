@@ -262,7 +262,9 @@ export async function updatePersistedGuestProfile(input: {
         guestId: input.guestId
       },
       create: {
-        username: `guest:${input.guestId}`,
+        username: isAuthProfileId(input.guestId)
+          ? `auth:${input.guestId.slice(5)}`
+          : `guest:${input.guestId}`,
         guestId: input.guestId,
         displayName: input.displayName,
         avatarKey: input.avatarKey
@@ -849,6 +851,7 @@ async function getUsersByPlayerId(
       }
 
       const guestId = player.guestId.trim();
+      const authBacked = isAuthProfileId(guestId);
 
       return [
         db.prisma.user
@@ -857,7 +860,7 @@ async function getUsersByPlayerId(
               guestId
             },
             create: {
-              username: `guest:${guestId}`,
+              username: authBacked ? `auth:${guestId.slice(5)}` : `guest:${guestId}`,
               guestId,
               displayName: player.name
             },
@@ -875,6 +878,10 @@ async function getUsersByPlayerId(
   );
 
   return Object.fromEntries(entries);
+}
+
+function isAuthProfileId(profileId: string): boolean {
+  return /^auth-[a-f0-9]{32}$/.test(profileId);
 }
 
 function calculatePersistedRatingChanges(persistedMatch: PersistedMatch, game: GameState) {
