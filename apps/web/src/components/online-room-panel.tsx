@@ -92,6 +92,7 @@ const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label:
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
+  const lastDealAnimationKeyRef = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [playerName, setPlayerName] = useState("Player");
   const [profileDisplayName, setProfileDisplayName] = useState("Player");
@@ -114,6 +115,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
+  const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
   const selectedCards = useMemo(
@@ -201,6 +203,28 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   useEffect(() => {
     setManualCardOrderIds((current) => normalizeManualCardOrder(current, room?.yourHand ?? []));
   }, [room?.yourHand]);
+
+  useEffect(() => {
+    if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0) {
+      setDealAnimationKey(null);
+      return;
+    }
+
+    const nextDealAnimationKey = `${room.roomCode}-${room.yourHand
+      .map((card) => getCardId(card))
+      .join(".")}`;
+
+    if (lastDealAnimationKeyRef.current === nextDealAnimationKey) {
+      return;
+    }
+
+    lastDealAnimationKeyRef.current = nextDealAnimationKey;
+    setDealAnimationKey(nextDealAnimationKey);
+
+    const timeout = window.setTimeout(() => setDealAnimationKey(null), 2200);
+
+    return () => window.clearTimeout(timeout);
+  }, [room]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -766,7 +790,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         />
 
         <section className="relative min-h-[28rem] lg:min-h-0">
-          <OnlineTable room={room} timerNow={timerNow} />
+          <OnlineTable room={room} timerNow={timerNow} dealAnimationKey={dealAnimationKey} />
           <ActiveTableDrawer
             panel={activeTablePanel}
             room={room}
@@ -860,7 +884,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
             <div className="flex items-end gap-1 sm:gap-2">
               <AnimatePresence initial={false} mode="popLayout">
-                {displayedHand.map((card) => {
+                {displayedHand.map((card, index) => {
                   const selected = selectedCardIds.includes(getCardId(card));
                   const playable = isYourTurn && playableCardIds.has(getCardId(card));
 
@@ -870,10 +894,27 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       layout
                       type="button"
                       className="shrink-0 rounded-md disabled:cursor-default"
-                      initial={{ opacity: 0, y: 42, scale: 0.96 }}
+                      initial={
+                        dealAnimationKey === null
+                          ? { opacity: 0, y: 42, scale: 0.96 }
+                          : {
+                              opacity: 0,
+                              x: 220 - index * 18,
+                              y: -260,
+                              scale: 0.72,
+                              rotate: index % 2 === 0 ? -8 : 8
+                            }
+                      }
                       animate={{ opacity: 1, y: selected ? -18 : 0, scale: selected ? 1.03 : 1 }}
-                      exit={{ opacity: 0, y: -44, scale: 0.84, rotate: -5 }}
+                      exit={{
+                        opacity: 0,
+                        x: Math.max(-140, Math.min(140, (index - displayedHand.length / 2) * 18)),
+                        y: -280,
+                        scale: 0.72,
+                        rotate: index % 2 === 0 ? -10 : 10
+                      }}
                       transition={{
+                        delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.045),
                         type: "spring",
                         stiffness: 420,
                         damping: 30
@@ -2640,10 +2681,12 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
 
 function OnlineTable({
   room,
-  timerNow
+  timerNow,
+  dealAnimationKey
 }: {
   readonly room: PublicRoomState | null;
   readonly timerNow: number;
+  readonly dealAnimationKey: string | null;
 }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
@@ -2697,6 +2740,10 @@ function OnlineTable({
         <CircleDot className="size-3 text-[var(--aqua)]" />
         {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
       </div>
+
+      <AnimatePresence>
+        {dealAnimationKey !== null ? <DealAnimationOverlay key={dealAnimationKey} /> : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {latestPass !== null && visiblePassKey === latestPass.eventKey ? (
@@ -2787,6 +2834,62 @@ function OnlineTable({
         </div>
       </div>
     </section>
+  );
+}
+
+function DealAnimationOverlay() {
+  return (
+    <motion.div
+      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/18 backdrop-blur-[1px]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+    >
+      <div className="relative h-44 w-64">
+        <motion.div
+          className="absolute left-1/2 top-1/2 h-24 w-16 -translate-x-1/2 -translate-y-1/2 rounded-md border border-[var(--gold)]/60 bg-[#142a4f] shadow-2xl"
+          initial={{ rotate: -8, scale: 0.92 }}
+          animate={{ rotate: [0, -12, 10, -5, 0], scale: [0.92, 1.02, 0.98, 1] }}
+          transition={{ duration: 0.9, ease: "easeInOut" }}
+        />
+        {Array.from({ length: 9 }).map((_, index) => (
+          <motion.div
+            key={index}
+            className="absolute left-1/2 top-1/2 h-24 w-16 rounded-md border border-white/18 bg-[linear-gradient(135deg,#1a386b,#0a1630)] shadow-xl"
+            initial={{
+              x: "-50%",
+              y: "-50%",
+              rotate: index * 2 - 8,
+              opacity: 0,
+              scale: 0.96
+            }}
+            animate={{
+              x: `calc(-50% + ${(index - 4) * 22}px)`,
+              y: `calc(-50% + ${Math.abs(index - 4) * 5}px)`,
+              rotate: (index - 4) * 7,
+              opacity: [0, 1, 1, 0],
+              scale: [0.96, 1, 1, 0.9]
+            }}
+            transition={{
+              delay: 0.12 + index * 0.045,
+              duration: 1.45,
+              ease: "easeInOut"
+            }}
+          >
+            <div className="m-2 h-[calc(100%-1rem)] rounded border border-white/12 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.18),transparent_34%),linear-gradient(135deg,rgba(242,193,78,0.22),transparent_45%)]" />
+          </motion.div>
+        ))}
+        <motion.p
+          className="absolute inset-x-0 bottom-0 text-center text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [6, 0, 0, -4] }}
+          transition={{ duration: 1.7, delay: 0.24 }}
+        >
+          Shuffling
+        </motion.p>
+      </div>
+    </motion.div>
   );
 }
 
