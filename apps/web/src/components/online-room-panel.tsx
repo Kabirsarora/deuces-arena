@@ -53,7 +53,15 @@ import {
   Users,
   X
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode
+} from "react";
 import { io, type Socket } from "socket.io-client";
 
 import { SignInWithGoogleButton, SignOutButton } from "@/components/auth-buttons";
@@ -205,7 +213,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     setManualCardOrderIds((current) => normalizeManualCardOrder(current, room?.yourHand ?? []));
   }, [room?.yourHand]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0) {
       setDealAnimationKey(null);
       return;
