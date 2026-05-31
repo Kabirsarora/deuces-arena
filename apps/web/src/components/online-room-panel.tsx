@@ -1,9 +1,12 @@
 "use client";
 
 import {
+  compareCards,
   createReplayTimeline,
   generateLegalMoves,
   getCardId,
+  getRankStrength,
+  getSuitStrength,
   type Card,
   type Move
 } from "@deuces-arena/game-engine";
@@ -56,6 +59,7 @@ import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
+type HandSortMode = "rank" | "suit" | "sets";
 type AuthUser = {
   readonly profileId: string;
   readonly name: string | null;
@@ -73,6 +77,11 @@ const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label:
   { key: "club", label: "Clubs" },
   { key: "heart", label: "Hearts" },
   { key: "spade", label: "Spades" }
+];
+const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label: string }[] = [
+  { mode: "rank", label: "Rank" },
+  { mode: "suit", label: "Suit" },
+  { mode: "sets", label: "Sets" }
 ];
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
@@ -94,6 +103,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [activeTablePanel, setActiveTablePanel] = useState<ActiveTablePanel | null>(null);
+  const [handSortMode, setHandSortMode] = useState<HandSortMode>("rank");
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
@@ -102,6 +112,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const selectedCards = useMemo(
     () => room?.yourHand.filter((card) => selectedCardIds.includes(getCardId(card))) ?? [],
     [room?.yourHand, selectedCardIds]
+  );
+  const displayedHand = useMemo(
+    () => sortHandForDisplay(room?.yourHand ?? [], handSortMode),
+    [handSortMode, room?.yourHand]
   );
   const legalMoves = useMemo(
     () =>
@@ -710,7 +724,24 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                   : turnStatus}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex rounded-full border border-white/10 bg-black/24 p-1">
+                {HAND_SORT_OPTIONS.map((option) => (
+                  <button
+                    key={option.mode}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-xs font-black transition",
+                      handSortMode === option.mode
+                        ? "bg-[var(--gold)] text-black"
+                        : "text-zinc-400 hover:bg-white/8 hover:text-white"
+                    )}
+                    type="button"
+                    onClick={() => setHandSortMode(option.mode)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
                 Pass
               </Button>
@@ -724,7 +755,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
             <div className="flex items-end gap-1 sm:gap-2">
               <AnimatePresence initial={false} mode="popLayout">
-                {(room?.yourHand ?? []).map((card) => {
+                {displayedHand.map((card) => {
                   const selected = selectedCardIds.includes(getCardId(card));
                   const playable = isYourTurn && playableCardIds.has(getCardId(card));
 
@@ -2523,6 +2554,14 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
     room?.currentTrick === null || room === null
       ? null
       : getRoomPlayerName(room, room.currentTrick.lastPlayedByPlayerId);
+  const lastEvent = room?.recentEvents.at(-1) ?? null;
+  const latestPass =
+    lastEvent?.wasPass === true
+      ? {
+          turnNumber: lastEvent.turnNumber,
+          playerName: getRoomPlayerName(room, lastEvent.playerId)
+        }
+      : null;
 
   return (
     <section
@@ -2535,6 +2574,21 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
         <CircleDot className="size-3 text-[var(--aqua)]" />
         {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
       </div>
+
+      <AnimatePresence>
+        {latestPass !== null ? (
+          <motion.div
+            key={`${latestPass.turnNumber}-${latestPass.playerName}`}
+            className="absolute left-1/2 top-[18%] z-30 -translate-x-1/2 rounded-full border border-white/12 bg-black/55 px-5 py-2 text-sm font-black text-zinc-100 shadow-2xl backdrop-blur"
+            initial={{ opacity: 0, y: 12, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 360, damping: 28 }}
+          >
+            {latestPass.playerName} passed
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {players.length === 0 ? (
         <div className="absolute inset-x-6 top-16 z-10 rounded-full border border-dashed border-white/15 bg-black/18 px-4 py-3 text-center text-sm text-zinc-300">
@@ -2787,6 +2841,42 @@ function OnlineCard({
 
 function formatCard(card: Card): string {
   return `${card.rank}${suitSymbol(card.suit)}`;
+}
+
+function sortHandForDisplay(cards: readonly Card[], mode: HandSortMode): readonly Card[] {
+  if (mode === "suit") {
+    return [...cards].sort(compareCardsBySuit);
+  }
+
+  if (mode === "sets") {
+    const rankCounts = new Map<Card["rank"], number>();
+
+    for (const card of cards) {
+      rankCounts.set(card.rank, (rankCounts.get(card.rank) ?? 0) + 1);
+    }
+
+    return [...cards].sort((left, right) => {
+      const countComparison = (rankCounts.get(right.rank) ?? 0) - (rankCounts.get(left.rank) ?? 0);
+
+      if (countComparison !== 0) {
+        return countComparison;
+      }
+
+      return compareCards(left, right);
+    });
+  }
+
+  return [...cards].sort(compareCards);
+}
+
+function compareCardsBySuit(left: Card, right: Card): number {
+  const suitComparison = getSuitStrength(left.suit) - getSuitStrength(right.suit);
+
+  if (suitComparison !== 0) {
+    return suitComparison;
+  }
+
+  return getRankStrength(left.rank) - getRankStrength(right.rank);
 }
 
 function formatHandType(type: string): string {
