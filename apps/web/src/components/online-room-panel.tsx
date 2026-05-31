@@ -107,6 +107,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
   const selectedCards = useMemo(
@@ -283,6 +284,17 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   useEffect(() => {
     setBotSeats((current) => Math.min(current, availableBotSeats));
   }, [availableBotSeats]);
+
+  useEffect(() => {
+    if (room?.turnTimer?.deadlineAt === null || room?.turnTimer === null) {
+      return;
+    }
+
+    setTimerNow(Date.now());
+    const interval = window.setInterval(() => setTimerNow(Date.now()), 1000);
+
+    return () => window.clearInterval(interval);
+  }, [room?.turnTimer]);
 
   function createRoom() {
     socketRef.current?.emit(
@@ -699,7 +711,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         />
 
         <section className="relative min-h-[28rem] lg:min-h-0">
-          <OnlineTable room={room} />
+          <OnlineTable room={room} timerNow={timerNow} />
           <ActiveTableDrawer
             panel={activeTablePanel}
             room={room}
@@ -2534,7 +2546,13 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
   );
 }
 
-function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
+function OnlineTable({
+  room,
+  timerNow
+}: {
+  readonly room: PublicRoomState | null;
+  readonly timerNow: number;
+}) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
   const yourPlayerIndex = players.findIndex((player) => player.id === room?.yourPlayerId);
@@ -2549,7 +2567,7 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
         ].filter((player): player is PublicRoomPlayer => player !== undefined);
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
-  const timerLabel = formatTurnTimer(room);
+  const timerLabel = formatTurnTimer(room, timerNow);
   const currentLeadName =
     room?.currentTrick === null || room === null
       ? null
@@ -2777,7 +2795,7 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
   return "";
 }
 
-function formatTurnTimer(room: PublicRoomState | null): string | null {
+function formatTurnTimer(room: PublicRoomState | null, now: number): string | null {
   if (room?.turnTimer === null || room === null) {
     return null;
   }
@@ -2788,7 +2806,7 @@ function formatTurnTimer(room: PublicRoomState | null): string | null {
 
   const secondsLeft = Math.max(
     0,
-    Math.ceil((new Date(room.turnTimer.deadlineAt).getTime() - Date.now()) / 1000)
+    Math.ceil((new Date(room.turnTimer.deadlineAt).getTime() - now) / 1000)
   );
 
   return `${secondsLeft}s to move`;
