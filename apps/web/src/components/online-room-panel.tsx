@@ -123,6 +123,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     [legalMoves]
   );
   const canPass = legalMoves.some((move) => move.type === "pass");
+  const playableCardCount = playableCardIds.size;
   const canPlaySelected =
     selectedCards.length > 0 &&
     legalMoves.some(
@@ -703,7 +704,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
               <p className="text-sm font-bold">Your Hand</p>
               <p className="text-xs text-zinc-400">
                 {isYourTurn
-                  ? `${selectedCards.length} selected · ${legalMoves.length} legal options`
+                  ? playableCardCount === 0 && canPass
+                    ? "No legal play available · pass to continue"
+                    : `${selectedCards.length} selected · ${legalMoves.length} legal options`
                   : turnStatus}
               </p>
             </div>
