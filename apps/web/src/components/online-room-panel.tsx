@@ -48,7 +48,8 @@ import {
   Send,
   Sparkles,
   Trophy,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
@@ -70,6 +71,7 @@ type AuthUser = {
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
+const HAND_SORT_STORAGE_KEY = "deuces-arena-hand-sort";
 const MAX_PLAYERS_PER_ROOM = 4;
 const DEFAULT_RANKED_TIMER_SECONDS = 45;
 const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label: string }[] = [
@@ -103,7 +105,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [activeTablePanel, setActiveTablePanel] = useState<ActiveTablePanel | null>(null);
-  const [handSortMode, setHandSortMode] = useState<HandSortMode>("rank");
+  const [handSortMode, setHandSortMode] = useState<HandSortMode>(() => loadHandSortMode());
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
@@ -176,6 +178,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     setProfileDisplayName(profile.displayName ?? playerName);
     setProfileAvatarKey(profile.avatarKey);
   }, [playerName, profile]);
+
+  useEffect(() => {
+    window.localStorage.setItem(HAND_SORT_STORAGE_KEY, handSortMode);
+  }, [handSortMode]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -754,6 +760,18 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                   </button>
                 ))}
               </div>
+              {selectedCards.length > 0 ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-9 px-0"
+                  aria-label="Clear selected cards"
+                  title="Clear selected cards"
+                  onClick={() => setSelectedCardIds([])}
+                >
+                  <X className="size-4" />
+                </Button>
+              ) : null}
               <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
                 Pass
               </Button>
@@ -2898,6 +2916,18 @@ function sortHandForDisplay(cards: readonly Card[], mode: HandSortMode): readonl
   }
 
   return [...cards].sort(compareCards);
+}
+
+function loadHandSortMode(): HandSortMode {
+  if (typeof window === "undefined") {
+    return "rank";
+  }
+
+  const savedMode = window.localStorage.getItem(HAND_SORT_STORAGE_KEY);
+
+  return HAND_SORT_OPTIONS.some((option) => option.mode === savedMode)
+    ? (savedMode as HandSortMode)
+    : "rank";
 }
 
 function compareCardsBySuit(left: Card, right: Card): number {
