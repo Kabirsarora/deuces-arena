@@ -105,6 +105,7 @@ const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
+const BOT_MOVE_DELAY_MS = 1_250;
 const RANKED_REQUIRED_PLAYERS = 4;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
@@ -836,7 +837,7 @@ function scheduleAutomatedTurn(room: Room): void {
   if (activePlayer.kind === "bot") {
     const botTimeout = setTimeout(
       () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
-      700
+      BOT_MOVE_DELAY_MS
     );
     botTimeout.unref();
     return;

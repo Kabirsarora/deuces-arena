@@ -712,7 +712,20 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                     key={getCardId(card)}
                     type="button"
                     className="shrink-0 rounded-md disabled:cursor-default"
-                    animate={{ y: selected ? -18 : 0 }}
+                    initial={{ opacity: 0, y: 42, scale: 0.96 }}
+                    animate={{ opacity: 1, y: selected ? -18 : 0, scale: selected ? 1.03 : 1 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 420,
+                      damping: 30
+                    }}
+                    {...(isYourTurn
+                      ? {
+                          whileHover: {
+                            y: selected ? -20 : -8
+                          }
+                        }
+                      : {})}
                     onClick={() => toggleCard(card)}
                     disabled={!isYourTurn}
                   >
@@ -2541,8 +2554,22 @@ function OnlineTable({ room }: { readonly room: PublicRoomState | null }) {
                   Waiting for the next lead.
                 </motion.div>
               ) : (
-                room.currentTrick.hand.cards.map((card) => (
-                  <OnlineCard key={getCardId(card)} card={card} compact />
+                room.currentTrick.hand.cards.map((card, index) => (
+                  <motion.div
+                    key={`${room.turnNumber}-${getCardId(card)}`}
+                    layout
+                    initial={{ opacity: 0, y: 36, scale: 0.88, rotate: index - 2 }}
+                    animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.92 }}
+                    transition={{
+                      delay: Math.min(0.24, index * 0.045),
+                      type: "spring",
+                      stiffness: 380,
+                      damping: 28
+                    }}
+                  >
+                    <OnlineCard card={card} compact />
+                  </motion.div>
                 ))
               )}
             </AnimatePresence>
