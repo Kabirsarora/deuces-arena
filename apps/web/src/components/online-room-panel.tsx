@@ -30,6 +30,8 @@ import type {
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   BookOpen,
   Bot,
   CheckCircle2,
@@ -60,7 +62,7 @@ import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
-type HandSortMode = "rank" | "suit" | "sets";
+type HandSortMode = "rank" | "suit" | "sets" | "manual";
 type AuthUser = {
   readonly profileId: string;
   readonly name: string | null;
@@ -83,7 +85,8 @@ const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label:
 const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label: string }[] = [
   { mode: "rank", label: "Rank" },
   { mode: "suit", label: "Suit" },
-  { mode: "sets", label: "Sets" }
+  { mode: "sets", label: "Sets" },
+  { mode: "manual", label: "Manual" }
 ];
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
@@ -106,6 +109,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [activeTablePanel, setActiveTablePanel] = useState<ActiveTablePanel | null>(null);
   const [handSortMode, setHandSortMode] = useState<HandSortMode>(() => loadHandSortMode());
+  const [manualCardOrderIds, setManualCardOrderIds] = useState<readonly string[]>([]);
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
@@ -117,8 +121,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     [room?.yourHand, selectedCardIds]
   );
   const displayedHand = useMemo(
-    () => sortHandForDisplay(room?.yourHand ?? [], handSortMode),
-    [handSortMode, room?.yourHand]
+    () => sortHandForDisplay(room?.yourHand ?? [], handSortMode, manualCardOrderIds),
+    [handSortMode, manualCardOrderIds, room?.yourHand]
   );
   const legalMoves = useMemo(
     () =>
@@ -141,6 +145,17 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   );
   const canPass = legalMoves.some((move) => move.type === "pass");
   const playableCardCount = playableCardIds.size;
+  const selectedManualCardId =
+    selectedCardIds.length === 1 && selectedCardIds[0] !== undefined ? selectedCardIds[0] : null;
+  const selectedManualCardIndex =
+    selectedManualCardId === null
+      ? -1
+      : displayedHand.findIndex((card) => getCardId(card) === selectedManualCardId);
+  const canMoveManualCardLeft = handSortMode === "manual" && selectedManualCardIndex > 0;
+  const canMoveManualCardRight =
+    handSortMode === "manual" &&
+    selectedManualCardIndex >= 0 &&
+    selectedManualCardIndex < displayedHand.length - 1;
   const canPlaySelected =
     selectedCards.length > 0 &&
     legalMoves.some(
@@ -182,6 +197,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   useEffect(() => {
     window.localStorage.setItem(HAND_SORT_STORAGE_KEY, handSortMode);
   }, [handSortMode]);
+
+  useEffect(() => {
+    setManualCardOrderIds((current) => normalizeManualCardOrder(current, room?.yourHand ?? []));
+  }, [room?.yourHand]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -596,6 +615,36 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     );
   }
 
+  function moveSelectedCardInHand(direction: -1 | 1) {
+    if (selectedManualCardId === null) {
+      return;
+    }
+
+    const cardIdToMove = selectedManualCardId;
+
+    setHandSortMode("manual");
+    setManualCardOrderIds((current) => {
+      const normalizedOrder = normalizeManualCardOrder(current, room?.yourHand ?? []);
+      const fromIndex = normalizedOrder.indexOf(cardIdToMove);
+      const toIndex = fromIndex + direction;
+
+      if (fromIndex < 0 || toIndex < 0 || toIndex >= normalizedOrder.length) {
+        return normalizedOrder;
+      }
+
+      const nextOrder = [...normalizedOrder];
+      const [movedCardId] = nextOrder.splice(fromIndex, 1);
+
+      if (movedCardId === undefined) {
+        return normalizedOrder;
+      }
+
+      nextOrder.splice(toIndex, 0, movedCardId);
+
+      return nextOrder;
+    });
+  }
+
   function handleRoomAck(successMessage: string) {
     return (ack: ServerAck<PublicRoomState>) => {
       if (ack.ok) {
@@ -772,6 +821,32 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                   <X className="size-4" />
                 </Button>
               ) : null}
+              {handSortMode === "manual" ? (
+                <div className="flex rounded-md border border-white/10 bg-black/24 p-0.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                    aria-label="Move selected card left"
+                    title="Move selected card left"
+                    onClick={() => moveSelectedCardInHand(-1)}
+                    disabled={!canMoveManualCardLeft}
+                  >
+                    <ArrowLeft className="size-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                    aria-label="Move selected card right"
+                    title="Move selected card right"
+                    onClick={() => moveSelectedCardInHand(1)}
+                    disabled={!canMoveManualCardRight}
+                  >
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </div>
+              ) : null}
               <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
                 Pass
               </Button>
@@ -811,7 +886,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                           }
                         : {})}
                       onClick={() => toggleCard(card)}
-                      disabled={!isYourTurn || !playable}
                     >
                       <OnlineCard card={card} selected={selected} playable={playable} />
                     </motion.button>
@@ -2892,7 +2966,26 @@ function formatCard(card: Card): string {
   return `${card.rank}${suitSymbol(card.suit)}`;
 }
 
-function sortHandForDisplay(cards: readonly Card[], mode: HandSortMode): readonly Card[] {
+function sortHandForDisplay(
+  cards: readonly Card[],
+  mode: HandSortMode,
+  manualCardOrderIds: readonly string[]
+): readonly Card[] {
+  if (mode === "manual") {
+    const orderIndex = new Map(manualCardOrderIds.map((cardId, index) => [cardId, index]));
+
+    return [...cards].sort((left, right) => {
+      const leftIndex = orderIndex.get(getCardId(left)) ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = orderIndex.get(getCardId(right)) ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftIndex !== rightIndex) {
+        return leftIndex - rightIndex;
+      }
+
+      return compareCards(left, right);
+    });
+  }
+
   if (mode === "suit") {
     return [...cards].sort(compareCardsBySuit);
   }
@@ -2916,6 +3009,18 @@ function sortHandForDisplay(cards: readonly Card[], mode: HandSortMode): readonl
   }
 
   return [...cards].sort(compareCards);
+}
+
+function normalizeManualCardOrder(
+  currentOrder: readonly string[],
+  cards: readonly Card[]
+): readonly string[] {
+  const handIds: readonly string[] = cards.map((card) => getCardId(card));
+  const handIdSet = new Set(handIds);
+  const preservedIds = currentOrder.filter((cardId) => handIdSet.has(cardId));
+  const missingIds = handIds.filter((cardId) => !preservedIds.includes(cardId));
+
+  return [...preservedIds, ...missingIds];
 }
 
 function loadHandSortMode(): HandSortMode {
