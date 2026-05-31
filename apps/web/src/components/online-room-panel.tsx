@@ -2631,6 +2631,11 @@ function RoomChat({
   readonly onSend: (body: string) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   function submitChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2644,14 +2649,14 @@ function RoomChat({
   }
 
   return (
-    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
+    <section className="rounded-[1rem] border border-white/10 bg-black/20 p-2">
+      <div className="flex items-center justify-between gap-2 text-xs font-bold">
         <span className="flex items-center gap-2">
           <MessageCircle className="size-3.5 text-[var(--gold)]" />
           Table Chat
         </span>
         <span className="text-[10px] text-zinc-500">{messages.length} recent</span>
-      </summary>
+      </div>
 
       <div className="mt-2 max-h-28 overflow-y-auto pr-1">
         {messages.length === 0 ? (
@@ -2670,6 +2675,7 @@ function RoomChat({
 
       <form className="mt-2 flex gap-2" onSubmit={submitChat}>
         <input
+          ref={inputRef}
           className="h-9 min-w-0 flex-1 rounded-full border border-white/10 bg-white/7 px-2 text-xs text-white outline-none focus:border-[var(--gold)]"
           maxLength={240}
           placeholder={disabled ? "Join a room to chat" : "Message"}
@@ -2681,7 +2687,7 @@ function RoomChat({
           <Send className="size-4" />
         </Button>
       </form>
-    </details>
+    </section>
   );
 }
 
