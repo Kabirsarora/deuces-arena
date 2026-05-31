@@ -135,6 +135,13 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     room.status === "waiting" &&
     room.players.length + selectedBotSeats >= MAX_PLAYERS_PER_ROOM &&
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
+  const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
+  const turnStatus =
+    activePlayer?.kind === "bot"
+      ? `${activePlayer.name} is thinking...`
+      : isYourTurn
+        ? "Your move"
+        : "Waiting for your turn";
 
   useEffect(() => {
     if (profile === null) {
@@ -642,7 +649,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         <ActiveRoomBar
           room={room}
           connected={connected}
-          isYourTurn={isYourTurn}
+          turnStatus={turnStatus}
           message={message}
           activePanel={activeTablePanel}
           onTogglePanel={(panel) =>
@@ -688,7 +695,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
               <p className="text-xs text-zinc-400">
                 {isYourTurn
                   ? `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                  : "Waiting for your turn"}
+                  : turnStatus}
               </p>
             </div>
             <div className="flex gap-2">
@@ -1409,7 +1416,7 @@ function MinimalProfileCard({
 function ActiveRoomBar({
   room,
   connected,
-  isYourTurn,
+  turnStatus,
   message,
   activePanel,
   onTogglePanel,
@@ -1419,7 +1426,7 @@ function ActiveRoomBar({
 }: {
   readonly room: PublicRoomState | null;
   readonly connected: boolean;
-  readonly isYourTurn: boolean;
+  readonly turnStatus: string;
   readonly message: string;
   readonly activePanel: ActiveTablePanel | null;
   readonly onTogglePanel: (panel: ActiveTablePanel) => void;
@@ -1440,7 +1447,7 @@ function ActiveRoomBar({
           <p className="truncate text-sm font-black">
             {room === null ? "Realtime Table" : `${formatMatchMode(room.mode)} Table`}
           </p>
-          <p className="truncate text-xs text-zinc-400">{isYourTurn ? "Your move" : message}</p>
+          <p className="truncate text-xs text-zinc-400">{room === null ? message : turnStatus}</p>
         </div>
       </div>
 
