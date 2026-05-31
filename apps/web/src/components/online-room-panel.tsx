@@ -69,7 +69,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
-type ActiveTablePanel = "players" | "replay" | "coach" | "chat";
+type ActiveTablePanel = "players" | "replay" | "coach" | "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
 type AuthUser = {
   readonly profileId: string;
@@ -95,6 +95,15 @@ const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label:
   { mode: "suit", label: "Suit" },
   { mode: "sets", label: "Sets" },
   { mode: "manual", label: "Manual" }
+];
+const DEUCES_RULES: readonly string[] = [
+  "3 of diamonds starts and must be included in the first play.",
+  "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
+  "Straights must match the exact length that opened the trick.",
+  "Players may pass even when they have a legal higher play.",
+  "A bomb is four of a kind plus one kicker and can beat normal hands.",
+  "After a bomb, only a stronger bomb can answer.",
+  "When everyone else passes, the last player to make a valid play leads the next trick."
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
 
@@ -1714,6 +1723,13 @@ function ActiveRoomBar({
           label="Chat"
           onToggle={onTogglePanel}
         />
+        <TablePanelButton
+          panel="rules"
+          activePanel={activePanel}
+          icon={<BookOpen className="size-4" />}
+          label="Rules"
+          onToggle={onTogglePanel}
+        />
         <Button size="sm" variant="secondary" onClick={onCopyInvite} disabled={room === null}>
           <Copy className="size-4" />
           Invite
@@ -2227,14 +2243,6 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
 }
 
 function RulesSummary() {
-  const rules = [
-    "3 of diamonds starts and must be in the first play.",
-    "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
-    "Players may pass even when they can beat the current play.",
-    "A bomb is four of a kind plus one kicker and can beat normal hands.",
-    "After a bomb, only a stronger bomb can answer."
-  ];
-
   return (
     <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
@@ -2248,7 +2256,7 @@ function RulesSummary() {
       </summary>
 
       <ul className="mt-3 grid gap-2">
-        {rules.map((rule) => (
+        {DEUCES_RULES.map((rule) => (
           <li
             key={rule}
             className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
@@ -2466,7 +2474,9 @@ function ActiveTableDrawer({
         ? "Replay Log"
         : panel === "coach"
           ? "Move Coach"
-          : "Table Chat";
+          : panel === "chat"
+            ? "Table Chat"
+            : "Rules";
 
   return (
     <aside className="hud-glass absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[min(24rem,calc(100%-1.5rem))] overflow-y-auto rounded-[1.25rem] border border-white/10 p-3 shadow-2xl backdrop-blur-xl">
@@ -2505,7 +2515,36 @@ function ActiveTableDrawer({
       {panel === "chat" ? (
         <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
       ) : null}
+
+      {panel === "rules" ? <TableRulesPanel /> : null}
     </aside>
+  );
+}
+
+function TableRulesPanel() {
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
+        <p className="text-xs font-black uppercase text-[var(--gold)]">Rank order</p>
+        <p className="mt-2 text-sm font-bold text-zinc-100">3 4 5 6 7 8 9 10 J Q K A 2</p>
+        <p className="mt-2 text-xs text-zinc-400">
+          Diamonds, clubs, hearts, spades from low to high. 3 of diamonds is lowest; 2 of spades is
+          highest.
+        </p>
+      </div>
+
+      <ol className="grid gap-2">
+        {DEUCES_RULES.map((rule, index) => (
+          <li
+            key={rule}
+            className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
+          >
+            <span className="mr-2 font-black text-[var(--gold)]">{index + 1}</span>
+            {rule}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
