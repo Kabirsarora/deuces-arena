@@ -113,6 +113,15 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           }),
     [room]
   );
+  const playableCardIds = useMemo(
+    () =>
+      new Set(
+        legalMoves.flatMap((move) =>
+          move.type === "play" ? move.cards.map((card) => getCardId(card)) : []
+        )
+      ),
+    [legalMoves]
+  );
   const canPass = legalMoves.some((move) => move.type === "pass");
   const canPlaySelected =
     selectedCards.length > 0 &&
@@ -713,6 +722,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
             <div className="flex items-end gap-1 sm:gap-2">
               {(room?.yourHand ?? []).map((card) => {
                 const selected = selectedCardIds.includes(getCardId(card));
+                const playable = isYourTurn && playableCardIds.has(getCardId(card));
 
                 return (
                   <motion.button
@@ -734,9 +744,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                         }
                       : {})}
                     onClick={() => toggleCard(card)}
-                    disabled={!isYourTurn}
+                    disabled={!isYourTurn || !playable}
                   >
-                    <OnlineCard card={card} selected={selected} />
+                    <OnlineCard card={card} selected={selected} playable={playable} />
                   </motion.button>
                 );
               })}
@@ -2726,10 +2736,12 @@ function formatTurnTimer(room: PublicRoomState | null): string | null {
 function OnlineCard({
   card,
   selected = false,
+  playable = false,
   compact = false
 }: {
   readonly card: Card;
   readonly selected?: boolean;
+  readonly playable?: boolean;
   readonly compact?: boolean;
 }) {
   const red = card.suit === "diamonds" || card.suit === "hearts";
@@ -2738,9 +2750,14 @@ function OnlineCard({
     <motion.div
       layout
       className={cn(
-        "card-face grid rounded-md border p-2 shadow-xl",
+        "card-face grid rounded-md border p-2 shadow-xl transition",
         compact ? "h-20 w-14" : "h-24 w-16 sm:h-28 sm:w-20",
-        selected ? "border-[var(--gold)] ring-2 ring-[var(--gold)]" : "border-black/12"
+        selected
+          ? "border-[var(--gold)] ring-2 ring-[var(--gold)]"
+          : playable
+            ? "border-[var(--aqua)]/70 shadow-[0_0_24px_rgba(61,214,208,0.18)]"
+            : "border-black/12",
+        !compact && !playable && !selected ? "opacity-72 saturate-75" : ""
       )}
     >
       <div
