@@ -3288,10 +3288,10 @@ function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
     placement === undefined
       ? `${player.name} finished with ${player.cardsRemaining} cards left.`
       : `${player.name} finished ${ordinal(placement)} with ${player.cardsRemaining} cards left.`,
-    `${plays} recent plays and ${passes} recent passes were recorded for your seat.`,
+    `${plays} plays and ${passes} passes were recorded for your seat.`,
     multiCardPlays > 0
-      ? `${multiCardPlays} recent plays shed multiple cards; those are usually worth reviewing first.`
-      : "No recent multi-card sheds were visible in the short table log.",
+      ? `${multiCardPlays} plays shed multiple cards; those are usually worth reviewing first.`
+      : "No multi-card sheds were visible in this match log.",
     "Deeper mistake detection will use full replay data plus simulations instead of generic advice."
   ];
 }

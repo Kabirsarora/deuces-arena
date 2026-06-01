@@ -1036,7 +1036,8 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     currentTrick: room.game?.currentTrick ?? null,
     turnNumber: room.game?.turnNumber ?? 0,
     placements: room.game?.placements ?? [],
-    recentEvents: room.game?.events.slice(-12) ?? [],
+    recentEvents:
+      room.game?.status === "complete" ? room.game.events : (room.game?.events.slice(-12) ?? []),
     recentChat: room.chatMessages.slice(-20),
     turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
