@@ -42,13 +42,14 @@ Deuces Arena currently implements a 4-player Deuces / Big Two shedding game:
 - When everyone else passes, the last valid player wins the trick and leads the next one.
 - First player to empty their hand wins.
 
-Current bomb variant:
+Bomb variants:
 
 - A bomb is four of a kind plus one kicker.
 - A bomb beats any non-bomb hand.
-- Once a bomb is active, only a stronger bomb can beat it.
 - Bomb strength is determined by the rank of the four of a kind; the kicker is ignored.
-- This is intentionally documented as a variant choice so alternate house rules can be added later.
+- Default room rule: once a bomb is active, only a stronger bomb can beat it.
+- Optional room rule: a bomb immediately wins the trick, so no stronger bomb response is allowed.
+- These are intentionally documented as variant choices so more house rules can be added later.
 
 ## Local Setup
 

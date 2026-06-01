@@ -9,3 +9,9 @@ It must not depend on React, Next.js, browser APIs, database clients, or server 
 Current bot support is intentionally modest: `random-legal`, `lowest-legal`, and `simple-heuristic` are baseline strategies for playable games, not trained AI.
 
 Current simulation support is intentionally basic: random legal rollouts can estimate one move or rank legal moves by win rate and average placement. These results are not presented as perfect strategy. Stronger bots and AI coach explanations should build on these primitives with better rollout policies, self-play data, and future model outputs.
+
+## Rule Variants
+
+The default bomb rule lets a stronger bomb answer the current bomb. Consumers can pass `{ bombEndsTrick: true }` to game-state transitions when a room should make any bomb immediately win the trick instead.
+
+Rule variants should stay explicit inputs to the engine so web, server, replay, and future mobile clients can all reproduce the same match behavior.

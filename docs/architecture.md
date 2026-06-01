@@ -67,7 +67,8 @@ Current progression rules:
 
 - Bombs are four of a kind plus one extra kicker card.
 - A bomb beats any non-bomb hand during a trick.
-- Once a bomb is active, it can only be beaten by a stronger bomb.
 - Bomb strength is currently determined by the rank of the four of a kind. The kicker is ignored.
+- Default rooms allow an active bomb to be beaten only by a stronger bomb.
+- Room settings can instead enable the `bombEndsTrick` variant, where any bomb immediately wins the trick and starts a new one.
 - Straights must be at least five cards and must match exact length when answered.
 - The default straight rules do not allow `2` inside a straight. This is documented as a variant point for later.
