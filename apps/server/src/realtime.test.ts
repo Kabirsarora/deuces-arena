@@ -212,6 +212,55 @@ describe("realtime rooms", () => {
     );
   });
 
+  it("cleans up a player's previous waiting room when they join another room", async () => {
+    const switchingPlayer = await connectTestSocket();
+    const otherHost = await connectTestSocket();
+    const firstRoom = await createRoom(switchingPlayer, {
+      playerName: "Switcher",
+      guestId: "guest-join-switch"
+    });
+    const secondRoom = await createRoom(otherHost, {
+      playerName: "Host",
+      guestId: "guest-join-host"
+    });
+
+    expect(firstRoom.ok).toBe(true);
+    expect(secondRoom.ok).toBe(true);
+
+    if (!firstRoom.ok || !secondRoom.ok) {
+      return;
+    }
+
+    const joinedRoom = await joinRoom(switchingPlayer, {
+      roomCode: secondRoom.data.roomCode,
+      playerName: "Switcher",
+      guestId: "guest-join-switch"
+    });
+
+    expect(joinedRoom.ok).toBe(true);
+
+    if (!joinedRoom.ok) {
+      return;
+    }
+
+    expect(joinedRoom.data.players.map((player) => player.name)).toEqual(["Host", "Switcher"]);
+
+    const lobby = await emitLobbyGet(switchingPlayer);
+
+    expect(lobby.ok).toBe(true);
+
+    if (!lobby.ok) {
+      return;
+    }
+
+    expect(lobby.data.openRooms.some((room) => room.roomCode === firstRoom.data.roomCode)).toBe(
+      false
+    );
+    expect(lobby.data.openRooms.some((room) => room.roomCode === secondRoom.data.roomCode)).toBe(
+      true
+    );
+  });
+
   it("requires all connected humans to be ready before starting a multiplayer room", async () => {
     const host = await connectTestSocket();
     const guest = await connectTestSocket();
