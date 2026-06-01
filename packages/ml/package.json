@@ -1,0 +1,20 @@
+{
+  "name": "@deuces-arena/ml",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "export:coach-evaluations": "tsx src/export-coach-evaluations.ts",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deuces-arena/db": "^0.1.0",
+    "@deuces-arena/game-engine": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1"
+  }
+}

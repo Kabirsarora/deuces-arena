@@ -1,0 +1,31 @@
+{
+  "name": "@deuces-arena/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint .",
+    "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "start": "node dist/index.js",
+    "test": "vitest run src --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deuces-arena/db": "^0.1.0",
+    "@deuces-arena/game-engine": "^0.1.0",
+    "@deuces-arena/shared": "^0.1.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "socket.io-client": "^4.8.3"
+  }
+}

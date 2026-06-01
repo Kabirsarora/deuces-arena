@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #080a0d;
+  --foreground: #f8fafc;
+  --muted: #a7b0be;
+  --table: #0f3b32;
+  --table-deep: #09251f;
+  --felt-line: rgba(255, 255, 255, 0.08);
+  --gold: #f2c14e;
+  --ruby: #ef476f;
+  --aqua: #3dd6d0;
+  --violet: #9b87f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(61, 214, 208, 0.16), transparent 26rem),
+    radial-gradient(circle at 82% 10%, rgba(242, 193, 78, 0.12), transparent 25rem),
+    radial-gradient(circle at 50% 105%, rgba(239, 71, 111, 0.12), transparent 30rem),
+    linear-gradient(145deg, #080a0d 0%, #11151b 48%, #07090c 100%);
+  color: var(--foreground);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.card-face {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(235, 239, 246, 0.98)),
+    radial-gradient(circle at 50% 12%, rgba(242, 193, 78, 0.2), transparent 12rem);
+  color: #111827;
+}
+
+.table-felt {
+  background:
+    radial-gradient(ellipse at 48% 38%, rgba(255, 255, 255, 0.13), transparent 18rem),
+    radial-gradient(ellipse at 50% 72%, rgba(0, 0, 0, 0.24), transparent 22rem),
+    radial-gradient(circle at 18% 18%, rgba(61, 214, 208, 0.09), transparent 18rem),
+    radial-gradient(circle at 82% 20%, rgba(242, 193, 78, 0.07), transparent 17rem),
+    linear-gradient(135deg, rgba(18, 88, 73, 0.95), rgba(8, 39, 33, 0.98) 56%, #061b17);
+}
+
+.table-theme-midnight-felt {
+  background:
+    radial-gradient(ellipse at 46% 38%, rgba(61, 214, 208, 0.16), transparent 18rem),
+    radial-gradient(ellipse at 50% 75%, rgba(0, 0, 0, 0.34), transparent 24rem),
+    radial-gradient(circle at 50% 55%, #12433a 0%, #061c18 76%);
+}
+
+.table-oval {
+  border-radius: 38% / 13%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.07),
+    inset 0 0 0 18px rgba(4, 8, 9, 0.28),
+    inset 0 0 48px rgba(255, 255, 255, 0.04),
+    inset 0 -44px 100px rgba(0, 0, 0, 0.28),
+    0 34px 92px rgba(0, 0, 0, 0.5);
+}
+
+.seat-panel {
+  border-radius: 999px;
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.035)),
+    rgba(5, 8, 11, 0.64);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 34px rgba(0, 0, 0, 0.26);
+}
+
+.trick-island {
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 255, 255, 0.1), transparent 62%),
+    rgba(3, 8, 10, 0.24);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 -22px 60px rgba(0, 0, 0, 0.12);
+}
+
+.hand-dock {
+  border-radius: 2rem 2rem 1rem 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(5, 7, 10, 0.58);
+}
+
+.hud-glass {
+  background: rgba(5, 7, 10, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 56px rgba(0, 0, 0, 0.28);
+}
+
+.online-hub {
+  background:
+    radial-gradient(ellipse at 44% 15%, rgba(20, 184, 166, 0.13), transparent 28rem),
+    radial-gradient(ellipse at 78% 28%, rgba(242, 193, 78, 0.09), transparent 22rem),
+    linear-gradient(145deg, rgba(14, 19, 25, 0.98), rgba(5, 7, 10, 0.98));
+}
+
+.online-panel {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 44px rgba(0, 0, 0, 0.2);
+}
+
+.room-table-preview {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 42% / 20%;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(255, 255, 255, 0.1), transparent 12rem),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 14px),
+    radial-gradient(ellipse at center, #14604d 0%, #08362c 72%);
+  box-shadow:
+    inset 0 0 0 10px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 12px rgba(255, 255, 255, 0.04),
+    0 22px 50px rgba(0, 0, 0, 0.28);
+}
+
+.room-table-preview::after {
+  position: absolute;
+  inset: 14px;
+  content: "";
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 42% / 20%;
+}
+
+.waiting-room-table {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 38% / 14%;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.11), transparent 17rem),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 18px),
+    radial-gradient(ellipse at center, #145844 0%, #082d25 72%);
+  box-shadow:
+    inset 0 0 0 18px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 21px rgba(255, 255, 255, 0.04),
+    0 34px 90px rgba(0, 0, 0, 0.45);
+}
+
+.waiting-room-table::after {
+  position: absolute;
+  inset: 3.5rem;
+  content: "";
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 38% / 14%;
+}
+
+.card-back {
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.2), transparent 30%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 7px),
+    linear-gradient(145deg, #163a5f, #0b1c33 58%, #35182d);
+}
+
+.card-back-classic-red {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22), transparent 28%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 7px),
+    linear-gradient(145deg, #f43f5e, #7f1d1d 62%, #2a0d14);
+}
