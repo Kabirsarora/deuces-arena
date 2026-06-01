@@ -138,6 +138,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
+  const [handDealtVisible, setHandDealtVisible] = useState(true);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
@@ -231,6 +232,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   useLayoutEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0) {
       setDealAnimationKey(null);
+      setHandDealtVisible(true);
       return;
     }
 
@@ -244,10 +246,15 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
 
     lastDealAnimationKeyRef.current = nextDealAnimationKey;
     setDealAnimationKey(nextDealAnimationKey);
+    setHandDealtVisible(false);
 
-    const timeout = window.setTimeout(() => setDealAnimationKey(null), 2200);
+    const revealHandTimeout = window.setTimeout(() => setHandDealtVisible(true), 850);
+    const clearDealTimeout = window.setTimeout(() => setDealAnimationKey(null), 2400);
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(revealHandTimeout);
+      window.clearTimeout(clearDealTimeout);
+    };
   }, [room]);
 
   useEffect(() => {
@@ -1034,7 +1041,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
             <div className="flex items-end gap-1 sm:gap-2">
               <AnimatePresence initial={false} mode="popLayout">
-                {displayedHand.map((card, index) => {
+                {(handDealtVisible ? displayedHand : []).map((card, index) => {
                   const selected = selectedCardIds.includes(getCardId(card));
                   const playable = isYourTurn && playableCardIds.has(getCardId(card));
 
