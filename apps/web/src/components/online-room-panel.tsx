@@ -113,6 +113,8 @@ const DEUCES_RULES: readonly string[] = [
   "When everyone else passes, the last player to make a valid play leads the next trick."
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
+const FEEDBACK_URL =
+  "https://github.com/Kabirsarora/deuces-arena/issues/new?title=Feedback%3A%20&labels=feedback";
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -1298,6 +1300,7 @@ function OnlineLobbyHub({
               <div className="mt-3 grid gap-3">
                 <LeaderboardSummary entries={leaderboard} />
                 <MatchHistorySummary entries={matchHistory} />
+                <FeedbackSummary />
                 <RulesSummary />
                 <CosmeticsSummary
                   cosmetics={cosmetics}
@@ -2360,6 +2363,28 @@ function RulesSummary() {
         ))}
       </ul>
     </details>
+  );
+}
+
+function FeedbackSummary() {
+  return (
+    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+      <p className="flex items-center gap-2 text-sm font-bold">
+        <MessageCircle className="size-4 text-[var(--aqua)]" />
+        Feedback
+      </p>
+      <p className="mt-2 text-xs text-zinc-400">
+        Found a bug or have an idea? Send it straight to the project issue tracker.
+      </p>
+      <a
+        className="mt-3 flex h-10 items-center justify-center rounded-full bg-[var(--gold)] px-4 text-sm font-black text-black transition hover:brightness-110"
+        href={FEEDBACK_URL}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Report feedback
+      </a>
+    </section>
   );
 }
 
