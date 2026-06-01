@@ -857,7 +857,13 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         />
 
         <section className="relative min-h-[28rem] lg:min-h-0">
-          <OnlineTable room={room} timerNow={timerNow} dealAnimationKey={dealAnimationKey} />
+          <OnlineTable
+            room={room}
+            timerNow={timerNow}
+            dealAnimationKey={dealAnimationKey}
+            onCreateBotGame={createBotGame}
+            onLeaveRoom={leaveRoom}
+          />
           <ActiveTableDrawer
             panel={activeTablePanel}
             room={room}
@@ -2805,11 +2811,15 @@ function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
 function OnlineTable({
   room,
   timerNow,
-  dealAnimationKey
+  dealAnimationKey,
+  onCreateBotGame,
+  onLeaveRoom
 }: {
   readonly room: PublicRoomState | null;
   readonly timerNow: number;
   readonly dealAnimationKey: string | null;
+  readonly onCreateBotGame: () => void;
+  readonly onLeaveRoom: () => void;
 }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
@@ -2946,14 +2956,28 @@ function OnlineTable({
             </AnimatePresence>
           </div>
 
-          {room?.status === "complete" ? <MatchResultsPanel room={room} /> : null}
+          {room?.status === "complete" ? (
+            <MatchResultsPanel
+              room={room}
+              onCreateBotGame={onCreateBotGame}
+              onLeaveRoom={onLeaveRoom}
+            />
+          ) : null}
         </div>
       </div>
     </section>
   );
 }
 
-function MatchResultsPanel({ room }: { readonly room: PublicRoomState }) {
+function MatchResultsPanel({
+  room,
+  onCreateBotGame,
+  onLeaveRoom
+}: {
+  readonly room: PublicRoomState;
+  readonly onCreateBotGame: () => void;
+  readonly onLeaveRoom: () => void;
+}) {
   const rows = getPlacementRows(room);
 
   return (
@@ -3009,6 +3033,17 @@ function MatchResultsPanel({ room }: { readonly room: PublicRoomState }) {
           </li>
         ))}
       </ol>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button size="sm" onClick={onCreateBotGame}>
+          <Play className="size-4" />
+          New bot table
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onLeaveRoom}>
+          <DoorOpen className="size-4" />
+          Leave table
+        </Button>
+      </div>
     </motion.div>
   );
 }
