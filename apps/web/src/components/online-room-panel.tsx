@@ -1321,6 +1321,7 @@ function OnlineLobbyHub({
               {hubMode === "ranked" ? (
                 <HubRankedCard
                   queue={rankedQueue}
+                  profile={profile}
                   connected={connected}
                   onJoin={onJoinRanked}
                   onLeave={onLeaveRanked}
@@ -1652,11 +1653,13 @@ function OpenRoomStrip({
 
 function HubRankedCard({
   queue,
+  profile,
   connected,
   onJoin,
   onLeave
 }: {
   readonly queue: PublicRankedQueueState | null;
+  readonly profile: PublicGuestProfile | null;
   readonly connected: boolean;
   readonly onJoin: () => void;
   readonly onLeave: () => void;
@@ -1664,6 +1667,8 @@ function HubRankedCard({
   const joined = queue?.joined ?? false;
   const queuedPlayers = queue?.queuedPlayers ?? 0;
   const requiredPlayers = queue?.requiredPlayers ?? 4;
+  const queuePosition =
+    queue?.queuePosition === null || queue === null ? "Not queued" : `#${queue.queuePosition}`;
   const etaLabel =
     queue?.etaSeconds === null || queue === null
       ? "ETA pending"
@@ -1684,10 +1689,11 @@ function HubRankedCard({
           </p>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ProfileMetric label="Queued" value={`${queuedPlayers}/${requiredPlayers}`} />
+        <ProfileMetric label="Position" value={queuePosition} />
         <ProfileMetric label="ETA" value={etaLabel} />
-        <ProfileMetric label="Rating" value="ELO" />
+        <ProfileMetric label="Your ELO" value={profile?.rating ?? 1000} />
       </div>
       <Button
         className="mt-6 h-14 w-full text-lg"

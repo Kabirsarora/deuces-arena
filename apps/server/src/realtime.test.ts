@@ -557,6 +557,32 @@ describe("realtime rooms", () => {
     expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);
   });
 
+  it("reports ranked queue position before a match starts", async () => {
+    const first = await connectTestSocket();
+    const second = await connectTestSocket();
+    const firstJoin = await joinRanked(first, {
+      playerName: "Queue One",
+      guestId: "guest-ranked-position-1"
+    });
+    const secondJoin = await joinRanked(second, {
+      playerName: "Queue Two",
+      guestId: "guest-ranked-position-2"
+    });
+
+    expect(firstJoin.ok).toBe(true);
+    expect(secondJoin.ok).toBe(true);
+
+    if (!firstJoin.ok || !secondJoin.ok) {
+      return;
+    }
+
+    expect(firstJoin.data.joined).toBe(true);
+    expect(firstJoin.data.queuePosition).toBe(1);
+    expect(secondJoin.data.joined).toBe(true);
+    expect(secondJoin.data.queuePosition).toBe(2);
+    expect(secondJoin.data.queuedPlayers).toBe(2);
+  });
+
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
     const host = await connectTestSocket();
     const guest = await connectTestSocket();

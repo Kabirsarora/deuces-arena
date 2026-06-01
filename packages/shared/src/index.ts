@@ -111,6 +111,7 @@ export type PublicRankedQueueState = {
   readonly requiredPlayers: number;
   readonly etaSeconds: number | null;
   readonly joined: boolean;
+  readonly queuePosition: number | null;
 };
 
 export type PublicRoomPlayer = {

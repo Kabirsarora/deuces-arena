@@ -1194,12 +1194,14 @@ function publicLobbyState(): PublicLobbyState {
 function publicRankedQueueState(socketId: string): PublicRankedQueueState {
   const queuedPlayers = rankedQueue.length;
   const playersNeeded = Math.max(0, RANKED_REQUIRED_PLAYERS - queuedPlayers);
+  const queueIndex = rankedQueue.findIndex((entry) => entry.socketId === socketId);
 
   return {
     queuedPlayers,
     requiredPlayers: RANKED_REQUIRED_PLAYERS,
     etaSeconds: playersNeeded === 0 ? 0 : playersNeeded * 20,
-    joined: rankedQueue.some((entry) => entry.socketId === socketId)
+    joined: queueIndex >= 0,
+    queuePosition: queueIndex >= 0 ? queueIndex + 1 : null
   };
 }
 
