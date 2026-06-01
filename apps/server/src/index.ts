@@ -109,7 +109,8 @@ const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
-const BOT_MOVE_DELAY_MS = 2_800;
+const MIN_BOT_MOVE_DELAY_MS = 3_800;
+const MAX_BOT_MOVE_DELAY_MS = 5_400;
 const RANKED_REQUIRED_PLAYERS = 4;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
@@ -873,7 +874,7 @@ function scheduleAutomatedTurn(room: Room): void {
   if (activePlayer.kind === "bot") {
     const botTimeout = setTimeout(
       () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
-      BOT_MOVE_DELAY_MS
+      botMoveDelayMs()
     );
     botTimeout.unref();
     return;
@@ -889,6 +890,13 @@ function scheduleAutomatedTurn(room: Room): void {
     Math.max(0, room.turnDeadlineAt.getTime() - Date.now())
   );
   room.timerTimeout.unref();
+}
+
+function botMoveDelayMs(): number {
+  return (
+    MIN_BOT_MOVE_DELAY_MS +
+    Math.floor(Math.random() * (MAX_BOT_MOVE_DELAY_MS - MIN_BOT_MOVE_DELAY_MS + 1))
+  );
 }
 
 function applyAutomatedMove(
