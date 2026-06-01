@@ -2946,17 +2946,70 @@ function OnlineTable({
             </AnimatePresence>
           </div>
 
-          {room?.status === "complete" ? (
-            <div className="mx-auto mt-5 w-fit rounded-full border border-[var(--gold)] bg-black/28 px-4 py-3">
-              <p className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--gold)]">
-                <Sparkles className="size-4" />
-                {getRoomPlayerName(room, room.placements[0] ?? "")} wins
-              </p>
-            </div>
-          ) : null}
+          {room?.status === "complete" ? <MatchResultsPanel room={room} /> : null}
         </div>
       </div>
     </section>
+  );
+}
+
+function MatchResultsPanel({ room }: { readonly room: PublicRoomState }) {
+  const rows = getPlacementRows(room);
+
+  return (
+    <motion.div
+      className="mx-auto mt-5 w-[min(24rem,92vw)] rounded-[1rem] border border-[var(--gold)]/50 bg-black/42 p-3 text-left shadow-2xl backdrop-blur"
+      initial={{ opacity: 0, y: 14, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-black text-[var(--gold)]">
+          <Sparkles className="size-4" />
+          Match complete
+        </p>
+        <span className="rounded-full border border-white/10 bg-white/8 px-2 py-1 text-[10px] font-bold uppercase text-zinc-300">
+          {formatMatchMode(room.mode)}
+        </span>
+      </div>
+
+      <ol className="grid gap-2">
+        {rows.map(({ player, placement }) => (
+          <li
+            key={player.id}
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-[0.8rem] border px-3 py-2",
+              placement === 1
+                ? "border-[var(--gold)]/50 bg-[var(--gold)]/14"
+                : "border-white/10 bg-white/7"
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-full text-xs font-black",
+                  placement === 1 ? "bg-[var(--gold)] text-black" : "bg-black/30 text-zinc-300"
+                )}
+              >
+                {placement}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black">
+                  {placement === 1 ? (
+                    <Crown className="mr-1 inline size-3.5 text-[var(--gold)]" />
+                  ) : null}
+                  {player.name}
+                </p>
+                <p className="text-xs text-zinc-400">{ordinal(placement)} place</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-black/28 px-2 py-1 text-xs font-bold text-zinc-300">
+              {player.cardsRemaining} left
+            </span>
+          </li>
+        ))}
+      </ol>
+    </motion.div>
   );
 }
 
@@ -3141,6 +3194,29 @@ function formatTurnTimer(room: PublicRoomState | null, now: number): string | nu
   );
 
   return `${secondsLeft}s to move`;
+}
+
+function getPlacementRows(
+  room: PublicRoomState
+): readonly { readonly player: PublicRoomPlayer; readonly placement: number }[] {
+  const orderedPlayerIds = [
+    ...room.placements,
+    ...room.players
+      .filter((player) => !room.placements.includes(player.id))
+      .sort((left, right) => left.cardsRemaining - right.cardsRemaining)
+      .map((player) => player.id)
+  ];
+
+  return orderedPlayerIds
+    .map((playerId, index) => {
+      const player = room.players.find((candidate) => candidate.id === playerId);
+
+      return player === undefined ? null : { player, placement: index + 1 };
+    })
+    .filter(
+      (row): row is { readonly player: PublicRoomPlayer; readonly placement: number } =>
+        row !== null
+    );
 }
 
 function OnlineCard({
