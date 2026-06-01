@@ -111,6 +111,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const lastDealAnimationKeyRef = useRef<string | null>(null);
+  const lastObservedChatKeyRef = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [playerName, setPlayerName] = useState("Player");
   const [profileDisplayName, setProfileDisplayName] = useState("Player");
@@ -134,6 +135,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
 
   const selectedCards = useMemo(
@@ -347,6 +349,34 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   useEffect(() => {
     setMoveEvaluations([]);
   }, [room?.turnNumber, room?.roomCode]);
+
+  useEffect(() => {
+    const latestChatMessage = room?.recentChat.at(-1) ?? null;
+    const latestChatKey =
+      room === null || latestChatMessage === null
+        ? null
+        : `${room.roomCode}:${latestChatMessage.id}`;
+
+    if (latestChatKey === null) {
+      lastObservedChatKeyRef.current = null;
+      setUnreadChatCount(0);
+      return;
+    }
+
+    if (lastObservedChatKeyRef.current === null) {
+      lastObservedChatKeyRef.current = latestChatKey;
+      return;
+    }
+
+    if (lastObservedChatKeyRef.current !== latestChatKey) {
+      lastObservedChatKeyRef.current = latestChatKey;
+      setUnreadChatCount((current) => (activeTablePanel === "chat" ? 0 : current + 1));
+    }
+
+    if (activeTablePanel === "chat") {
+      setUnreadChatCount(0);
+    }
+  }, [activeTablePanel, room?.recentChat, room?.roomCode]);
 
   useEffect(() => {
     setBotSeats((current) => Math.min(current, availableBotSeats));
@@ -803,6 +833,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           turnStatus={turnStatus}
           message={message}
           activePanel={activeTablePanel}
+          unreadChatCount={unreadChatCount}
           onTogglePanel={(panel) =>
             setActiveTablePanel((currentPanel) => (currentPanel === panel ? null : panel))
           }
@@ -1653,6 +1684,7 @@ function ActiveRoomBar({
   turnStatus,
   message,
   activePanel,
+  unreadChatCount,
   onTogglePanel,
   onCopyRoomCode,
   onCopyInvite,
@@ -1663,6 +1695,7 @@ function ActiveRoomBar({
   readonly turnStatus: string;
   readonly message: string;
   readonly activePanel: ActiveTablePanel | null;
+  readonly unreadChatCount: number;
   readonly onTogglePanel: (panel: ActiveTablePanel) => void;
   readonly onCopyRoomCode: () => void;
   readonly onCopyInvite: () => void;
@@ -1721,6 +1754,7 @@ function ActiveRoomBar({
           activePanel={activePanel}
           icon={<MessageCircle className="size-4" />}
           label="Chat"
+          badgeCount={unreadChatCount}
           onToggle={onTogglePanel}
         />
         <TablePanelButton
@@ -1748,12 +1782,14 @@ function TablePanelButton({
   activePanel,
   icon,
   label,
+  badgeCount = 0,
   onToggle
 }: {
   readonly panel: ActiveTablePanel;
   readonly activePanel: ActiveTablePanel | null;
   readonly icon: ReactNode;
   readonly label: string;
+  readonly badgeCount?: number;
   readonly onToggle: (panel: ActiveTablePanel) => void;
 }) {
   const active = panel === activePanel;
@@ -1762,6 +1798,16 @@ function TablePanelButton({
     <Button size="sm" variant={active ? "primary" : "secondary"} onClick={() => onToggle(panel)}>
       {icon}
       {label}
+      {badgeCount > 0 ? (
+        <span
+          className={cn(
+            "grid min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-black",
+            active ? "bg-black/20 text-black" : "bg-[var(--gold)] text-black"
+          )}
+        >
+          {Math.min(9, badgeCount)}
+        </span>
+      ) : null}
     </Button>
   );
 }
