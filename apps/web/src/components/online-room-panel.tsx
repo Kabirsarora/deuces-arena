@@ -2899,7 +2899,10 @@ function MatchResultsPanel({
 }) {
   const rows = getPlacementRows(room);
   const [showReview, setShowReview] = useState(false);
+  const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
   const review = getPlayerMatchReview(room);
+  const selectedStatsPlayer =
+    room.players.find((player) => player.id === selectedStatsPlayerId) ?? null;
 
   return (
     <motion.div
@@ -2939,12 +2942,16 @@ function MatchResultsPanel({
                 {placement}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-black">
+                <button
+                  className="block max-w-full truncate text-left text-sm font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
+                  type="button"
+                  onClick={() => setSelectedStatsPlayerId(player.id)}
+                >
                   {placement === 1 ? (
                     <Crown className="mr-1 inline size-3.5 text-[var(--gold)]" />
                   ) : null}
                   {player.name}
-                </p>
+                </button>
                 <p className="text-xs text-zinc-400">{ordinal(placement)} place</p>
               </div>
             </div>
@@ -2989,6 +2996,16 @@ function MatchResultsPanel({
           Leave table
         </Button>
       </div>
+
+      <AnimatePresence>
+        {selectedStatsPlayer !== null ? (
+          <PlayerStatsPopover
+            key={selectedStatsPlayer.id}
+            player={selectedStatsPlayer}
+            onClose={() => setSelectedStatsPlayerId(null)}
+          />
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }
