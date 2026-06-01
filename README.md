@@ -28,6 +28,28 @@ packages/ml          Self-play and coach-evaluation data export scripts
 
 The engine is deliberately independent from React and the server. A future Expo / React Native app should be able to reuse the rules, shared contracts, replay format, persistence model, and AI/simulation tooling while replacing the web UI.
 
+## Game Rules
+
+Deuces Arena currently implements a 4-player Deuces / Big Two shedding game:
+
+- Each player receives 13 cards.
+- Card rank order is `3 4 5 6 7 8 9 10 J Q K A 2`.
+- Suit order is diamonds, clubs, hearts, spades.
+- The player holding 3 of diamonds starts, and the first play must include it.
+- The lead player chooses the trick type: single, pair, trips, quad, full house, straight, longer straight, or bomb.
+- Players must answer with the same hand type and straight length, unless they play a bomb.
+- Players may pass even if they have a legal answer.
+- When everyone else passes, the last valid player wins the trick and leads the next one.
+- First player to empty their hand wins.
+
+Current bomb variant:
+
+- A bomb is four of a kind plus one kicker.
+- A bomb beats any non-bomb hand.
+- Once a bomb is active, only a stronger bomb can beat it.
+- Bomb strength is determined by the rank of the four of a kind; the kicker is ignored.
+- This is intentionally documented as a variant choice so alternate house rules can be added later.
+
 ## Local Setup
 
 ```bash
@@ -99,6 +121,25 @@ Current automated coverage includes engine rule tests, bot behavior tests, repla
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for web, server, database, and environment variable deployment notes.
+
+## Roadmap
+
+- Polish online table UX, mobile layout, animations, and accessibility.
+- Add production Google sign-in and account/profile persistence with deployed OAuth credentials.
+- Deploy the frontend, backend, PostgreSQL database, and optional Redis layer.
+- Expand ranked mode with queue health, rating history, leaderboards, and anti-abuse checks.
+- Improve baseline bots, then add simulation-backed bots and self-play data generation.
+- Build AI coach explanations from legal moves, replay state, rollout outcomes, and future model scores.
+- Add replay timeline UI, searchable match history, and richer post-game analysis.
+- Add non-pay-to-win cosmetics such as card backs, table themes, avatars, profile borders, and supporter badges.
+
+## Known Limitations
+
+- Current bots are baseline opponents, not trained AI.
+- Move Lab uses random rollout simulation, so its recommendations are exploratory rather than perfect strategy.
+- Google auth requires local or deployed OAuth environment variables.
+- Database persistence is optional locally; without `DATABASE_URL`, stats and match history use safe in-memory fallbacks.
+- Redis-backed scaling, matchmaking durability, anti-cheat hardening, and payment flows are future work.
 
 ## Resume Targets
 
