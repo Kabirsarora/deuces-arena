@@ -177,6 +177,12 @@ app.get("/lobby", (_request, response) => {
   response.json(publicLobbyState());
 });
 
+app.get("/leaderboard", async (request, response) => {
+  const limit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : undefined;
+  response.json(await publicLeaderboard(Number.isNaN(limit) ? undefined : limit));
+});
+
 app.get("/cosmetics", async (_request, response) => {
   response.json(await publicCosmetics());
 });

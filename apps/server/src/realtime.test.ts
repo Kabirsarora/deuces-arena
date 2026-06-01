@@ -12,6 +12,7 @@ import type {
   PublicCosmetic,
   PublicFeedbackReceipt,
   PublicGuestProfile,
+  PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMoveEvaluation,
   PublicRankedQueueState,
@@ -125,6 +126,16 @@ describe("realtime rooms", () => {
     expect(restCatalog.map((cosmetic) => cosmetic.slug)).toEqual(
       socketCatalog.data.map((cosmetic) => cosmetic.slug)
     );
+  });
+
+  it("serves the public leaderboard over REST", async () => {
+    const response = await fetch(`${serverUrl}/leaderboard?limit=3`);
+
+    expect(response.ok).toBe(true);
+
+    const leaderboard = (await response.json()) as PublicLeaderboardEntry[];
+    expect(Array.isArray(leaderboard)).toBe(true);
+    expect(leaderboard.length).toBeLessThanOrEqual(3);
   });
 
   it("rejects cosmetic equip requests when persistence is unavailable", async () => {
