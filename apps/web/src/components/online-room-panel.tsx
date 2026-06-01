@@ -35,6 +35,8 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  ChevronsLeft,
+  ChevronsRight,
   CircleDot,
   Copy,
   Crown,
@@ -47,6 +49,7 @@ import {
   MessageCircle,
   Palette,
   Play,
+  RotateCcw,
   Send,
   Sparkles,
   Trophy,
@@ -178,6 +181,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     handSortMode === "manual" &&
     selectedManualCardIndex >= 0 &&
     selectedManualCardIndex < displayedHand.length - 1;
+  const canMoveManualCardToEdge = handSortMode === "manual" && selectedManualCardIndex >= 0;
   const canPlaySelected =
     selectedCards.length > 0 &&
     legalMoves.some(
@@ -701,6 +705,38 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     moveCardInHand(selectedManualCardId, direction);
   }
 
+  function moveSelectedCardToEdge(edge: "start" | "end") {
+    if (selectedManualCardId === null) {
+      return;
+    }
+
+    setHandSortMode("manual");
+    setManualCardOrderIds((current) => {
+      const normalizedOrder = normalizeManualCardOrder(current, room?.yourHand ?? []);
+      const fromIndex = normalizedOrder.indexOf(selectedManualCardId);
+
+      if (fromIndex < 0) {
+        return normalizedOrder;
+      }
+
+      const nextOrder = [...normalizedOrder];
+      const [movedCardId] = nextOrder.splice(fromIndex, 1);
+
+      if (movedCardId === undefined) {
+        return normalizedOrder;
+      }
+
+      nextOrder.splice(edge === "start" ? 0 : nextOrder.length, 0, movedCardId);
+
+      return nextOrder;
+    });
+  }
+
+  function resetManualHandOrder() {
+    setManualCardOrderIds([]);
+    setHandSortMode("rank");
+  }
+
   function moveCardInHand(cardIdToMove: string, direction: number) {
     if (direction === 0) {
       return;
@@ -730,10 +766,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }
 
   function handleManualCardDrag(card: Card, info: PanInfo) {
-    if (handSortMode !== "manual") {
-      return;
-    }
-
     const dragSteps = Math.round(info.offset.x / MANUAL_CARD_DRAG_STEP_PX);
 
     if (dragSteps !== 0) {
@@ -934,6 +966,17 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                     variant="secondary"
                     size="sm"
                     className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                    aria-label="Move selected card to start"
+                    title="Move selected card to start"
+                    onClick={() => moveSelectedCardToEdge("start")}
+                    disabled={!canMoveManualCardToEdge || selectedManualCardIndex === 0}
+                  >
+                    <ChevronsLeft className="size-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
                     aria-label="Move selected card left"
                     title="Move selected card left"
                     onClick={() => moveSelectedCardInHand(-1)}
@@ -951,6 +994,30 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                     disabled={!canMoveManualCardRight}
                   >
                     <ArrowRight className="size-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                    aria-label="Move selected card to end"
+                    title="Move selected card to end"
+                    onClick={() => moveSelectedCardToEdge("end")}
+                    disabled={
+                      !canMoveManualCardToEdge ||
+                      selectedManualCardIndex === displayedHand.length - 1
+                    }
+                  >
+                    <ChevronsRight className="size-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                    aria-label="Reset hand order"
+                    title="Reset hand order"
+                    onClick={resetManualHandOrder}
+                  >
+                    <RotateCcw className="size-4" />
                   </Button>
                 </div>
               ) : null}
@@ -1002,10 +1069,11 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                         stiffness: 420,
                         damping: 30
                       }}
-                      drag={handSortMode === "manual" ? "x" : false}
+                      drag="x"
                       dragSnapToOrigin
                       dragElastic={0.18}
                       dragMomentum={false}
+                      onDragStart={() => setHandSortMode("manual")}
                       onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
                       {...(isYourTurn
                         ? {
