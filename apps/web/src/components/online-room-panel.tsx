@@ -2986,6 +2986,10 @@ function OnlineTable({
           playerName: getRoomPlayerName(room, lastEvent.playerId)
         }
       : null;
+  const trickEntryOffset =
+    room === null || lastEvent === null || lastEvent.wasPass
+      ? { x: 0, y: 36, rotate: 0 }
+      : getTrickEntryOffset(seatedPlayers.findIndex((player) => player.id === lastEvent.playerId));
   const [visiblePassKey, setVisiblePassKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -3077,8 +3081,14 @@ function OnlineTable({
                   <motion.div
                     key={`${room.turnNumber}-${getCardId(card)}`}
                     layout
-                    initial={{ opacity: 0, y: 36, scale: 0.88, rotate: index - 2 }}
-                    animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+                    initial={{
+                      opacity: 0,
+                      x: trickEntryOffset.x,
+                      y: trickEntryOffset.y,
+                      scale: 0.82,
+                      rotate: trickEntryOffset.rotate + index - 2
+                    }}
+                    animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
                     exit={{ opacity: 0, y: -20, scale: 0.92 }}
                     transition={{
                       delay: Math.min(0.24, index * 0.045),
@@ -3496,6 +3506,26 @@ function normalizeManualCardOrder(
   const missingIds = handIds.filter((cardId) => !preservedIds.includes(cardId));
 
   return [...preservedIds, ...missingIds];
+}
+
+function getTrickEntryOffset(position: number): {
+  readonly x: number;
+  readonly y: number;
+  readonly rotate: number;
+} {
+  if (position === 1) {
+    return { x: -180, y: 8, rotate: -8 };
+  }
+
+  if (position === 2) {
+    return { x: 180, y: 8, rotate: 8 };
+  }
+
+  if (position === 3) {
+    return { x: 0, y: 220, rotate: 4 };
+  }
+
+  return { x: 0, y: -120, rotate: -4 };
 }
 
 function loadHandSortMode(): HandSortMode {
