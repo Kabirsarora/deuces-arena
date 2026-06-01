@@ -872,11 +872,12 @@ function scheduleAutomatedTurn(room: Room): void {
   }
 
   if (activePlayer.kind === "bot") {
-    const botTimeout = setTimeout(
+    clearTurnTimer(room);
+    room.timerTimeout = setTimeout(
       () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
       botMoveDelayMs()
     );
-    botTimeout.unref();
+    room.timerTimeout.unref();
     return;
   }
 
