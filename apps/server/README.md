@@ -13,4 +13,6 @@ Waiting rooms track player ready states before multiplayer games start. A solo p
 
 ## Admin Cosmetics
 
-Set `ADMIN_GUEST_IDS` to a comma-separated list of trusted guest/profile IDs to grant all cosmetics for testing and creator/admin accounts. Admin cosmetic access is for development/support use and should be replaced with real account-role checks before production payments.
+Set `ADMIN_EMAILS` to a comma-separated list of trusted Google account emails to grant all cosmetics for testing and creator/admin accounts. You can also set `ADMIN_GUEST_IDS` directly for guest/profile IDs.
+
+Admin cosmetic access is for development/support use and should be replaced with real account-role checks before production payments.

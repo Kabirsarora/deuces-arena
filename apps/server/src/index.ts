@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 import {
@@ -108,7 +109,10 @@ type RankedQueuedPlayer = {
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
-const ADMIN_GUEST_IDS = parseCommaList(process.env.ADMIN_GUEST_IDS);
+const ADMIN_GUEST_IDS = [
+  ...parseCommaList(process.env.ADMIN_GUEST_IDS),
+  ...parseCommaList(process.env.ADMIN_EMAILS).map(createAuthProfileId)
+];
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
@@ -1290,6 +1294,10 @@ function parseCommaList(value: string | undefined): string[] {
 
 function isAdminGuestId(guestId: string): boolean {
   return ADMIN_GUEST_IDS.includes(guestId);
+}
+
+function createAuthProfileId(identifier: string): string {
+  return `auth-${createHash("sha256").update(identifier.toLowerCase()).digest("hex").slice(0, 32)}`;
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {

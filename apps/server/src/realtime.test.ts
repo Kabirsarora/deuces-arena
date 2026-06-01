@@ -37,6 +37,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL = "";
   process.env.CLIENT_ORIGIN = "http://localhost:3000, https://preview.example.com ";
   process.env.ADMIN_GUEST_IDS = "guest-admin-cosmetics";
+  process.env.ADMIN_EMAILS = "creator@example.com";
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -182,6 +183,38 @@ describe("realtime rooms", () => {
     }
 
     expect(equipAck.data.equippedCosmetics.map((equipped) => equipped.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
+  });
+
+  it("allows configured admin emails to equip any cosmetic", async () => {
+    const socket = await connectTestSocket();
+    const catalog = await listCosmetics(socket);
+
+    expect(catalog.ok).toBe(true);
+
+    if (!catalog.ok) {
+      return;
+    }
+
+    const supporterCosmetic = catalog.data.find((cosmetic) => cosmetic.isSupporter);
+
+    expect(supporterCosmetic).toBeDefined();
+
+    if (supporterCosmetic === undefined) {
+      return;
+    }
+
+    const adminProfileId = "auth-758f27d1f066779a62a65665242b8780";
+    const profile = await getProfile(socket, adminProfileId);
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
       supporterCosmetic.id
     );
   });
