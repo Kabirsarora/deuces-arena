@@ -1,11 +1,16 @@
 import NextAuth, { type NextAuthResult } from "next-auth";
 import Google from "next-auth/providers/google";
 
+const authSecret =
+  process.env.AUTH_SECRET ??
+  (process.env.NODE_ENV === "production" ? undefined : "deuces-arena-local-dev-secret");
+
 const nextAuth: NextAuthResult = NextAuth({
   providers: [Google({})],
   pages: {
     signIn: "/auth/sign-in"
   },
+  ...(authSecret === undefined ? {} : { secret: authSecret }),
   trustHost: true
 });
 
