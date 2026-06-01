@@ -2857,6 +2857,8 @@ function MatchResultsPanel({
   readonly onLeaveRoom: () => void;
 }) {
   const rows = getPlacementRows(room);
+  const [showReview, setShowReview] = useState(false);
+  const review = getPlayerMatchReview(room);
 
   return (
     <motion.div
@@ -2912,11 +2914,35 @@ function MatchResultsPanel({
         ))}
       </ol>
 
+      {showReview ? (
+        <motion.div
+          className="mt-3 rounded-[0.9rem] border border-white/10 bg-black/24 p-3"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <p className="text-xs font-black uppercase text-[var(--aqua)]">Strategy review</p>
+          <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
+            {review.map((item) => (
+              <li key={item} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      ) : null}
+
       <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setShowReview((current) => !current)}>
+          <Gauge className="size-4" />
+          {showReview ? "Hide review" : "Review strategy"}
+        </Button>
         <Button size="sm" onClick={onCreateBotGame}>
           <Play className="size-4" />
-          New bot table
+          New table
         </Button>
+      </div>
+
+      <div className="mt-2 grid">
         <Button size="sm" variant="secondary" onClick={onLeaveRoom}>
           <DoorOpen className="size-4" />
           Leave table
@@ -3130,6 +3156,34 @@ function getPlacementRows(
       (row): row is { readonly player: PublicRoomPlayer; readonly placement: number } =>
         row !== null
     );
+}
+
+function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
+  const playerId = room.yourPlayerId;
+  const player = room.players.find((candidate) => candidate.id === playerId);
+
+  if (playerId === null || player === undefined) {
+    return ["Join a completed table to see your personal strategy notes."];
+  }
+
+  const placement = getPlacementRows(room).find((row) => row.player.id === playerId)?.placement;
+  const playerEvents = room.recentEvents.filter((event) => event.playerId === playerId);
+  const passes = playerEvents.filter((event) => event.wasPass).length;
+  const plays = playerEvents.length - passes;
+  const multiCardPlays = playerEvents.filter(
+    (event) => event.move.type === "play" && event.move.cards.length >= 2
+  ).length;
+
+  return [
+    placement === undefined
+      ? `${player.name} finished with ${player.cardsRemaining} cards left.`
+      : `${player.name} finished ${ordinal(placement)} with ${player.cardsRemaining} cards left.`,
+    `${plays} recent plays and ${passes} recent passes were recorded for your seat.`,
+    multiCardPlays > 0
+      ? `${multiCardPlays} recent plays shed multiple cards; those are usually worth reviewing first.`
+      : "No recent multi-card sheds were visible in the short table log.",
+    "Deeper mistake detection will use full replay data plus simulations instead of generic advice."
+  ];
 }
 
 function OnlineCard({
