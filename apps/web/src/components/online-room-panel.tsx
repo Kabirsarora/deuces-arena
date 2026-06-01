@@ -102,7 +102,6 @@ const DEUCES_RULES: readonly string[] = [
   "Straights must match the exact length that opened the trick.",
   "Players may pass even when they have a legal higher play.",
   "A bomb is four of a kind plus one kicker and can beat normal hands.",
-  "After a bomb, only a stronger bomb can answer.",
   "When everyone else passes, the last player to make a valid play leads the next trick."
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
@@ -133,6 +132,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [botSeats, setBotSeats] = useState(3);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
+  const [bombEndsTrick, setBombEndsTrick] = useState(false);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -425,10 +425,13 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           "room:start",
           {
             roomCode: createAck.data.roomCode,
-            botCount: 3,
+            botCount: selectedBotSeats,
             timer: {
               enabled: lobbyTimerEnabled,
               secondsPerTurn: turnTimerSeconds
+            },
+            rules: {
+              bombEndsTrick
             }
           },
           handleRoomAck("Started a bot table.")
@@ -521,6 +524,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         timer: {
           enabled: lobbyTimerEnabled,
           secondsPerTurn: turnTimerSeconds
+        },
+        rules: {
+          bombEndsTrick
         }
       },
       handleRoomAck("Game started.")
@@ -773,6 +779,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         maxBotSeats={availableBotSeats}
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
+        bombEndsTrick={bombEndsTrick}
         message={message}
         onPlayerNameChange={setPlayerName}
         onProfileDisplayNameChange={setProfileDisplayName}
@@ -789,6 +796,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onBotSeatsChange={setBotSeats}
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
+        onBombEndsTrickChange={setBombEndsTrick}
         onEquipCosmetic={equipCosmetic}
       />
     );
@@ -804,6 +812,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         maxBotSeats={availableBotSeats}
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
+        bombEndsTrick={bombEndsTrick}
         roomCanStart={roomCanStart}
         yourReady={yourPlayer?.ready ?? false}
         onCopyRoomCode={() => {
@@ -820,6 +829,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onBotSeatsChange={setBotSeats}
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
+        onBombEndsTrickChange={setBombEndsTrick}
       />
     );
   }
@@ -1037,6 +1047,7 @@ function OnlineLobbyHub({
   maxBotSeats,
   timerEnabled,
   timerSeconds,
+  bombEndsTrick,
   message,
   onPlayerNameChange,
   onProfileDisplayNameChange,
@@ -1053,6 +1064,7 @@ function OnlineLobbyHub({
   onBotSeatsChange,
   onTimerEnabledChange,
   onTimerSecondsChange,
+  onBombEndsTrickChange,
   onEquipCosmetic
 }: {
   readonly connected: boolean;
@@ -1072,6 +1084,7 @@ function OnlineLobbyHub({
   readonly maxBotSeats: number;
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
+  readonly bombEndsTrick: boolean;
   readonly message: string;
   readonly onPlayerNameChange: (value: string) => void;
   readonly onProfileDisplayNameChange: (value: string) => void;
@@ -1088,6 +1101,7 @@ function OnlineLobbyHub({
   readonly onBotSeatsChange: (count: number) => void;
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
+  readonly onBombEndsTrickChange: (enabled: boolean) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
 }) {
   const activity = lobby?.activity;
@@ -1168,6 +1182,11 @@ function OnlineLobbyHub({
                       seconds={timerSeconds}
                       onEnabledChange={onTimerEnabledChange}
                       onSecondsChange={onTimerSecondsChange}
+                    />
+                    <CompactRuleToggle
+                      label="Bomb ends trick"
+                      enabled={bombEndsTrick}
+                      onChange={onBombEndsTrickChange}
                     />
                   </div>
                 </HubPlayCard>
@@ -1461,6 +1480,33 @@ function CompactTimerControl({
       />
       <p className="mt-1 text-zinc-400">{seconds}s per turn</p>
     </div>
+  );
+}
+
+function CompactRuleToggle({
+  label,
+  enabled,
+  onChange
+}: {
+  readonly label: string;
+  readonly enabled: boolean;
+  readonly onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-20 items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+      <span>
+        {label}
+        <span className="mt-1 block text-xs font-semibold text-zinc-400">
+          A bomb immediately wins the trick.
+        </span>
+      </span>
+      <input
+        className="size-4 shrink-0 accent-[var(--gold)]"
+        type="checkbox"
+        checked={enabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
   );
 }
 
@@ -1826,6 +1872,7 @@ function OnlineWaitingRoom({
   maxBotSeats,
   timerEnabled,
   timerSeconds,
+  bombEndsTrick,
   roomCanStart,
   yourReady,
   onCopyRoomCode,
@@ -1835,7 +1882,8 @@ function OnlineWaitingRoom({
   onLeave,
   onBotSeatsChange,
   onTimerEnabledChange,
-  onTimerSecondsChange
+  onTimerSecondsChange,
+  onBombEndsTrickChange
 }: {
   readonly room: PublicRoomState;
   readonly connected: boolean;
@@ -1844,6 +1892,7 @@ function OnlineWaitingRoom({
   readonly maxBotSeats: number;
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
+  readonly bombEndsTrick: boolean;
   readonly roomCanStart: boolean;
   readonly yourReady: boolean;
   readonly onCopyRoomCode: () => void;
@@ -1854,6 +1903,7 @@ function OnlineWaitingRoom({
   readonly onBotSeatsChange: (count: number) => void;
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
+  readonly onBombEndsTrickChange: (enabled: boolean) => void;
 }) {
   const seatedHumans = room.players.filter((player) => player.kind === "human").length;
   const seatsNeeded = Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length - botSeats);
@@ -1941,6 +1991,11 @@ function OnlineWaitingRoom({
             seconds={timerSeconds}
             onEnabledChange={onTimerEnabledChange}
             onSecondsChange={onTimerSecondsChange}
+          />
+          <CompactRuleToggle
+            label="Bomb ends trick"
+            enabled={bombEndsTrick}
+            onChange={onBombEndsTrickChange}
           />
 
           <Button className="h-12" variant={yourReady ? "secondary" : "primary"} onClick={onReady}>
@@ -2568,12 +2623,17 @@ function ActiveTableDrawer({
         <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
       ) : null}
 
-      {panel === "rules" ? <TableRulesPanel /> : null}
+      {panel === "rules" ? <TableRulesPanel room={room} /> : null}
     </aside>
   );
 }
 
-function TableRulesPanel() {
+function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
+  const bombRule =
+    room?.rules.bombEndsTrick === true
+      ? "Bombs immediately end the trick; no stronger bomb response is allowed."
+      : "After a bomb, only a stronger bomb can answer.";
+
   return (
     <div className="grid gap-3">
       <div className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
@@ -2586,7 +2646,7 @@ function TableRulesPanel() {
       </div>
 
       <ol className="grid gap-2">
-        {DEUCES_RULES.map((rule, index) => (
+        {[...DEUCES_RULES, bombRule].map((rule, index) => (
           <li
             key={rule}
             className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"

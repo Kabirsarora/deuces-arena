@@ -20,6 +20,10 @@ export type GameState = {
   readonly events: readonly GameEvent[];
 };
 
+export type GameRules = {
+  readonly bombEndsTrick?: boolean;
+};
+
 export type GameEvent = {
   readonly turnNumber: number;
   readonly playerId: string;
@@ -85,7 +89,12 @@ export function createInitialGame(
   };
 }
 
-export function applyMove(state: GameState, playerId: string, move: Move): GameActionResult {
+export function applyMove(
+  state: GameState,
+  playerId: string,
+  move: Move,
+  rules: GameRules = {}
+): GameActionResult {
   if (state.status === "complete") {
     return {
       ok: false,
@@ -160,7 +169,7 @@ export function applyMove(state: GameState, playerId: string, move: Move): GameA
     };
   }
 
-  const nextState = applyPlay(state, playerId, move.cards, validation.hand);
+  const nextState = applyPlay(state, playerId, move.cards, validation.hand, rules);
 
   return {
     ok: true,
@@ -207,7 +216,8 @@ function applyPlay(
   state: GameState,
   playerId: string,
   cards: readonly Card[],
-  hand: HandAnalysis
+  hand: HandAnalysis,
+  rules: GameRules
 ): GameState {
   const players = state.players.map((player) =>
     player.id === playerId
@@ -232,6 +242,16 @@ function applyPlay(
       turnNumber: state.turnNumber + 1,
       placements: [...state.placements, playerId],
       status: "complete"
+    };
+  }
+
+  if (rules.bombEndsTrick === true && hand.type === "bomb") {
+    return {
+      ...state,
+      players,
+      activePlayerId: playerId,
+      currentTrick: null,
+      turnNumber: state.turnNumber + 1
     };
   }
 

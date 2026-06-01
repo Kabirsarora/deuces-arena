@@ -266,6 +266,37 @@ describe("game state", () => {
       bombsPlayed: 1
     });
   });
+
+  it("can end the trick immediately when a bomb rule variant is enabled", () => {
+    const game = createSummaryGame([
+      createCard("3", "diamonds"),
+      createCard("3", "clubs"),
+      createCard("3", "hearts"),
+      createCard("3", "spades"),
+      createCard("4", "diamonds"),
+      createCard("5", "diamonds")
+    ]);
+    const result = applyMove(
+      game,
+      "player-1",
+      {
+        type: "play",
+        cards: game.players[0]?.hand.slice(0, 5) ?? []
+      },
+      { bombEndsTrick: true }
+    );
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.state.activePlayerId).toBe("player-1");
+    expect(result.state.currentTrick).toBeNull();
+    expect(result.state.status).toBe("in-progress");
+    expect(result.state.players[0]?.hand).toEqual([createCard("5", "diamonds")]);
+  });
 });
 
 function createSummaryGame(playerOneHand: GameState["players"][number]["hand"]): GameState {

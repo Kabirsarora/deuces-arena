@@ -26,6 +26,7 @@ import type {
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
+  PublicRoomRules,
   PublicRoomPlayer,
   PublicRoomState,
   ProfileAvatarKey,
@@ -83,6 +84,7 @@ type Room = {
   persistedMatch: PersistedMatch | null;
   statsApplied: boolean;
   timer: RoomTimerSettings;
+  rules: RoomRuleSettings;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
 };
@@ -91,6 +93,8 @@ type RoomTimerSettings = {
   readonly enabled: boolean;
   readonly secondsPerTurn: number;
 };
+
+type RoomRuleSettings = PublicRoomRules;
 
 type RankedQueuedPlayer = {
   readonly socketId: string;
@@ -317,6 +321,7 @@ io.on("connection", (socket) => {
 
     fillRoomWithBots(room, botCount);
     room.timer = normalizeTimerSettings(payload.timer);
+    room.rules = normalizeRuleSettings(payload.rules);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
       shuffleDeck()
@@ -537,7 +542,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const result = applyMove(room.game, player.id, payload.move);
+    const result = applyMove(room.game, player.id, payload.move, room.rules);
 
     if (!result.ok) {
       callback(fail(result.reason));
@@ -702,6 +707,9 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
       enabled: false,
       secondsPerTurn: DEFAULT_TIMER_SECONDS
     },
+    rules: {
+      bombEndsTrick: false
+    },
     turnDeadlineAt: null,
     timerTimeout: null
   };
@@ -814,6 +822,12 @@ function normalizeTimerSettings(
   };
 }
 
+function normalizeRuleSettings(rules: PublicRoomRules | undefined): RoomRuleSettings {
+  return {
+    bombEndsTrick: rules?.bombEndsTrick ?? false
+  };
+}
+
 function resetTurnTimer(room: Room): void {
   clearTurnTimer(room);
 
@@ -895,7 +909,7 @@ function applyAutomatedMove(
     },
     strategy
   });
-  const result = applyMove(room.game, playerId, decision.move);
+  const result = applyMove(room.game, playerId, decision.move, room.rules);
 
   if (result.ok) {
     room.game = result.state;
@@ -971,6 +985,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     roomCode: room.code,
     mode: room.mode,
     status: room.game?.status ?? "waiting",
+    rules: room.rules,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     activePlayerId: room.game?.activePlayerId ?? null,
     currentTrick: room.game?.currentTrick ?? null,

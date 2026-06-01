@@ -153,6 +153,7 @@ export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;
   readonly status: RoomStatus;
+  readonly rules: PublicRoomRules;
   readonly players: readonly PublicRoomPlayer[];
   readonly activePlayerId: string | null;
   readonly currentTrick: CurrentTrick | null;
@@ -169,6 +170,10 @@ export type PublicTurnTimerState = {
   readonly enabled: boolean;
   readonly secondsPerTurn: number;
   readonly deadlineAt: string | null;
+};
+
+export type PublicRoomRules = {
+  readonly bombEndsTrick: boolean;
 };
 
 export type RoomReplayExport = {
@@ -239,6 +244,7 @@ export type ClientToServerEvents = {
         readonly enabled: boolean;
         readonly secondsPerTurn: number;
       };
+      readonly rules?: PublicRoomRules;
     },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
