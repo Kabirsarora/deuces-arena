@@ -177,8 +177,24 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 );
 
 io.on("connection", (socket) => {
+  function leaveCurrentRoomForSocket(): void {
+    if (socket.data.roomCode === undefined || socket.data.playerId === undefined) {
+      return;
+    }
+
+    const currentRoom = rooms.get(normalizeRoomCode(socket.data.roomCode));
+
+    if (currentRoom !== undefined) {
+      leaveRoom(currentRoom, socket.data.playerId);
+      socket.leave(currentRoom.code);
+    }
+
+    socket.data = {};
+  }
+
   socket.on("room:create", (payload, callback) => {
     removeRankedQueueEntry(socket.id);
+    leaveCurrentRoomForSocket();
     const room = createRoom(payload.playerName, socket.id, payload.guestId);
     const player = room.players[0];
 
@@ -217,6 +233,12 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (isPlayerInRoom(room, socket.id)) {
+      callback(fail("You are already seated in this room."));
+      return;
+    }
+
+    leaveCurrentRoomForSocket();
     const player = addHumanPlayer(room, payload.playerName, socket.id, payload.guestId);
     socket.data = {
       playerId: player.id,

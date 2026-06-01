@@ -172,6 +172,46 @@ describe("realtime rooms", () => {
     );
   });
 
+  it("cleans up a player's previous waiting room when they create a new room", async () => {
+    const host = await connectTestSocket();
+    const firstRoom = await createRoom(host, {
+      playerName: "Host",
+      guestId: "guest-room-switch"
+    });
+
+    expect(firstRoom.ok).toBe(true);
+
+    if (!firstRoom.ok) {
+      return;
+    }
+
+    const secondRoom = await createRoom(host, {
+      playerName: "Host",
+      guestId: "guest-room-switch"
+    });
+
+    expect(secondRoom.ok).toBe(true);
+
+    if (!secondRoom.ok) {
+      return;
+    }
+
+    const lobby = await emitLobbyGet(host);
+
+    expect(lobby.ok).toBe(true);
+
+    if (!lobby.ok) {
+      return;
+    }
+
+    expect(lobby.data.openRooms.some((room) => room.roomCode === firstRoom.data.roomCode)).toBe(
+      false
+    );
+    expect(lobby.data.openRooms.some((room) => room.roomCode === secondRoom.data.roomCode)).toBe(
+      true
+    );
+  });
+
   it("requires all connected humans to be ready before starting a multiplayer room", async () => {
     const host = await connectTestSocket();
     const guest = await connectTestSocket();
