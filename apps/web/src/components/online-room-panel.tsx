@@ -1028,8 +1028,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       transition={{
                         delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.045),
                         type: "spring",
-                        stiffness: 420,
-                        damping: 30
+                        stiffness: 300,
+                        damping: 32,
+                        mass: 0.85
                       }}
                       drag="x"
                       dragSnapToOrigin
@@ -2860,10 +2861,11 @@ function OnlineTable({
                     animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
                     exit={{ opacity: 0, y: -20, scale: 0.92 }}
                     transition={{
-                      delay: Math.min(0.24, index * 0.045),
+                      delay: Math.min(0.28, index * 0.055),
                       type: "spring",
-                      stiffness: 380,
-                      damping: 28
+                      stiffness: 280,
+                      damping: 30,
+                      mass: 0.9
                     }}
                   >
                     <OnlineCard card={card} compact />
@@ -3005,7 +3007,7 @@ function DealAnimationOverlay() {
           className="absolute left-1/2 top-1/2 h-24 w-16 -translate-x-1/2 -translate-y-1/2 rounded-md border border-[var(--gold)]/60 bg-[#142a4f] shadow-2xl"
           initial={{ rotate: -8, scale: 0.92 }}
           animate={{ rotate: [0, -12, 10, -5, 0], scale: [0.92, 1.02, 0.98, 1] }}
-          transition={{ duration: 0.9, ease: "easeInOut" }}
+          transition={{ duration: 1.1, ease: "easeInOut" }}
         />
         {Array.from({ length: 9 }).map((_, index) => (
           <motion.div
@@ -3026,8 +3028,8 @@ function DealAnimationOverlay() {
               scale: [0.96, 1, 1, 0.9]
             }}
             transition={{
-              delay: 0.12 + index * 0.045,
-              duration: 1.45,
+              delay: 0.14 + index * 0.055,
+              duration: 1.65,
               ease: "easeInOut"
             }}
           >
