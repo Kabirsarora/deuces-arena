@@ -2746,6 +2746,9 @@ function OnlineTable({
       ? { x: 0, y: 36, rotate: 0 }
       : getTrickEntryOffset(seatedPlayers.findIndex((player) => player.id === lastEvent.playerId));
   const [visiblePassKey, setVisiblePassKey] = useState<string | null>(null);
+  const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
+  const selectedStatsPlayer =
+    room?.players.find((player) => player.id === selectedStatsPlayerId) ?? null;
 
   useEffect(() => {
     if (latestPass === null) {
@@ -2801,9 +2804,20 @@ function OnlineTable({
             player={player}
             active={room?.activePlayerId === player.id}
             position={index}
+            onOpenStats={() => setSelectedStatsPlayerId(player.id)}
           />
         ))
       ) : null}
+
+      <AnimatePresence>
+        {selectedStatsPlayer !== null ? (
+          <PlayerStatsPopover
+            key={selectedStatsPlayer.id}
+            player={selectedStatsPlayer}
+            onClose={() => setSelectedStatsPlayerId(null)}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <div className="relative z-10 grid h-full min-h-[26rem] place-items-center text-center sm:min-h-[30rem] lg:min-h-0">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
@@ -3036,11 +3050,13 @@ function DealAnimationOverlay() {
 function OnlineSeat({
   player,
   active,
-  position
+  position,
+  onOpenStats
 }: {
   readonly player: PublicRoomPlayer;
   readonly active: boolean;
   readonly position: number;
+  readonly onOpenStats: () => void;
 }) {
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
@@ -3074,7 +3090,13 @@ function OnlineSeat({
         {player.name.slice(0, 1).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold">{player.name}</p>
+        <button
+          className="block max-w-full truncate text-left text-sm font-bold underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
+          type="button"
+          onClick={onOpenStats}
+        >
+          {player.name}
+        </button>
         <p className="text-xs text-zinc-400">
           {player.cardsRemaining} cards · {player.connected ? "online" : "away"}
         </p>
@@ -3091,6 +3113,50 @@ function OnlineSeat({
         </span>
       </div>
     </div>
+  );
+}
+
+function PlayerStatsPopover({
+  player,
+  onClose
+}: {
+  readonly player: PublicRoomPlayer;
+  readonly onClose: () => void;
+}) {
+  const stats = player.stats;
+
+  return (
+    <motion.aside
+      className="hud-glass absolute right-4 top-16 z-40 w-[min(20rem,calc(100%-2rem))] rounded-[1.1rem] border border-white/10 p-4 text-left shadow-2xl backdrop-blur-xl"
+      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 360, damping: 30 }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black">{player.name}</p>
+          <p className="text-xs uppercase text-zinc-400">{player.kind}</p>
+        </div>
+        <Button className="h-8 px-3" size="sm" variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ProfileMetric label="Cards" value={player.cardsRemaining} />
+        <ProfileMetric label="Rating" value={stats?.rating ?? "-"} />
+        <ProfileMetric label="Wins" value={stats?.wins ?? "-"} />
+        <ProfileMetric
+          label="Avg place"
+          value={
+            stats?.averagePlacement === null || stats === null
+              ? "-"
+              : stats.averagePlacement.toFixed(2)
+          }
+        />
+      </div>
+    </motion.aside>
   );
 }
 
