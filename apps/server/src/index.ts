@@ -8,6 +8,7 @@ import {
   createInitialGame,
   evaluateLegalMovesByRandomRollouts,
   summarizeGame,
+  type BotStrategy,
   type Card,
   type GameState,
   type PlayerState
@@ -16,6 +17,7 @@ import type {
   ClientToServerEvents,
   InterServerEvents,
   MatchMode,
+  PublicBotDifficulty,
   PublicChatMessage,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
@@ -85,6 +87,7 @@ type Room = {
   statsApplied: boolean;
   timer: RoomTimerSettings;
   rules: RoomRuleSettings;
+  botDifficulty: PublicBotDifficulty;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
 };
@@ -323,6 +326,7 @@ io.on("connection", (socket) => {
     fillRoomWithBots(room, botCount);
     room.timer = normalizeTimerSettings(payload.timer);
     room.rules = normalizeRuleSettings(payload.rules);
+    room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
       shuffleDeck()
@@ -711,6 +715,7 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
     rules: {
       bombEndsTrick: false
     },
+    botDifficulty: "normal",
     turnDeadlineAt: null,
     timerTimeout: null
   };
@@ -829,6 +834,10 @@ function normalizeRuleSettings(rules: PublicRoomRules | undefined): RoomRuleSett
   };
 }
 
+function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): PublicBotDifficulty {
+  return difficulty === "easy" || difficulty === "hard" ? difficulty : "normal";
+}
+
 function resetTurnTimer(room: Room): void {
   clearTurnTimer(room);
 
@@ -874,7 +883,7 @@ function scheduleAutomatedTurn(room: Room): void {
   if (activePlayer.kind === "bot") {
     clearTurnTimer(room);
     room.timerTimeout = setTimeout(
-      () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
+      () => applyAutomatedMove(room, activePlayer.id, botStrategyForDifficulty(room.botDifficulty)),
       botMoveDelayMs()
     );
     room.timerTimeout.unref();
@@ -900,11 +909,7 @@ function botMoveDelayMs(): number {
   );
 }
 
-function applyAutomatedMove(
-  room: Room,
-  playerId: string,
-  strategy: "lowest-legal" | "simple-heuristic"
-): void {
+function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy): void {
   if (room.game === null || room.game.activePlayerId !== playerId) {
     return;
   }
@@ -928,6 +933,18 @@ function applyAutomatedMove(
     emitLobbyState();
     scheduleAutomatedTurn(room);
   }
+}
+
+function botStrategyForDifficulty(difficulty: PublicBotDifficulty): BotStrategy {
+  if (difficulty === "easy") {
+    return "random-legal";
+  }
+
+  if (difficulty === "hard") {
+    return "simple-heuristic";
+  }
+
+  return "lowest-legal";
 }
 
 function persistLastMove(room: Room): void {
@@ -995,6 +1012,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     mode: room.mode,
     status: room.game?.status ?? "waiting",
     rules: room.rules,
+    botDifficulty: room.botDifficulty,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     activePlayerId: room.game?.activePlayerId ?? null,
     currentTrick: room.game?.currentTrick ?? null,

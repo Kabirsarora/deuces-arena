@@ -3,6 +3,7 @@ import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-eng
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
+export type PublicBotDifficulty = "easy" | "normal" | "hard";
 export type CosmeticKind =
   | "CARD_BACK"
   | "TABLE_THEME"
@@ -155,6 +156,7 @@ export type PublicRoomState = {
   readonly mode: MatchMode;
   readonly status: RoomStatus;
   readonly rules: PublicRoomRules;
+  readonly botDifficulty: PublicBotDifficulty;
   readonly players: readonly PublicRoomPlayer[];
   readonly activePlayerId: string | null;
   readonly currentTrick: CurrentTrick | null;
@@ -246,6 +248,7 @@ export type ClientToServerEvents = {
         readonly secondsPerTurn: number;
       };
       readonly rules?: PublicRoomRules;
+      readonly botDifficulty?: PublicBotDifficulty;
     },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;

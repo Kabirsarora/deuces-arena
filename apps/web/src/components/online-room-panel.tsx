@@ -11,6 +11,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  PublicBotDifficulty,
   PublicChatMessage,
   PublicCosmetic,
   PublicGuestProfile,
@@ -95,6 +96,14 @@ const HAND_SORT_OPTIONS: readonly { readonly mode: HandSortMode; readonly label:
   { mode: "sets", label: "Sets" },
   { mode: "manual", label: "Manual" }
 ];
+const BOT_DIFFICULTY_OPTIONS: readonly {
+  readonly value: PublicBotDifficulty;
+  readonly label: string;
+}[] = [
+  { value: "easy", label: "Easy" },
+  { value: "normal", label: "Normal" },
+  { value: "hard", label: "Hard" }
+];
 const DEUCES_RULES: readonly string[] = [
   "3 of diamonds starts and must be included in the first play.",
   "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
@@ -128,6 +137,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [handSortMode, setHandSortMode] = useState<HandSortMode>(() => loadHandSortMode());
   const [manualCardOrderIds, setManualCardOrderIds] = useState<readonly string[]>([]);
   const [botSeats, setBotSeats] = useState(3);
+  const [botDifficulty, setBotDifficulty] = useState<PublicBotDifficulty>("normal");
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
@@ -434,7 +444,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
             },
             rules: {
               bombEndsTrick
-            }
+            },
+            botDifficulty
           },
           handleRoomAck("Started a bot table.")
         );
@@ -529,7 +540,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         },
         rules: {
           bombEndsTrick
-        }
+        },
+        botDifficulty
       },
       handleRoomAck("Game started.")
     );
@@ -760,6 +772,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
+        botDifficulty={botDifficulty}
         message={message}
         onPlayerNameChange={setPlayerName}
         onProfileDisplayNameChange={setProfileDisplayName}
@@ -777,6 +790,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
+        onBotDifficultyChange={setBotDifficulty}
         onEquipCosmetic={equipCosmetic}
       />
     );
@@ -793,6 +807,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
+        botDifficulty={botDifficulty}
         roomCanStart={roomCanStart}
         yourReady={yourPlayer?.ready ?? false}
         onCopyRoomCode={() => {
@@ -810,6 +825,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
+        onBotDifficultyChange={setBotDifficulty}
       />
     );
   }
@@ -1060,6 +1076,7 @@ function OnlineLobbyHub({
   timerEnabled,
   timerSeconds,
   bombEndsTrick,
+  botDifficulty,
   message,
   onPlayerNameChange,
   onProfileDisplayNameChange,
@@ -1077,6 +1094,7 @@ function OnlineLobbyHub({
   onTimerEnabledChange,
   onTimerSecondsChange,
   onBombEndsTrickChange,
+  onBotDifficultyChange,
   onEquipCosmetic
 }: {
   readonly connected: boolean;
@@ -1097,6 +1115,7 @@ function OnlineLobbyHub({
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
+  readonly botDifficulty: PublicBotDifficulty;
   readonly message: string;
   readonly onPlayerNameChange: (value: string) => void;
   readonly onProfileDisplayNameChange: (value: string) => void;
@@ -1114,6 +1133,7 @@ function OnlineLobbyHub({
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
+  readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
 }) {
   const activity = lobby?.activity;
@@ -1193,6 +1213,7 @@ function OnlineLobbyHub({
                       onEnabledChange={onTimerEnabledChange}
                       onSecondsChange={onTimerSecondsChange}
                     />
+                    <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
                     <CompactRuleToggle
                       label="Bomb ends trick"
                       enabled={bombEndsTrick}
@@ -1427,6 +1448,37 @@ function CompactTimerControl({
         onChange={(event) => onSecondsChange(Number(event.target.value))}
       />
       <p className="mt-1 text-zinc-400">{seconds}s per turn</p>
+    </div>
+  );
+}
+
+function CompactBotDifficulty({
+  value,
+  onChange
+}: {
+  readonly value: PublicBotDifficulty;
+  readonly onChange: (difficulty: PublicBotDifficulty) => void;
+}) {
+  return (
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+      <p className="mb-2">Bot difficulty</p>
+      <div className="grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
+        {BOT_DIFFICULTY_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            className={cn(
+              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              value === option.value
+                ? "bg-[var(--gold)] text-black"
+                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+            )}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1803,6 +1855,7 @@ function OnlineWaitingRoom({
   timerEnabled,
   timerSeconds,
   bombEndsTrick,
+  botDifficulty,
   roomCanStart,
   yourReady,
   onCopyRoomCode,
@@ -1813,7 +1866,8 @@ function OnlineWaitingRoom({
   onBotSeatsChange,
   onTimerEnabledChange,
   onTimerSecondsChange,
-  onBombEndsTrickChange
+  onBombEndsTrickChange,
+  onBotDifficultyChange
 }: {
   readonly room: PublicRoomState;
   readonly connected: boolean;
@@ -1823,6 +1877,7 @@ function OnlineWaitingRoom({
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
+  readonly botDifficulty: PublicBotDifficulty;
   readonly roomCanStart: boolean;
   readonly yourReady: boolean;
   readonly onCopyRoomCode: () => void;
@@ -1834,6 +1889,7 @@ function OnlineWaitingRoom({
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
+  readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
 }) {
   const seatedHumans = room.players.filter((player) => player.kind === "human").length;
   const seatsNeeded = Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length - botSeats);
@@ -1922,6 +1978,7 @@ function OnlineWaitingRoom({
             onEnabledChange={onTimerEnabledChange}
             onSecondsChange={onTimerSecondsChange}
           />
+          <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
           <CompactRuleToggle
             label="Bomb ends trick"
             enabled={bombEndsTrick}
