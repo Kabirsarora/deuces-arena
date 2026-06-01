@@ -2,7 +2,6 @@
 
 import {
   compareCards,
-  createReplayTimeline,
   generateLegalMoves,
   getCardId,
   getRankStrength,
@@ -18,7 +17,6 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
-  PublicMoveEvaluation,
   PublicOpenRoom,
   PublicRankedQueueState,
   PublicRoomPlayer,
@@ -29,7 +27,6 @@ import type {
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import {
-  Activity,
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -40,7 +37,6 @@ import {
   CircleDot,
   Copy,
   Crown,
-  Download,
   DoorOpen,
   Gauge,
   History,
@@ -72,7 +68,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked";
-type ActiveTablePanel = "players" | "replay" | "coach" | "chat" | "rules";
+type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
 type AuthUser = {
   readonly profileId: string;
@@ -127,7 +123,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
-  const [moveEvaluations, setMoveEvaluations] = useState<readonly PublicMoveEvaluation[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
   const [activeTablePanel, setActiveTablePanel] = useState<ActiveTablePanel | null>(null);
   const [handSortMode, setHandSortMode] = useState<HandSortMode>(() => loadHandSortMode());
@@ -358,10 +353,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }, [profile?.equippedCosmetics, profile?.unlocks, room]);
 
   useEffect(() => {
-    setMoveEvaluations([]);
-  }, [room?.turnNumber, room?.roomCode]);
-
-  useEffect(() => {
     const latestChatMessage = room?.recentChat.at(-1) ?? null;
     const latestChatKey =
       room === null || latestChatMessage === null
@@ -577,37 +568,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     });
   }
 
-  function exportReplay() {
-    if (room === null) {
-      return;
-    }
-
-    socketRef.current?.emit("room:replay", { roomCode: room.roomCode }, (ack) => {
-      if (!ack.ok) {
-        setMessage(ack.error);
-        return;
-      }
-
-      const replay = {
-        exportedAt: new Date().toISOString(),
-        source: "online-room",
-        ...ack.data,
-        timeline: createReplayTimeline(ack.data.events)
-      };
-      const blob = new Blob([JSON.stringify(replay, null, 2)], {
-        type: "application/json"
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-
-      anchor.href = url;
-      anchor.download = `deuces-arena-room-${ack.data.roomCode}-replay-${Date.now()}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setMessage("Replay exported.");
-    });
-  }
-
   function playSelected() {
     submitMove({
       type: "play",
@@ -658,25 +618,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         setMessage(ack.error);
       }
     });
-  }
-
-  function evaluateMoves() {
-    if (room === null) {
-      return;
-    }
-
-    socketRef.current?.emit(
-      "coach:evaluate",
-      { roomCode: room.roomCode, rollouts: 8, maxMoves: 12 },
-      (ack) => {
-        if (ack.ok) {
-          setMoveEvaluations(ack.data);
-          setMessage("Move lab updated from random rollouts.");
-        } else {
-          setMessage(ack.error);
-        }
-      }
-    );
   }
 
   function equipCosmetic(cosmetic: PublicCosmetic) {
@@ -916,11 +857,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           <ActiveTableDrawer
             panel={activeTablePanel}
             room={room}
-            moveEvaluations={moveEvaluations}
-            canEvaluate={isYourTurn}
             onClose={() => setActiveTablePanel(null)}
-            onExportReplay={exportReplay}
-            onEvaluateMoves={evaluateMoves}
             onSendChat={sendChat}
           />
         </section>
@@ -1185,9 +1122,7 @@ function OnlineLobbyHub({
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="online-hub mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl lg:grid-cols-[7.5rem_minmax(0,1fr)]">
-        <OnlineHubRail activeMode={hubMode} onModeChange={onHubModeChange} />
-
+      <section className="online-hub mx-auto min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl">
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
           <section className="flex min-h-0 flex-col">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -1354,68 +1289,6 @@ function OnlineLobbyHub({
         </div>
       </section>
     </main>
-  );
-}
-
-function OnlineHubRail({
-  activeMode,
-  onModeChange
-}: {
-  readonly activeMode: OnlineHubMode;
-  readonly onModeChange: (mode: OnlineHubMode) => void;
-}) {
-  return (
-    <nav className="hidden border-r border-white/10 bg-black/22 p-3 lg:grid lg:content-start lg:gap-3">
-      <div className="mb-2 grid h-16 place-items-center rounded-[1.4rem] border border-white/10 bg-white/8 text-sm font-black">
-        DA
-      </div>
-      <RailButton
-        active={activeMode === "bots"}
-        icon={<Bot className="size-6" />}
-        label="Bots"
-        onClick={() => onModeChange("bots")}
-      />
-      <RailButton
-        active={activeMode === "casual"}
-        icon={<Users className="size-6" />}
-        label="Rooms"
-        onClick={() => onModeChange("casual")}
-      />
-      <RailButton
-        active={activeMode === "ranked"}
-        icon={<Trophy className="size-6" />}
-        label="Ranked"
-        onClick={() => onModeChange("ranked")}
-      />
-    </nav>
-  );
-}
-
-function RailButton({
-  active,
-  icon,
-  label,
-  onClick
-}: {
-  readonly active: boolean;
-  readonly icon: ReactNode;
-  readonly label: string;
-  readonly onClick: () => void;
-}) {
-  return (
-    <button
-      className={cn(
-        "grid justify-items-center gap-2 rounded-[1.35rem] px-3 py-4 text-sm font-black transition",
-        active
-          ? "bg-[var(--table)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
-          : "text-zinc-400 hover:bg-white/8 hover:text-white"
-      )}
-      type="button"
-      onClick={onClick}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 
@@ -1858,27 +1731,6 @@ function ActiveRoomBar({
             {room.roomCode}
           </button>
         ) : null}
-        <TablePanelButton
-          panel="players"
-          activePanel={activePanel}
-          icon={<Users className="size-4" />}
-          label="Stats"
-          onToggle={onTogglePanel}
-        />
-        <TablePanelButton
-          panel="replay"
-          activePanel={activePanel}
-          icon={<History className="size-4" />}
-          label="Replay"
-          onToggle={onTogglePanel}
-        />
-        <TablePanelButton
-          panel="coach"
-          activePanel={activePanel}
-          icon={<Gauge className="size-4" />}
-          label="Coach"
-          onToggle={onTogglePanel}
-        />
         <TablePanelButton
           panel="chat"
           activePanel={activePanel}
@@ -2628,40 +2480,19 @@ function ProfileMetric({
 function ActiveTableDrawer({
   panel,
   room,
-  moveEvaluations,
-  canEvaluate,
   onClose,
-  onExportReplay,
-  onEvaluateMoves,
   onSendChat
 }: {
   readonly panel: ActiveTablePanel | null;
   readonly room: PublicRoomState | null;
-  readonly moveEvaluations: readonly PublicMoveEvaluation[];
-  readonly canEvaluate: boolean;
   readonly onClose: () => void;
-  readonly onExportReplay: () => void;
-  readonly onEvaluateMoves: () => void;
   readonly onSendChat: (body: string) => void;
 }) {
-  const recentEvents = createReplayTimeline(room?.recentEvents ?? [])
-    .slice(-6)
-    .reverse();
-
   if (panel === null) {
     return null;
   }
 
-  const title =
-    panel === "players"
-      ? "Table Stats"
-      : panel === "replay"
-        ? "Replay Log"
-        : panel === "coach"
-          ? "Move Coach"
-          : panel === "chat"
-            ? "Table Chat"
-            : "Rules";
+  const title = panel === "chat" ? "Table Chat" : "Rules";
 
   return (
     <aside className="hud-glass absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[min(24rem,calc(100%-1.5rem))] overflow-y-auto rounded-[1.25rem] border border-white/10 p-3 shadow-2xl backdrop-blur-xl">
@@ -2676,26 +2507,6 @@ function ActiveTableDrawer({
           Close
         </Button>
       </div>
-
-      {panel === "players" ? (
-        <div className="grid gap-2">
-          {(room?.players ?? []).map((player) => (
-            <OnlinePlayerStat key={player.id} player={player} />
-          ))}
-        </div>
-      ) : null}
-
-      {panel === "replay" ? (
-        <ReplayLog room={room} events={recentEvents} onExportReplay={onExportReplay} />
-      ) : null}
-
-      {panel === "coach" ? (
-        <MoveLab
-          evaluations={moveEvaluations}
-          disabled={!canEvaluate}
-          onEvaluateMoves={onEvaluateMoves}
-        />
-      ) : null}
 
       {panel === "chat" ? (
         <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
@@ -2735,118 +2546,6 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
         ))}
       </ol>
     </div>
-  );
-}
-
-function ReplayLog({
-  room,
-  events,
-  onExportReplay
-}: {
-  readonly room: PublicRoomState | null;
-  readonly events: ReturnType<typeof createReplayTimeline>;
-  readonly onExportReplay: () => void;
-}) {
-  return (
-    <div className="grid gap-3">
-      <Button size="sm" variant="secondary" disabled={room === null} onClick={onExportReplay}>
-        <Download className="size-4" />
-        Export Replay
-      </Button>
-      <div className="min-h-0 overflow-hidden rounded-[0.9rem] border border-white/10 bg-black/20">
-        {events.length === 0 ? (
-          <div className="grid h-full min-h-32 place-items-center px-3 text-center text-xs text-zinc-400">
-            Accepted moves will stream here.
-          </div>
-        ) : (
-          <ol className="max-h-80 overflow-y-auto p-2">
-            {events.map((event) => (
-              <li
-                key={`${event.turnNumber}-${event.playerId}`}
-                className="mb-2 rounded-[0.9rem] border border-white/10 bg-white/6 px-2 py-2 last:mb-0"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold">
-                      {getRoomPlayerName(room, event.playerId)}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-300">
-                      {event.kind === "pass"
-                        ? "Passed"
-                        : `${formatHandType(event.handType ?? "play")} · ${event.cardCount} cards`}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-black/28 px-1.5 py-0.5 text-[10px] text-zinc-400">
-                    #{event.turnNumber + 1}
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500">
-                  <Activity className="size-3" />
-                  {event.legalMoveCount} legal · {event.cardsRemainingAfter} left
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MoveLab({
-  evaluations,
-  disabled,
-  onEvaluateMoves
-}: {
-  readonly evaluations: readonly PublicMoveEvaluation[];
-  readonly disabled: boolean;
-  readonly onEvaluateMoves: () => void;
-}) {
-  return (
-    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-2">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold">
-        <span className="flex items-center gap-2">
-          <Gauge className="size-3.5 text-[var(--aqua)]" />
-          Move Lab
-        </span>
-        <span className="text-[10px] font-normal text-zinc-500">rollouts</span>
-      </summary>
-
-      <Button
-        className="mt-3 w-full"
-        size="sm"
-        variant="secondary"
-        disabled={disabled}
-        onClick={onEvaluateMoves}
-      >
-        Analyze Legal Moves
-      </Button>
-
-      <div className="mt-2 grid gap-2">
-        {evaluations.length === 0 ? (
-          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2 text-xs text-zinc-500">
-            Run analysis on your turn to rank legal moves with random simulations.
-          </p>
-        ) : (
-          evaluations.slice(0, 3).map((evaluation, index) => (
-            <div
-              key={`${index}-${formatMove(evaluation.move)}`}
-              className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-xs font-bold">{formatMove(evaluation.move)}</p>
-                <span className="rounded-full bg-black/24 px-2 py-1 text-[10px] text-zinc-300">
-                  {(evaluation.winRate * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="mt-1 text-[11px] text-zinc-400">
-                Avg place {evaluation.averagePlacement.toFixed(2)} · {evaluation.rollouts} rollouts
-              </p>
-            </div>
-          ))
-        )}
-      </div>
-    </details>
   );
 }
 
@@ -2917,32 +2616,6 @@ function RoomChat({
         </Button>
       </form>
     </section>
-  );
-}
-
-function OnlinePlayerStat({ player }: { readonly player: PublicRoomPlayer }) {
-  const equippedCount = player.equippedCosmetics.length;
-
-  return (
-    <div className="rounded-[0.9rem] border border-white/10 bg-white/7 p-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-xs font-bold">{player.name}</p>
-        <span
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            player.connected ? "bg-emerald-300" : "bg-red-300"
-          )}
-        />
-      </div>
-      <div className="mt-1 grid gap-y-1 text-[11px] text-zinc-400">
-        <span>{player.cardsRemaining} cards</span>
-        <span>
-          {player.stats === null ? player.kind : `${player.stats.rating} rating`} ·{" "}
-          {player.ready ? "ready" : "not ready"}
-        </span>
-        {equippedCount > 0 ? <span>{equippedCount} cosmetic loadout</span> : null}
-      </div>
-    </div>
   );
 }
 
@@ -3555,10 +3228,6 @@ function formatHandType(type: string): string {
     .split("-")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function formatMove(move: Move): string {
-  return move.type === "pass" ? "Pass" : move.cards.map(formatCard).join(" ");
 }
 
 function formatRatingDelta(delta: number | null): string {
