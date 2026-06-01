@@ -18,6 +18,15 @@ Recommended free/low-cost path:
 
 ## Required Environment Variables
 
+Copy the relevant example file before local setup:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+cp apps/server/.env.example apps/server/.env
+```
+
+Do not commit the copied files with real secrets.
+
 Web:
 
 ```bash
