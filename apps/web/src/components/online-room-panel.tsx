@@ -1567,6 +1567,9 @@ function OpenRoomStrip({
                 <span className="mt-1 block text-sm text-zinc-300">
                   {room.seatedPlayers}/{room.maxPlayers} seated · {room.roomCode}
                 </span>
+                <span className="mt-3 block w-fit rounded-full border border-white/10 bg-black/24 px-3 py-1 text-xs font-bold text-zinc-200">
+                  {room.rules.bombEndsTrick ? "Bombs end tricks" : "Bombs can be answered"}
+                </span>
               </span>
               <span className="mt-8 flex items-center justify-between gap-3">
                 <span className="rounded-full bg-black/24 px-3 py-1 text-xs font-bold text-zinc-200">

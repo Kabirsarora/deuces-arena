@@ -1083,6 +1083,7 @@ function publicLobbyState(): PublicLobbyState {
       return {
         roomCode: room.code,
         hostName: room.players[0]?.name ?? "Open table",
+        rules: room.rules,
         seatedPlayers,
         readyPlayers,
         maxPlayers: MAX_PLAYERS_PER_ROOM,

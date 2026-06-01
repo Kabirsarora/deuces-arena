@@ -402,6 +402,49 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(3);
   });
 
+  it("publishes casual room rule variants in room and lobby state", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Rules Host",
+      guestId: "guest-rules-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const lobbyBeforeStart = await emitLobbyGet(host);
+
+    expect(lobbyBeforeStart.ok).toBe(true);
+
+    if (!lobbyBeforeStart.ok) {
+      return;
+    }
+
+    expect(
+      lobbyBeforeStart.data.openRooms.find((room) => room.roomCode === createdRoom.data.roomCode)
+        ?.rules
+    ).toEqual({ bombEndsTrick: false });
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 3,
+      rules: {
+        bombEndsTrick: true
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.rules).toEqual({ bombEndsTrick: true });
+  });
+
   it("matches ranked queues with four humans and no bots", async () => {
     const players = await Promise.all([
       connectTestSocket(),
@@ -625,6 +668,9 @@ function startRoom(
     readonly timer?: {
       readonly enabled: boolean;
       readonly secondsPerTurn: number;
+    };
+    readonly rules?: {
+      readonly bombEndsTrick: boolean;
     };
   }
 ): Promise<ServerAck<PublicRoomState>> {

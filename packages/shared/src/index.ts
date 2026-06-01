@@ -81,6 +81,7 @@ export type PublicMatchHistoryItem = {
 export type PublicOpenRoom = {
   readonly roomCode: string;
   readonly hostName: string;
+  readonly rules: PublicRoomRules;
   readonly seatedPlayers: number;
   readonly readyPlayers: number;
   readonly maxPlayers: number;
