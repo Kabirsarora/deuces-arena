@@ -16,6 +16,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  FeedbackKind,
   InterServerEvents,
   MatchMode,
   PublicBotDifficulty,
@@ -52,6 +53,7 @@ import {
   getPersistedLeaderboard,
   getPersistedMatchHistory,
   persistCoachEvaluation,
+  persistFeedbackReport,
   persistMoveEvent,
   updatePersistedGuestProfile,
   type PersistedMatch
@@ -660,6 +662,32 @@ io.on("connection", (socket) => {
     );
     void persistCoachEvaluation(room.persistedMatch, record);
     callback(ok(evaluations));
+  });
+
+  socket.on("feedback:submit", async (payload, callback) => {
+    const body = normalizeFeedbackBody(payload.body);
+
+    if (body === null) {
+      callback(fail("Feedback must be 6-800 characters."));
+      return;
+    }
+
+    const roomCode =
+      payload.roomCode === undefined || payload.roomCode.trim() === ""
+        ? null
+        : normalizeRoomCode(payload.roomCode).slice(0, 16);
+    const receipt = await persistFeedbackReport({
+      id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: normalizeFeedbackKind(payload.kind),
+      body,
+      guestId: normalizeGuestId(payload.guestId),
+      roomCode,
+      contactEmail: normalizeContactEmail(payload.contactEmail),
+      userAgent: normalizeUserAgent(socket.handshake.headers["user-agent"]),
+      createdAt: new Date()
+    });
+
+    callback(ok(receipt));
   });
 
   socket.on("disconnect", () => {
@@ -1276,6 +1304,39 @@ function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
   }
 
   return "diamond";
+}
+
+function normalizeFeedbackKind(kind: FeedbackKind): FeedbackKind {
+  if (kind === "IDEA" || kind === "BALANCE" || kind === "UI") {
+    return kind;
+  }
+
+  return "BUG";
+}
+
+function normalizeFeedbackBody(body: string): string | null {
+  const normalized = body.replace(/\s+/g, " ").trim();
+
+  if (normalized.length < 6 || normalized.length > 800) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeContactEmail(email: string | undefined): string | null {
+  const normalized = email?.trim().toLowerCase();
+
+  if (normalized === undefined || normalized === "") {
+    return null;
+  }
+
+  return normalized.length <= 254 && normalized.includes("@") ? normalized : null;
+}
+
+function normalizeUserAgent(userAgent: string | undefined): string | null {
+  const normalized = userAgent?.trim();
+  return normalized === undefined || normalized === "" ? null : normalized.slice(0, 320);
 }
 
 function parseClientOrigins(value: string | undefined): string[] {

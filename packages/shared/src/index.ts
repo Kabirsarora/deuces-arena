@@ -151,6 +151,14 @@ export type PublicCoachEvaluationRecord = {
   readonly evaluations: readonly PublicMoveEvaluation[];
 };
 
+export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI";
+
+export type PublicFeedbackReceipt = {
+  readonly id: string;
+  readonly stored: boolean;
+  readonly createdAt: string;
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;
@@ -214,6 +222,14 @@ export type MovePayload = {
 export type ChatPayload = {
   readonly roomCode: string;
   readonly body: string;
+};
+
+export type FeedbackPayload = {
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly guestId?: string;
+  readonly roomCode?: string;
+  readonly contactEmail?: string;
 };
 
 export type ServerAck<T = undefined> =
@@ -304,6 +320,10 @@ export type ClientToServerEvents = {
   "coach:evaluate": (
     payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number },
     callback: (ack: ServerAck<readonly PublicMoveEvaluation[]>) => void
+  ) => void;
+  "feedback:submit": (
+    payload: FeedbackPayload,
+    callback: (ack: ServerAck<PublicFeedbackReceipt>) => void
   ) => void;
 };
 

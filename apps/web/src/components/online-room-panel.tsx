@@ -11,9 +11,11 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  FeedbackKind,
   PublicBotDifficulty,
   PublicChatMessage,
   PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -113,8 +115,12 @@ const DEUCES_RULES: readonly string[] = [
   "When everyone else passes, the last player to make a valid play leads the next trick."
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
-const FEEDBACK_URL =
-  "https://github.com/Kabirsarora/deuces-arena/issues/new?title=Feedback%3A%20&labels=feedback";
+const FEEDBACK_KIND_OPTIONS: readonly { readonly value: FeedbackKind; readonly label: string }[] = [
+  { value: "BUG", label: "Bug" },
+  { value: "IDEA", label: "Idea" },
+  { value: "UI", label: "UI" },
+  { value: "BALANCE", label: "Balance" }
+];
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -634,6 +640,46 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     });
   }
 
+  function submitFeedback(input: {
+    readonly kind: FeedbackKind;
+    readonly body: string;
+    readonly contactEmail: string;
+  }): Promise<ServerAck<PublicFeedbackReceipt>> {
+    return new Promise((resolve) => {
+      if (socketRef.current === null) {
+        resolve({
+          ok: false,
+          error: "Realtime server is not connected."
+        });
+        return;
+      }
+
+      socketRef.current.emit(
+        "feedback:submit",
+        {
+          kind: input.kind,
+          body: input.body,
+          guestId: getActiveProfileId(),
+          contactEmail: input.contactEmail,
+          ...(room === null
+            ? {}
+            : {
+                roomCode: room.roomCode
+              })
+        },
+        (ack) => {
+          if (ack.ok) {
+            setMessage(ack.data.stored ? "Feedback saved." : "Feedback received for this session.");
+          } else {
+            setMessage(ack.error);
+          }
+
+          resolve(ack);
+        }
+      );
+    });
+  }
+
   function equipCosmetic(cosmetic: PublicCosmetic) {
     socketRef.current?.emit(
       "cosmetics:equip",
@@ -794,6 +840,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onBombEndsTrickChange={setBombEndsTrick}
         onBotDifficultyChange={setBotDifficulty}
         onEquipCosmetic={equipCosmetic}
+        onSubmitFeedback={submitFeedback}
       />
     );
   }
@@ -1098,7 +1145,8 @@ function OnlineLobbyHub({
   onTimerSecondsChange,
   onBombEndsTrickChange,
   onBotDifficultyChange,
-  onEquipCosmetic
+  onEquipCosmetic,
+  onSubmitFeedback
 }: {
   readonly connected: boolean;
   readonly playerName: string;
@@ -1138,6 +1186,11 @@ function OnlineLobbyHub({
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
+  readonly onSubmitFeedback: (input: {
+    readonly kind: FeedbackKind;
+    readonly body: string;
+    readonly contactEmail: string;
+  }) => Promise<ServerAck<PublicFeedbackReceipt>>;
 }) {
   const activity = lobby?.activity;
   const openRooms = lobby?.openRooms ?? [];
@@ -1301,7 +1354,10 @@ function OnlineLobbyHub({
               <div className="mt-3 grid gap-3">
                 <LeaderboardSummary entries={leaderboard} />
                 <MatchHistorySummary entries={matchHistory} />
-                <FeedbackSummary />
+                <FeedbackSummary
+                  defaultEmail={authUser?.email ?? ""}
+                  onSubmitFeedback={onSubmitFeedback}
+                />
                 <RulesSummary />
                 <CosmeticsSummary
                   cosmetics={cosmetics}
@@ -2367,25 +2423,105 @@ function RulesSummary() {
   );
 }
 
-function FeedbackSummary() {
+function FeedbackSummary({
+  defaultEmail,
+  onSubmitFeedback
+}: {
+  readonly defaultEmail: string;
+  readonly onSubmitFeedback: (input: {
+    readonly kind: FeedbackKind;
+    readonly body: string;
+    readonly contactEmail: string;
+  }) => Promise<ServerAck<PublicFeedbackReceipt>>;
+}) {
+  const [kind, setKind] = useState<FeedbackKind>("BUG");
+  const [body, setBody] = useState("");
+  const [contactEmail, setContactEmail] = useState(defaultEmail);
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  useEffect(() => {
+    setContactEmail((current) => (current.trim() === "" ? defaultEmail : current));
+  }, [defaultEmail]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("sending");
+
+    const result = await onSubmitFeedback({
+      kind,
+      body,
+      contactEmail
+    });
+
+    if (result.ok) {
+      setStatus("sent");
+      setBody("");
+      return;
+    }
+
+    setStatus("error");
+  }
+
   return (
-    <section className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+    <form
+      className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3"
+      onSubmit={handleSubmit}
+    >
       <p className="flex items-center gap-2 text-sm font-bold">
         <MessageCircle className="size-4 text-[var(--aqua)]" />
         Feedback
       </p>
       <p className="mt-2 text-xs text-zinc-400">
-        Found a bug or have an idea? Send it straight to the project issue tracker.
+        Found a bug or have an idea? Send a note without leaving the app.
       </p>
-      <a
-        className="mt-3 flex h-10 items-center justify-center rounded-full bg-[var(--gold)] px-4 text-sm font-black text-black transition hover:brightness-110"
-        href={FEEDBACK_URL}
-        target="_blank"
-        rel="noreferrer"
+      <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
+        {FEEDBACK_KIND_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            className={cn(
+              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              kind === option.value
+                ? "bg-[var(--gold)] text-black"
+                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+            )}
+            type="button"
+            onClick={() => setKind(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <textarea
+        className="mt-3 min-h-24 w-full resize-none rounded-[1rem] border border-white/10 bg-black/24 px-3 py-2 text-sm outline-none placeholder:text-zinc-500 focus:border-[var(--gold)]"
+        value={body}
+        maxLength={800}
+        placeholder="What happened?"
+        onChange={(event) => {
+          setStatus("idle");
+          setBody(event.target.value);
+        }}
+      />
+      <input
+        className="mt-2 h-10 w-full rounded-full border border-white/10 bg-black/24 px-3 text-sm outline-none placeholder:text-zinc-500 focus:border-[var(--gold)]"
+        value={contactEmail}
+        placeholder="Email optional"
+        onChange={(event) => setContactEmail(event.target.value)}
+      />
+      <Button
+        className="mt-3 h-10 w-full"
+        disabled={status === "sending" || body.trim().length < 6}
+        size="sm"
+        type="submit"
       >
-        Report feedback
-      </a>
-    </section>
+        {status === "sending" ? "Sending..." : "Send feedback"}
+      </Button>
+      {status === "sent" ? (
+        <p className="mt-2 text-xs font-bold text-emerald-200">Feedback sent. Thank you.</p>
+      ) : null}
+      {status === "error" ? (
+        <p className="mt-2 text-xs font-bold text-red-200">Could not send feedback right now.</p>
+      ) : null}
+    </form>
   );
 }
 

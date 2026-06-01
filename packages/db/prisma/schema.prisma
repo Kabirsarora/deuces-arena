@@ -65,6 +65,7 @@ model User {
   cosmeticUnlocks UserCosmeticUnlock[]
   equippedCosmetics UserEquippedCosmetic[]
   oauthAccounts   OAuthAccount[]
+  feedbackReports FeedbackReport[]
 
   @@index([rating])
 }
@@ -222,4 +223,22 @@ model UserEquippedCosmetic {
 
   @@unique([userId, kind])
   @@index([cosmeticId])
+}
+
+model FeedbackReport {
+  id           String   @id @default(cuid())
+  userId       String?
+  guestId      String?
+  roomCode     String?
+  kind         String
+  body         String
+  contactEmail String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([guestId])
+  @@index([roomCode])
+  @@index([kind])
 }

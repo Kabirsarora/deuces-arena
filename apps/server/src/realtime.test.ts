@@ -6,9 +6,11 @@ import type {
   ClientToServerEvents,
   ChatPayload,
   CreateRoomPayload,
+  FeedbackPayload,
   JoinRoomPayload,
   PublicChatMessage,
   PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLobbyState,
   PublicMoveEvaluation,
@@ -702,6 +704,37 @@ describe("realtime rooms", () => {
     expect(replay.data.coachEvaluations[0]?.playerId).toBe(startedRoom.data.activePlayerId);
     expect(replay.data.coachEvaluations[0]?.evaluations).toHaveLength(activeEvaluation.data.length);
   });
+
+  it("accepts structured feedback without requiring database persistence", async () => {
+    const socket = await connectTestSocket();
+    const feedback = await submitFeedback(socket, {
+      kind: "UI",
+      body: "The table view feels easier to read after the cleanup.",
+      guestId: "guest-feedback",
+      roomCode: "abc123",
+      contactEmail: "PLAYER@EXAMPLE.COM"
+    });
+
+    expect(feedback.ok).toBe(true);
+
+    if (!feedback.ok) {
+      return;
+    }
+
+    expect(feedback.data.id).toMatch(/^feedback-/);
+    expect(feedback.data.stored).toBe(false);
+    expect(Date.parse(feedback.data.createdAt)).not.toBeNaN();
+  });
+
+  it("rejects feedback that is too short", async () => {
+    const socket = await connectTestSocket();
+    const feedback = await submitFeedback(socket, {
+      kind: "BUG",
+      body: "bad"
+    });
+
+    expect(feedback.ok).toBe(false);
+  });
 });
 
 async function connectTestSocket(): Promise<TestSocket> {
@@ -854,6 +887,17 @@ function exportReplay(
 ): Promise<ServerAck<RoomReplayExport>> {
   return new Promise((resolve) => {
     socket.emit("room:replay", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function submitFeedback(
+  socket: TestSocket,
+  payload: FeedbackPayload
+): Promise<ServerAck<PublicFeedbackReceipt>> {
+  return new Promise((resolve) => {
+    socket.emit("feedback:submit", payload, (ack) => {
       resolve(ack);
     });
   });

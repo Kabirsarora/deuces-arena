@@ -9,9 +9,11 @@ import {
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
+  FeedbackKind,
   MatchMode,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicMatchHistoryItem,
@@ -607,6 +609,79 @@ export async function persistCoachEvaluation(
     });
   } catch (error) {
     console.error("Unable to persist coach evaluation.", error);
+  }
+}
+
+export async function persistFeedbackReport(input: {
+  readonly id: string;
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly guestId: string | null;
+  readonly roomCode: string | null;
+  readonly contactEmail: string | null;
+  readonly userAgent: string | null;
+  readonly createdAt: Date;
+}): Promise<PublicFeedbackReceipt> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+
+  try {
+    const user =
+      input.guestId === null
+        ? null
+        : await db.prisma.user.findUnique({
+            where: {
+              guestId: input.guestId
+            },
+            select: {
+              id: true
+            }
+          });
+
+    await db.prisma.$executeRaw`
+      INSERT INTO "FeedbackReport" (
+        "id",
+        "userId",
+        "guestId",
+        "roomCode",
+        "kind",
+        "body",
+        "contactEmail",
+        "userAgent",
+        "createdAt"
+      )
+      VALUES (
+        ${input.id},
+        ${user?.id ?? null},
+        ${input.guestId},
+        ${input.roomCode},
+        ${input.kind},
+        ${input.body},
+        ${input.contactEmail},
+        ${input.userAgent},
+        ${input.createdAt}
+      )
+    `;
+
+    return {
+      id: input.id,
+      stored: true,
+      createdAt: input.createdAt.toISOString()
+    };
+  } catch (error) {
+    console.error("Unable to persist feedback report.", error);
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
   }
 }
 
