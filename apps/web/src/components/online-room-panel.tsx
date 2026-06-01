@@ -2,11 +2,14 @@
 
 import {
   compareCards,
+  detectHand,
   generateLegalMoves,
   getCardId,
   getRankStrength,
   getSuitStrength,
   type Card,
+  type GameEvent,
+  type HandType,
   type Move
 } from "@deuces-arena/game-engine";
 import type {
@@ -3414,22 +3417,184 @@ function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
 
   const placement = getPlacementRows(room).find((row) => row.player.id === playerId)?.placement;
   const playerEvents = room.recentEvents.filter((event) => event.playerId === playerId);
-  const passes = playerEvents.filter((event) => event.wasPass).length;
-  const plays = playerEvents.length - passes;
-  const multiCardPlays = playerEvents.filter(
-    (event) => event.move.type === "play" && event.move.cards.length >= 2
-  ).length;
-
-  return [
+  const review: string[] = [];
+  const summary = summarizePlayerEvents(playerEvents);
+  const finalLine =
     placement === undefined
       ? `${player.name} finished with ${player.cardsRemaining} cards left.`
-      : `${player.name} finished ${ordinal(placement)} with ${player.cardsRemaining} cards left.`,
-    `${plays} plays and ${passes} passes were recorded for your seat.`,
-    multiCardPlays > 0
-      ? `${multiCardPlays} plays shed multiple cards; those are usually worth reviewing first.`
-      : "No multi-card sheds were visible in this match log.",
-    "Deeper mistake detection will use full replay data plus simulations instead of generic advice."
-  ];
+      : `${player.name} finished ${ordinal(placement)} with ${player.cardsRemaining} cards left.`;
+
+  review.push(finalLine);
+
+  if (playerEvents.length === 0) {
+    return [
+      ...review,
+      "No completed moves were recorded for your seat, so there is not enough replay data to review yet."
+    ];
+  }
+
+  review.push(
+    `${summary.playCount} plays and ${summary.passCount} passes were recorded from your seat.`
+  );
+
+  if (summary.voluntaryPassCount > 0) {
+    review.push(
+      `${summary.voluntaryPassCount} passes happened while at least one playable response likely existed. Those turns are good candidates for later simulation review.`
+    );
+  } else if (summary.passCount > 0) {
+    review.push(
+      "Your passes appear to be forced or low-choice spots based on the legal move counts."
+    );
+  }
+
+  if (summary.multiCardShedCount > 0) {
+    review.push(
+      `${summary.multiCardShedCount} plays shed multiple cards, removing ${summary.cardsShedByMultiCardPlays} cards total. Multi-card sheds are usually the first replay moments to inspect.`
+    );
+  } else {
+    review.push(
+      "No multi-card sheds were visible, so the match may have left too many cards moving one at a time."
+    );
+  }
+
+  if (summary.leadCount > 0) {
+    review.push(
+      `You led ${summary.leadCount} ${pluralize("trick", summary.leadCount)}: ${formatHandTypeBreakdown(summary.leadTypeCounts)}. Lead choices shape the table, so these are useful coach targets.`
+    );
+  }
+
+  if (summary.bombCount > 0) {
+    review.push(
+      `${summary.bombCount} bomb ${pluralize("play", summary.bombCount)} ${summary.bombCount === 1 ? "was" : "were"} recorded. Later review can compare whether saving it changed placement odds.`
+    );
+  }
+
+  if (summary.lowHandPressureTurn !== null) {
+    review.push(
+      `Late-game pressure started around turn ${summary.lowHandPressureTurn}, when you dropped to ${summary.lowestCardsAfterPlay} cards.`
+    );
+  }
+
+  review.push(
+    "Next step for stronger coaching: run simulations from these replay spots instead of guessing from fixed strategy rules."
+  );
+
+  return review;
+}
+
+type PlayerEventSummary = {
+  readonly playCount: number;
+  readonly passCount: number;
+  readonly voluntaryPassCount: number;
+  readonly multiCardShedCount: number;
+  readonly cardsShedByMultiCardPlays: number;
+  readonly leadCount: number;
+  readonly leadTypeCounts: Readonly<Record<string, number>>;
+  readonly bombCount: number;
+  readonly lowestCardsAfterPlay: number | null;
+  readonly lowHandPressureTurn: number | null;
+};
+
+function summarizePlayerEvents(events: readonly GameEvent[]): PlayerEventSummary {
+  let playCount = 0;
+  let passCount = 0;
+  let voluntaryPassCount = 0;
+  let multiCardShedCount = 0;
+  let cardsShedByMultiCardPlays = 0;
+  let leadCount = 0;
+  let bombCount = 0;
+  let lowestCardsAfterPlay: number | null = null;
+  let lowHandPressureTurn: number | null = null;
+  const leadTypeCounts: Record<string, number> = {};
+
+  for (const event of events) {
+    if (event.wasPass) {
+      passCount += 1;
+
+      if (event.legalMoveCount > 1) {
+        voluntaryPassCount += 1;
+      }
+
+      continue;
+    }
+
+    playCount += 1;
+
+    if (event.move.type !== "play") {
+      continue;
+    }
+
+    const handType = getMoveHandType(event);
+    const cardsAfterPlay = event.cardsRemainingAfter[event.playerId] ?? null;
+
+    if (event.move.cards.length >= 2) {
+      multiCardShedCount += 1;
+      cardsShedByMultiCardPlays += event.move.cards.length;
+    }
+
+    if (event.currentTrickBefore === null) {
+      leadCount += 1;
+      leadTypeCounts[handType ?? "unknown"] = (leadTypeCounts[handType ?? "unknown"] ?? 0) + 1;
+    }
+
+    if (handType === "bomb") {
+      bombCount += 1;
+    }
+
+    if (
+      cardsAfterPlay !== null &&
+      (lowestCardsAfterPlay === null || cardsAfterPlay < lowestCardsAfterPlay)
+    ) {
+      lowestCardsAfterPlay = cardsAfterPlay;
+
+      if (cardsAfterPlay <= 4 && lowHandPressureTurn === null) {
+        lowHandPressureTurn = event.turnNumber;
+      }
+    }
+  }
+
+  return {
+    playCount,
+    passCount,
+    voluntaryPassCount,
+    multiCardShedCount,
+    cardsShedByMultiCardPlays,
+    leadCount,
+    leadTypeCounts,
+    bombCount,
+    lowestCardsAfterPlay,
+    lowHandPressureTurn
+  };
+}
+
+function getMoveHandType(event: GameEvent): HandType | null {
+  if (event.move.type === "pass") {
+    return null;
+  }
+
+  const hand = detectHand(event.move.cards);
+  return hand.type === "invalid" ? null : hand.type;
+}
+
+function formatHandTypeBreakdown(counts: Readonly<Record<string, number>>): string {
+  const entries = Object.entries(counts);
+
+  if (entries.length === 0) {
+    return "no lead type data";
+  }
+
+  return entries
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([type, count]) => `${count} ${formatHandTypeLabel(type)}`)
+    .join(", ");
+}
+
+function formatHandTypeLabel(type: string): string {
+  return type.replaceAll("-", " ");
+}
+
+function pluralize(label: string, count: number): string {
+  return count === 1 ? label : `${label}s`;
 }
 
 function OnlineCard({
