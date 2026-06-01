@@ -2696,8 +2696,8 @@ function OnlineTable({
     yourPlayerIndex === -1 || players.length < 4
       ? players.slice(0, 4)
       : [
-          players[(yourPlayerIndex + 1) % players.length],
           players[(yourPlayerIndex + 2) % players.length],
+          players[(yourPlayerIndex + 1) % players.length],
           players[(yourPlayerIndex + 3) % players.length],
           players[yourPlayerIndex]
         ].filter((player): player is PublicRoomPlayer => player !== undefined);
@@ -2769,7 +2769,7 @@ function OnlineTable({
         <div className="absolute inset-x-6 top-16 z-10 rounded-full border border-dashed border-white/15 bg-black/18 px-4 py-3 text-center text-sm text-zinc-300">
           Create or join a room to take a seat.
         </div>
-      ) : (
+      ) : room?.status !== "complete" ? (
         seatedPlayers.map((player, index) => (
           <OnlineSeat
             key={player.id}
@@ -2778,7 +2778,7 @@ function OnlineTable({
             position={index}
           />
         ))
-      )}
+      ) : null}
 
       <div className="relative z-10 grid h-full min-h-[26rem] place-items-center text-center sm:min-h-[30rem] lg:min-h-0">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
