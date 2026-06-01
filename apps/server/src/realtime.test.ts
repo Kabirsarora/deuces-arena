@@ -36,6 +36,7 @@ beforeAll(async () => {
   process.env.PORT = "0";
   process.env.DATABASE_URL = "";
   process.env.CLIENT_ORIGIN = "http://localhost:3000, https://preview.example.com ";
+  process.env.ADMIN_GUEST_IDS = "guest-admin-cosmetics";
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -137,6 +138,52 @@ describe("realtime rooms", () => {
     }
 
     expect(equipAck.error).toContain("database");
+  });
+
+  it("allows configured admin profiles to equip any cosmetic without progression", async () => {
+    const socket = await connectTestSocket();
+    const catalog = await listCosmetics(socket);
+
+    expect(catalog.ok).toBe(true);
+
+    if (!catalog.ok) {
+      return;
+    }
+
+    const supporterCosmetic = catalog.data.find((cosmetic) => cosmetic.isSupporter);
+
+    expect(supporterCosmetic).toBeDefined();
+
+    if (supporterCosmetic === undefined) {
+      return;
+    }
+
+    const profile = await getProfile(socket, "guest-admin-cosmetics");
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
+
+    const equipAck = await equipCosmetic(socket, {
+      guestId: "guest-admin-cosmetics",
+      cosmeticId: supporterCosmetic.id
+    });
+
+    expect(equipAck.ok).toBe(true);
+
+    if (!equipAck.ok) {
+      return;
+    }
+
+    expect(equipAck.data.equippedCosmetics.map((equipped) => equipped.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
   });
 
   it("creates rooms and exposes them through lobby activity", async () => {

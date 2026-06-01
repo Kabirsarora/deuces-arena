@@ -108,6 +108,7 @@ type RankedQueuedPlayer = {
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
+const ADMIN_GUEST_IDS = parseCommaList(process.env.ADMIN_GUEST_IDS);
 const MAX_PLAYERS_PER_ROOM = 4;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
@@ -468,6 +469,19 @@ io.on("connection", (socket) => {
 
     if (guestId === null || cosmeticId === "") {
       callback(fail("Cosmetic not found."));
+      return;
+    }
+
+    if (isAdminGuestId(guestId)) {
+      const adminProfile = await equipAdminCosmetic(guestId, cosmeticId);
+
+      if (adminProfile === null) {
+        callback(fail("Cosmetic not found."));
+        return;
+      }
+
+      callback(ok(adminProfile));
+      emitRoomStatesForGuest(guestId);
       return;
     }
 
@@ -1260,13 +1274,22 @@ function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
 }
 
 function parseClientOrigins(value: string | undefined): string[] {
-  const origins =
-    value
-      ?.split(",")
-      .map((origin) => origin.trim())
-      .filter((origin) => origin !== "") ?? [];
+  const origins = parseCommaList(value);
 
   return origins.length === 0 ? ["http://localhost:3000"] : origins;
+}
+
+function parseCommaList(value: string | undefined): string[] {
+  return (
+    value
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "") ?? []
+  );
+}
+
+function isAdminGuestId(guestId: string): boolean {
+  return ADMIN_GUEST_IDS.includes(guestId);
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {
@@ -1305,12 +1328,12 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
         : persistedProfile.averagePlacement * persistedProfile.gamesPlayed;
     guestEquippedCosmetics.set(guestId, persistedProfile.equippedCosmetics);
 
-    return persistedProfile;
+    return isAdminGuestId(guestId) ? withAdminCosmeticAccess(persistedProfile) : persistedProfile;
   }
 
   const profile = getOrCreateGuestProfile(guestId);
 
-  return {
+  const fallbackProfile: PublicGuestProfile = {
     guestId,
     displayName: profile.displayName,
     avatarKey: profile.avatarKey,
@@ -1322,6 +1345,8 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     unlocks: [],
     equippedCosmetics: []
   };
+
+  return isAdminGuestId(guestId) ? withAdminCosmeticAccess(fallbackProfile) : fallbackProfile;
 }
 
 async function publicLeaderboard(
@@ -1351,6 +1376,46 @@ async function publicLeaderboard(
 
 async function publicCosmetics(): Promise<readonly PublicCosmetic[]> {
   return (await getPersistedCosmetics()) ?? STARTER_COSMETICS;
+}
+
+async function equipAdminCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<PublicGuestProfile | null> {
+  const cosmetic = (await publicCosmetics()).find((candidate) => candidate.id === cosmeticId);
+
+  if (cosmetic === undefined) {
+    return null;
+  }
+
+  const equippedCosmetics: PublicEquippedCosmetic[] = [
+    ...(guestEquippedCosmetics.get(guestId) ?? []).filter(
+      (equipped) => equipped.kind !== cosmetic.kind
+    ),
+    {
+      kind: cosmetic.kind,
+      cosmetic,
+      equippedAt: new Date().toISOString()
+    }
+  ];
+
+  guestEquippedCosmetics.set(guestId, equippedCosmetics);
+
+  return withAdminCosmeticAccess(await publicGuestProfile(guestId));
+}
+
+async function withAdminCosmeticAccess(profile: PublicGuestProfile): Promise<PublicGuestProfile> {
+  const unlockedAt = new Date().toISOString();
+
+  return {
+    ...profile,
+    unlocks: (await publicCosmetics()).map((cosmetic) => ({
+      cosmetic,
+      source: "ADMIN_GRANT",
+      earnedAt: unlockedAt
+    })),
+    equippedCosmetics: guestEquippedCosmetics.get(profile.guestId) ?? profile.equippedCosmetics
+  };
 }
 
 function getEquipCosmeticError(
