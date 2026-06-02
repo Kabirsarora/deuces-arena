@@ -1262,6 +1262,10 @@ function OnlineLobbyHub({
                   Deuces Arena
                 </p>
                 <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
+                <p className="mt-2 text-sm font-semibold text-zinc-400">
+                  {activity?.connectedUsers ?? 0} online · {activity?.playersInActiveGames ?? 0}{" "}
+                  playing · {activity?.openRooms ?? 0} open rooms
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -1413,14 +1417,6 @@ function OnlineLobbyHub({
               onProfileAvatarKeyChange={onProfileAvatarKeyChange}
               onProfileSave={onProfileSave}
             />
-
-            <section className="online-panel p-5 text-center">
-              <Crown className="mx-auto mb-3 size-12 text-yellow-200" />
-              <h2 className="text-xl font-black">Cosmetics</h2>
-              <p className="mt-2 text-sm text-zinc-400">
-                Card backs, table themes, avatars, and badges. Never pay-to-win.
-              </p>
-            </section>
 
             <details className="online-panel p-4">
               <summary className="cursor-pointer list-none text-sm font-black">More</summary>
@@ -2886,6 +2882,11 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
     room?.rules.bombEndsTrick === true
       ? "Bombs immediately end the trick; no stronger bomb response is allowed."
       : "After a bomb, only a stronger bomb can answer.";
+  const suitOrder =
+    room?.rules.deckType === "arena-six"
+      ? "Diamonds, clubs, hearts, spades, stars, crowns from low to high. Stars and crowns are placeholder Arena 6 suits."
+      : "Diamonds, clubs, hearts, spades from low to high.";
+  const highestCard = room?.rules.deckType === "arena-six" ? "2 of crowns" : "2 of spades";
 
   return (
     <div className="grid gap-3">
@@ -2893,8 +2894,7 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
         <p className="text-xs font-black uppercase text-[var(--gold)]">Rank order</p>
         <p className="mt-2 text-sm font-bold text-zinc-100">3 4 5 6 7 8 9 10 J Q K A 2</p>
         <p className="mt-2 text-xs text-zinc-400">
-          Diamonds, clubs, hearts, spades from low to high. 3 of diamonds is lowest; 2 of spades is
-          highest.
+          {suitOrder} 3 of diamonds is lowest; {highestCard} is highest.
         </p>
       </div>
 
@@ -3228,7 +3228,7 @@ function MatchResultsPanel({
                   ) : null}
                   {player.name}
                 </button>
-                <p className="text-xs text-zinc-400">{ordinal(placement)} place</p>
+                <p className="text-xs text-zinc-400">{ordinal(placement)}</p>
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-black/28 px-2 py-1 text-xs font-bold text-zinc-300">
@@ -3244,7 +3244,7 @@ function MatchResultsPanel({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <p className="text-xs font-black uppercase text-[var(--aqua)]">Strategy review</p>
+          <p className="text-xs font-black uppercase text-[var(--aqua)]">Decision review</p>
           <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
             {review.map((item) => (
               <li key={item} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
@@ -3258,7 +3258,7 @@ function MatchResultsPanel({
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowReview((current) => !current)}>
           <Gauge className="size-4" />
-          {showReview ? "Hide review" : "Review strategy"}
+          {showReview ? "Hide review" : "Review decisions"}
         </Button>
         <Button size="sm" onClick={onCreateBotGame}>
           <Play className="size-4" />
