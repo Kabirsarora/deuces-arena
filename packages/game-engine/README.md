@@ -14,4 +14,6 @@ Current simulation support is intentionally basic: random legal rollouts can est
 
 The default bomb rule lets a stronger bomb answer the current bomb. Consumers can pass `{ bombEndsTrick: true }` to game-state transitions when a room should make any bomb immediately win the trick instead.
 
+The default deck is classic Deuces with diamonds, clubs, hearts, and spades. The experimental `arena-six` deck adds placeholder Stars and Crowns suits above spades for casual 5-6 player tables and larger hands. These suits are a product/design placeholder, not final card art.
+
 Rule variants should stay explicit inputs to the engine so web, server, replay, and future mobile clients can all reproduce the same match behavior.

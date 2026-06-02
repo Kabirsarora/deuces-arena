@@ -8,6 +8,7 @@ import {
   getRankStrength,
   getSuitStrength,
   type Card,
+  type DeckType,
   type GameEvent,
   type HandType,
   type Move
@@ -87,7 +88,8 @@ const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000"
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
 const HAND_SORT_STORAGE_KEY = "deuces-arena-hand-sort";
-const MAX_PLAYERS_PER_ROOM = 4;
+const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
+const DEFAULT_CARDS_PER_PLAYER = 13;
 const DEFAULT_RANKED_TIMER_SECONDS = 45;
 const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label: string }[] = [
   { key: "diamond", label: "Diamonds" },
@@ -149,6 +151,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [manualCardOrderIds, setManualCardOrderIds] = useState<readonly string[]>([]);
   const [botSeats, setBotSeats] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState<PublicBotDifficulty>("normal");
+  const [deckType, setDeckType] = useState<DeckType>("classic");
+  const [playerCount, setPlayerCount] = useState(4);
+  const [cardsPerPlayer, setCardsPerPlayer] = useState(DEFAULT_CARDS_PER_PLAYER);
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
@@ -213,12 +218,19 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const connectedHumans =
     room?.players.filter((player) => player.kind === "human" && player.connected) ?? [];
   const availableBotSeats =
-    room === null ? 3 : Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length);
+    room === null
+      ? Math.max(0, playerCount - 1)
+      : Math.max(0, Math.max(playerCount, room.players.length) - room.players.length);
   const selectedBotSeats = Math.min(botSeats, availableBotSeats);
+  const selectedPlayerCount = Math.max(playerCount, room?.players.length ?? 1);
+  const selectedCardsPerPlayer = Math.min(
+    cardsPerPlayer,
+    getMaxCardsPerPlayer(deckType, selectedPlayerCount)
+  );
   const roomCanStart =
     room !== null &&
     room.status === "waiting" &&
-    room.players.length + selectedBotSeats >= MAX_PLAYERS_PER_ROOM &&
+    room.players.length + selectedBotSeats >= selectedPlayerCount &&
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const turnStatus =
@@ -406,6 +418,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }, [availableBotSeats]);
 
   useEffect(() => {
+    setCardsPerPlayer((current) => Math.min(current, getMaxCardsPerPlayer(deckType, playerCount)));
+  }, [deckType, playerCount]);
+
+  useEffect(() => {
     if (room?.turnTimer?.deadlineAt === null || room?.turnTimer === null) {
       return;
     }
@@ -454,7 +470,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
               secondsPerTurn: turnTimerSeconds
             },
             rules: {
-              bombEndsTrick
+              bombEndsTrick,
+              deckType,
+              playerCount: selectedPlayerCount,
+              cardsPerPlayer: selectedCardsPerPlayer
             },
             botDifficulty
           },
@@ -550,7 +569,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           secondsPerTurn: turnTimerSeconds
         },
         rules: {
-          bombEndsTrick
+          bombEndsTrick,
+          deckType,
+          playerCount: selectedPlayerCount,
+          cardsPerPlayer: selectedCardsPerPlayer
         },
         botDifficulty
       },
@@ -820,6 +842,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         cosmetics={cosmetics}
         botSeats={botSeats}
         maxBotSeats={availableBotSeats}
+        deckType={deckType}
+        playerCount={playerCount}
+        cardsPerPlayer={selectedCardsPerPlayer}
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
@@ -838,6 +863,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onJoinRanked={joinRankedQueue}
         onLeaveRanked={leaveRankedQueue}
         onBotSeatsChange={setBotSeats}
+        onDeckTypeChange={setDeckType}
+        onPlayerCountChange={setPlayerCount}
+        onCardsPerPlayerChange={setCardsPerPlayer}
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
@@ -856,6 +884,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         message={message}
         botSeats={selectedBotSeats}
         maxBotSeats={availableBotSeats}
+        deckType={deckType}
+        playerCount={selectedPlayerCount}
+        cardsPerPlayer={selectedCardsPerPlayer}
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
@@ -874,6 +905,9 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onStart={startRoom}
         onLeave={leaveRoom}
         onBotSeatsChange={setBotSeats}
+        onDeckTypeChange={setDeckType}
+        onPlayerCountChange={setPlayerCount}
+        onCardsPerPlayerChange={setCardsPerPlayer}
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
@@ -1126,6 +1160,9 @@ function OnlineLobbyHub({
   cosmetics,
   botSeats,
   maxBotSeats,
+  deckType,
+  playerCount,
+  cardsPerPlayer,
   timerEnabled,
   timerSeconds,
   bombEndsTrick,
@@ -1144,6 +1181,9 @@ function OnlineLobbyHub({
   onJoinRanked,
   onLeaveRanked,
   onBotSeatsChange,
+  onDeckTypeChange,
+  onPlayerCountChange,
+  onCardsPerPlayerChange,
   onTimerEnabledChange,
   onTimerSecondsChange,
   onBombEndsTrickChange,
@@ -1166,6 +1206,9 @@ function OnlineLobbyHub({
   readonly cosmetics: readonly PublicCosmetic[];
   readonly botSeats: number;
   readonly maxBotSeats: number;
+  readonly deckType: DeckType;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
@@ -1184,6 +1227,9 @@ function OnlineLobbyHub({
   readonly onJoinRanked: () => void;
   readonly onLeaveRanked: () => void;
   readonly onBotSeatsChange: (count: number) => void;
+  readonly onDeckTypeChange: (deckType: DeckType) => void;
+  readonly onPlayerCountChange: (count: number) => void;
+  readonly onCardsPerPlayerChange: (count: number) => void;
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
@@ -1252,12 +1298,20 @@ function OnlineLobbyHub({
                 <HubPlayCard
                   icon={<Bot className="size-12" />}
                   title="Play vs. Bots"
-                  meta={`${selectedBotSeats} bots · ${timerEnabled ? `${timerSeconds}s timer` : "no timer"}`}
+                  meta={`${playerCount} seats · ${selectedBotSeats} bots · ${cardsPerPlayer} cards each`}
                   actionLabel="Start Bot Game"
                   disabled={!connected}
                   onAction={onCreateBotGame}
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
+                    <CompactRange
+                      label="Table seats"
+                      value={playerCount}
+                      min={2}
+                      max={MAX_CASUAL_PLAYERS_PER_ROOM}
+                      disabled={!connected}
+                      onChange={onPlayerCountChange}
+                    />
                     <CompactRange
                       label="Bot seats"
                       value={selectedBotSeats}
@@ -1265,6 +1319,15 @@ function OnlineLobbyHub({
                       max={Math.max(1, maxBotSeats)}
                       disabled={!connected}
                       onChange={onBotSeatsChange}
+                    />
+                    <CompactDeckControl value={deckType} onChange={onDeckTypeChange} />
+                    <CompactRange
+                      label="Cards each"
+                      value={cardsPerPlayer}
+                      min={DEFAULT_CARDS_PER_PLAYER}
+                      max={getMaxCardsPerPlayer(deckType, playerCount)}
+                      disabled={!connected}
+                      onChange={onCardsPerPlayerChange}
                     />
                     <CompactTimerControl
                       enabled={timerEnabled}
@@ -1543,6 +1606,43 @@ function CompactBotDifficulty({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CompactDeckControl({
+  value,
+  onChange
+}: {
+  readonly value: DeckType;
+  readonly onChange: (deckType: DeckType) => void;
+}) {
+  return (
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+      <p className="mb-2">Deck</p>
+      <div className="grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
+        {[
+          { value: "classic" as const, label: "Classic" },
+          { value: "arena-six" as const, label: "Arena 6" }
+        ].map((option) => (
+          <button
+            key={option.value}
+            className={cn(
+              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              value === option.value
+                ? "bg-[var(--gold)] text-black"
+                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+            )}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs font-semibold text-zinc-400">
+        Arena 6 adds ★ Stars and ♛ Crowns above spades.
+      </p>
     </div>
   );
 }
@@ -1921,6 +2021,9 @@ function OnlineWaitingRoom({
   message,
   botSeats,
   maxBotSeats,
+  deckType,
+  playerCount,
+  cardsPerPlayer,
   timerEnabled,
   timerSeconds,
   bombEndsTrick,
@@ -1933,6 +2036,9 @@ function OnlineWaitingRoom({
   onStart,
   onLeave,
   onBotSeatsChange,
+  onDeckTypeChange,
+  onPlayerCountChange,
+  onCardsPerPlayerChange,
   onTimerEnabledChange,
   onTimerSecondsChange,
   onBombEndsTrickChange,
@@ -1943,6 +2049,9 @@ function OnlineWaitingRoom({
   readonly message: string;
   readonly botSeats: number;
   readonly maxBotSeats: number;
+  readonly deckType: DeckType;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
@@ -1955,13 +2064,16 @@ function OnlineWaitingRoom({
   readonly onStart: () => void;
   readonly onLeave: () => void;
   readonly onBotSeatsChange: (count: number) => void;
+  readonly onDeckTypeChange: (deckType: DeckType) => void;
+  readonly onPlayerCountChange: (count: number) => void;
+  readonly onCardsPerPlayerChange: (count: number) => void;
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
 }) {
   const seatedHumans = room.players.filter((player) => player.kind === "human").length;
-  const seatsNeeded = Math.max(0, MAX_PLAYERS_PER_ROOM - room.players.length - botSeats);
+  const seatsNeeded = Math.max(0, playerCount - room.players.length - botSeats);
   const inviteUrl = getRoomInviteUrl(room.roomCode);
 
   return (
@@ -2025,8 +2137,26 @@ function OnlineWaitingRoom({
             </span>
           </div>
 
+          <CompactRange
+            label="Table seats"
+            value={playerCount}
+            min={Math.max(2, room.players.length)}
+            max={MAX_CASUAL_PLAYERS_PER_ROOM}
+            disabled={!connected}
+            onChange={onPlayerCountChange}
+          />
+          <CompactDeckControl value={deckType} onChange={onDeckTypeChange} />
+          <CompactRange
+            label="Cards each"
+            value={cardsPerPlayer}
+            min={DEFAULT_CARDS_PER_PLAYER}
+            max={getMaxCardsPerPlayer(deckType, playerCount)}
+            disabled={!connected}
+            onChange={onCardsPerPlayerChange}
+          />
+
           <div className="grid grid-cols-2 gap-2 text-center">
-            <ProfileMetric label="Players" value={`${room.players.length}/4`} />
+            <ProfileMetric label="Seats" value={`${room.players.length}/${playerCount}`} />
             <ProfileMetric
               label="Ready"
               value={room.players.filter((player) => player.ready).length}
@@ -3615,6 +3745,7 @@ function OnlineCard({
   readonly compact?: boolean;
 }) {
   const red = card.suit === "diamonds" || card.suit === "hearts";
+  const special = card.suit === "stars" || card.suit === "crowns";
 
   return (
     <motion.div
@@ -3631,7 +3762,10 @@ function OnlineCard({
       )}
     >
       <div
-        className={cn("text-left font-black leading-none", red ? "text-red-600" : "text-zinc-950")}
+        className={cn(
+          "text-left font-black leading-none",
+          red ? "text-red-600" : special ? "text-amber-600" : "text-zinc-950"
+        )}
       >
         <div className={compact ? "text-base" : "text-lg"}>{card.rank}</div>
         <div className={compact ? "text-sm" : "text-base"}>{suitSymbol(card.suit)}</div>
@@ -3639,7 +3773,7 @@ function OnlineCard({
       <div
         className={cn(
           "self-center text-center text-3xl font-black",
-          red ? "text-red-600" : "text-zinc-950"
+          red ? "text-red-600" : special ? "text-amber-600" : "text-zinc-950"
         )}
       >
         {suitSymbol(card.suit)}
@@ -3766,6 +3900,11 @@ function formatRatingDelta(delta: number | null): string {
   return delta >= 0 ? `+${delta}` : `${delta}`;
 }
 
+function getMaxCardsPerPlayer(deckType: DeckType, playerCount: number): number {
+  const deckSize = deckType === "arena-six" ? 78 : 52;
+  return Math.max(DEFAULT_CARDS_PER_PLAYER, Math.floor(deckSize / playerCount));
+}
+
 function ordinal(value: number): string {
   const suffix =
     value % 10 === 1 && value % 100 !== 11
@@ -3793,5 +3932,9 @@ function suitSymbol(suit: Card["suit"]): string {
       return "♥";
     case "spades":
       return "♠";
+    case "stars":
+      return "★";
+    case "crowns":
+      return "♛";
   }
 }

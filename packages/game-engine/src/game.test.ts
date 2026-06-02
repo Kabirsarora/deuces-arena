@@ -25,6 +25,30 @@ describe("game state", () => {
     expect(game.status).toBe("in-progress");
   });
 
+  it("supports six-player arena deals with the expanded deck", () => {
+    const game = createInitialGame(
+      ["player-1", "player-2", "player-3", "player-4", "player-5", "player-6"],
+      createDeck("arena-six"),
+      {
+        cardsPerPlayer: 13
+      }
+    );
+
+    expect(game.players).toHaveLength(6);
+    expect(game.players.every((player) => player.hand.length === 13)).toBe(true);
+    expect(game.players.some((player) => player.hand.some((card) => card.suit === "crowns"))).toBe(
+      true
+    );
+  });
+
+  it("supports custom cards per player when the deck has enough cards", () => {
+    const game = createInitialGame(playerIds, createDeck("arena-six"), {
+      cardsPerPlayer: 15
+    });
+
+    expect(game.players.every((player) => player.hand.length === 15)).toBe(true);
+  });
+
   it("rejects moves from players whose turn it is not", () => {
     const result = applyMove(testGame(), "player-2", {
       type: "play",

@@ -24,6 +24,10 @@ export type GameRules = {
   readonly bombEndsTrick?: boolean;
 };
 
+export type InitialGameOptions = {
+  readonly cardsPerPlayer?: number;
+};
+
 export type GameEvent = {
   readonly turnNumber: number;
   readonly playerId: string;
@@ -56,19 +60,26 @@ export type GameActionResult =
 
 export function createInitialGame(
   playerIds: readonly string[],
-  deck: readonly Card[] = createDeck()
+  deck: readonly Card[] = createDeck(),
+  options: InitialGameOptions = {}
 ): GameState {
-  if (playerIds.length !== 4) {
-    throw new Error("Deuces Arena currently requires exactly 4 players.");
+  const cardsPerPlayer = options.cardsPerPlayer ?? 13;
+
+  if (playerIds.length < 2 || playerIds.length > 6) {
+    throw new Error("Deuces Arena currently supports 2 to 6 players.");
   }
 
-  if (deck.length !== 52) {
-    throw new Error("A game must start with a 52-card deck.");
+  if (cardsPerPlayer < 1) {
+    throw new Error("A game must deal at least one card to each player.");
+  }
+
+  if (deck.length < playerIds.length * cardsPerPlayer) {
+    throw new Error("Deck does not contain enough cards for this table setup.");
   }
 
   const players = playerIds.map((id, index) => ({
     id,
-    hand: sortCards(deck.slice(index * 13, index * 13 + 13))
+    hand: sortCards(deck.slice(index * cardsPerPlayer, index * cardsPerPlayer + cardsPerPlayer))
   }));
   const startingPlayer = players.find((player) =>
     player.hand.some((card) => isSameCard(card, LOWEST_CARD))

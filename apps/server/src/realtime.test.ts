@@ -519,13 +519,21 @@ describe("realtime rooms", () => {
     expect(
       lobbyBeforeStart.data.openRooms.find((room) => room.roomCode === createdRoom.data.roomCode)
         ?.rules
-    ).toEqual({ bombEndsTrick: false });
+    ).toEqual({
+      bombEndsTrick: false,
+      deckType: "classic",
+      playerCount: 4,
+      cardsPerPlayer: 13
+    });
 
     const startedRoom = await startRoom(host, {
       roomCode: createdRoom.data.roomCode,
       botCount: 3,
       rules: {
-        bombEndsTrick: true
+        bombEndsTrick: true,
+        deckType: "arena-six",
+        playerCount: 4,
+        cardsPerPlayer: 15
       }
     });
 
@@ -535,7 +543,49 @@ describe("realtime rooms", () => {
       return;
     }
 
-    expect(startedRoom.data.rules).toEqual({ bombEndsTrick: true });
+    expect(startedRoom.data.rules).toEqual({
+      bombEndsTrick: true,
+      deckType: "arena-six",
+      playerCount: 4,
+      cardsPerPlayer: 15
+    });
+    expect(startedRoom.data.yourHand).toHaveLength(15);
+  });
+
+  it("starts six-player arena tables with expanded suits", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Arena Host",
+      guestId: "guest-arena-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 5,
+      rules: {
+        bombEndsTrick: false,
+        deckType: "arena-six",
+        playerCount: 6,
+        cardsPerPlayer: 13
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.players).toHaveLength(6);
+    expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(5);
+    expect(startedRoom.data.yourHand).toHaveLength(13);
+    expect(startedRoom.data.rules.deckType).toBe("arena-six");
   });
 
   it("matches ranked queues with four humans and no bots", async () => {
@@ -819,9 +869,7 @@ function startRoom(
       readonly enabled: boolean;
       readonly secondsPerTurn: number;
     };
-    readonly rules?: {
-      readonly bombEndsTrick: boolean;
-    };
+    readonly rules?: PublicRoomState["rules"];
   }
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {

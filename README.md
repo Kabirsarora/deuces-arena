@@ -30,11 +30,13 @@ The engine is deliberately independent from React and the server. A future Expo 
 
 ## Game Rules
 
-Deuces Arena currently implements a 4-player Deuces / Big Two shedding game:
+Deuces Arena currently implements classic 4-player Deuces / Big Two plus an experimental casual Arena 6 table variant:
 
 - Each player receives 13 cards.
 - Card rank order is `3 4 5 6 7 8 9 10 J Q K A 2`.
-- Suit order is diamonds, clubs, hearts, spades.
+- Classic suit order is diamonds, clubs, hearts, spades.
+- Arena 6 adds placeholder Stars and Crowns suits above spades, so the full order is diamonds, clubs, hearts, spades, stars, crowns.
+- Casual rooms can choose 2-6 seats and custom cards per player when the selected deck has enough cards.
 - The player holding 3 of diamonds starts, and the first play must include it.
 - The lead player chooses the trick type: single, pair, trips, quad, full house, straight, longer straight, or bomb.
 - Players must answer with the same hand type and straight length, unless they play a bomb.
@@ -49,6 +51,7 @@ Bomb variants:
 - Bomb strength is determined by the rank of the four of a kind; the kicker is ignored.
 - Default room rule: once a bomb is active, only a stronger bomb can beat it.
 - Optional room rule: a bomb immediately wins the trick, so no stronger bomb response is allowed.
+- Arena 6 keeps bombs as four of a kind plus one kicker for now; five- or six-of-a-kind "super bomb" rules are intentionally deferred.
 - These are intentionally documented as variant choices so more house rules can be added later.
 
 ## Local Setup
@@ -129,6 +132,7 @@ See [docs/deployment.md](docs/deployment.md) for web, server, database, and envi
 - Add production Google sign-in and account/profile persistence with deployed OAuth credentials.
 - Deploy the frontend, backend, PostgreSQL database, and optional Redis layer.
 - Expand ranked mode with queue health, rating history, leaderboards, and anti-abuse checks.
+- Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
 - Improve baseline bots, then add simulation-backed bots and self-play data generation.
 - Build AI coach explanations from legal moves, replay state, rollout outcomes, and future model scores.
 - Add replay timeline UI, searchable match history, and richer post-game analysis.

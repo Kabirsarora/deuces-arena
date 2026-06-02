@@ -11,6 +11,7 @@ import {
   summarizeGame,
   type BotStrategy,
   type Card,
+  type DeckType,
   type GameState,
   type PlayerState
 } from "@deuces-arena/game-engine";
@@ -115,7 +116,9 @@ const ADMIN_GUEST_IDS = [
   ...parseCommaList(process.env.ADMIN_GUEST_IDS),
   ...parseCommaList(process.env.ADMIN_EMAILS).map(createAuthProfileId)
 ];
-const MAX_PLAYERS_PER_ROOM = 4;
+const CLASSIC_PLAYER_COUNT = 4;
+const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
+const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
@@ -249,7 +252,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.filter((player) => player.kind === "human").length >= MAX_PLAYERS_PER_ROOM) {
+    if (
+      room.players.filter((player) => player.kind === "human").length >= MAX_CASUAL_PLAYERS_PER_ROOM
+    ) {
       callback(fail("Room is full."));
       return;
     }
@@ -329,20 +334,29 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const botCount = normalizeBotCount(payload.botCount, room.players.length);
+    const rules = normalizeRuleSettings(payload.rules, room.players.length);
+    const botCount = normalizeBotCount(payload.botCount, room.players.length, rules.playerCount);
 
-    if (room.players.length + botCount < MAX_PLAYERS_PER_ROOM) {
-      callback(fail("A game needs 4 seated players. Add more humans or bots."));
+    if (createDeck(rules.deckType).length < rules.playerCount * rules.cardsPerPlayer) {
+      callback(fail("Selected deck does not have enough cards for this table setup."));
       return;
     }
 
-    fillRoomWithBots(room, botCount);
+    if (room.players.length + botCount < rules.playerCount) {
+      callback(fail(`A game needs ${rules.playerCount} seated players. Add more humans or bots.`));
+      return;
+    }
+
+    fillRoomWithBots(room, botCount, rules.playerCount);
     room.timer = normalizeTimerSettings(payload.timer);
-    room.rules = normalizeRuleSettings(payload.rules);
+    room.rules = rules;
     room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
-      shuffleDeck()
+      shuffleDeck(room.rules.deckType, room.rules.playerCount, room.rules.cardsPerPlayer),
+      {
+        cardsPerPlayer: room.rules.cardsPerPlayer
+      }
     );
     room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
     resetTurnTimer(room);
@@ -765,7 +779,10 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
       secondsPerTurn: DEFAULT_TIMER_SECONDS
     },
     rules: {
-      bombEndsTrick: false
+      bombEndsTrick: false,
+      deckType: "classic",
+      playerCount: CLASSIC_PLAYER_COUNT,
+      cardsPerPlayer: DEFAULT_CARDS_PER_PLAYER
     },
     botDifficulty: "normal",
     turnDeadlineAt: null,
@@ -847,10 +864,10 @@ function canStartRoom(room: Room): boolean {
   return connectedHumans.every((player) => player.ready);
 }
 
-function fillRoomWithBots(room: Room, botCount: number): void {
+function fillRoomWithBots(room: Room, botCount: number, targetPlayerCount: number): void {
   let botsAdded = 0;
 
-  while (room.players.length < MAX_PLAYERS_PER_ROOM && botsAdded < botCount) {
+  while (room.players.length < targetPlayerCount && botsAdded < botCount) {
     const seatIndex = room.players.length;
     room.players = [
       ...room.players,
@@ -867,8 +884,12 @@ function fillRoomWithBots(room: Room, botCount: number): void {
   }
 }
 
-function normalizeBotCount(botCount: number | undefined, seatedPlayers: number): number {
-  return clampInteger(botCount ?? MAX_PLAYERS_PER_ROOM, 0, MAX_PLAYERS_PER_ROOM - seatedPlayers);
+function normalizeBotCount(
+  botCount: number | undefined,
+  seatedPlayers: number,
+  targetPlayerCount: number
+): number {
+  return clampInteger(botCount ?? targetPlayerCount, 0, targetPlayerCount - seatedPlayers);
 }
 
 function normalizeTimerSettings(
@@ -880,10 +901,29 @@ function normalizeTimerSettings(
   };
 }
 
-function normalizeRuleSettings(rules: PublicRoomRules | undefined): RoomRuleSettings {
+function normalizeRuleSettings(
+  rules: PublicRoomRules | undefined,
+  seatedPlayers = 1
+): RoomRuleSettings {
+  const deckType = normalizeDeckType(rules?.deckType);
+  const cardsPerPlayer = clampInteger(rules?.cardsPerPlayer ?? DEFAULT_CARDS_PER_PLAYER, 1, 20);
+  const maximumPlayersByDeck = Math.floor(createDeck(deckType).length / cardsPerPlayer);
+  const playerCount = clampInteger(
+    rules?.playerCount ?? CLASSIC_PLAYER_COUNT,
+    Math.max(2, seatedPlayers),
+    Math.min(MAX_CASUAL_PLAYERS_PER_ROOM, maximumPlayersByDeck)
+  );
+
   return {
-    bombEndsTrick: rules?.bombEndsTrick ?? false
+    bombEndsTrick: rules?.bombEndsTrick ?? false,
+    deckType,
+    playerCount,
+    cardsPerPlayer
   };
+}
+
+function normalizeDeckType(deckType: DeckType | undefined): DeckType {
+  return deckType === "arena-six" ? "arena-six" : "classic";
 }
 
 function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): PublicBotDifficulty {
@@ -1028,7 +1068,7 @@ function applyGuestStats(room: Room, game: GameState): void {
             playerId: player.id,
             ratingBefore:
               player.guestId === null ? 1000 : getOrCreateGuestProfile(player.guestId).rating,
-            placement: toPlacement(placements.indexOf(player.id) + 1)
+            placement: toRankedPlacement(placements.indexOf(player.id) + 1)
           }))
         )
       : [];
@@ -1150,7 +1190,7 @@ function publicLobbyState(): PublicLobbyState {
     .filter(
       (room) =>
         room.game === null &&
-        room.players.length < MAX_PLAYERS_PER_ROOM &&
+        room.players.length < MAX_CASUAL_PLAYERS_PER_ROOM &&
         room.players.some((player) => player.socketId !== null)
     )
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
@@ -1166,8 +1206,8 @@ function publicLobbyState(): PublicLobbyState {
         rules: room.rules,
         seatedPlayers,
         readyPlayers,
-        maxPlayers: MAX_PLAYERS_PER_ROOM,
-        botSeatsAvailable: MAX_PLAYERS_PER_ROOM - seatedPlayers,
+        maxPlayers: room.rules.playerCount,
+        botSeatsAvailable: Math.max(0, room.rules.playerCount - seatedPlayers),
         createdAt: room.createdAt.toISOString()
       };
     });
@@ -1600,7 +1640,11 @@ function inferPlacements(game: GameState): readonly string[] {
   ];
 }
 
-function toPlacement(value: number): 1 | 2 | 3 | 4 {
+function toPlacement(value: number): number {
+  return Math.max(1, value);
+}
+
+function toRankedPlacement(value: number): 1 | 2 | 3 | 4 {
   if (value === 1 || value === 2 || value === 3 || value === 4) {
     return value;
   }
@@ -1608,8 +1652,12 @@ function toPlacement(value: number): 1 | 2 | 3 | 4 {
   return 4;
 }
 
-function shuffleDeck(): Card[] {
-  const deck = createDeck();
+function shuffleDeck(
+  deckType: DeckType = "classic",
+  playerCount = CLASSIC_PLAYER_COUNT,
+  cardsPerPlayer = DEFAULT_CARDS_PER_PLAYER
+): Card[] {
+  const deck = createDeck(deckType);
 
   for (let index = deck.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -1619,6 +1667,19 @@ function shuffleDeck(): Card[] {
     if (current !== undefined && swap !== undefined) {
       deck[index] = swap;
       deck[swapIndex] = current;
+    }
+  }
+
+  const dealtCardCount = playerCount * cardsPerPlayer;
+  const lowestCardIndex = deck.findIndex((card) => card.rank === "3" && card.suit === "diamonds");
+
+  if (lowestCardIndex >= dealtCardCount && lowestCardIndex !== -1) {
+    const firstCard = deck[0];
+    const lowestCard = deck[lowestCardIndex];
+
+    if (firstCard !== undefined && lowestCard !== undefined) {
+      deck[0] = lowestCard;
+      deck[lowestCardIndex] = firstCard;
     }
   }
 

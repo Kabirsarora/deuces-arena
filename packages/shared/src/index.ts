@@ -1,4 +1,4 @@
-import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-engine";
+import type { Card, CurrentTrick, DeckType, GameEvent, Move } from "@deuces-arena/game-engine";
 
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
@@ -186,6 +186,9 @@ export type PublicTurnTimerState = {
 
 export type PublicRoomRules = {
   readonly bombEndsTrick: boolean;
+  readonly deckType: DeckType;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
 };
 
 export type RoomReplayExport = {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ARENA_HIGHEST_CARD,
+  ARENA_SUITS,
+  CLASSIC_SUITS,
   HIGHEST_CARD,
   LOWEST_CARD,
   RANKS,
@@ -25,6 +28,12 @@ describe("card ranking", () => {
     expect(compareSuits("diamonds", "clubs")).toBeLessThan(0);
     expect(compareSuits("clubs", "hearts")).toBeLessThan(0);
     expect(compareSuits("hearts", "spades")).toBeLessThan(0);
+  });
+
+  it("orders arena placeholder suits above spades", () => {
+    expect(compareSuits("spades", "stars")).toBeLessThan(0);
+    expect(compareSuits("stars", "crowns")).toBeLessThan(0);
+    expect(compareCards(ARENA_HIGHEST_CARD, createCard("2", "spades"))).toBeGreaterThan(0);
   });
 
   it("treats 3 of diamonds as the lowest card", () => {
@@ -62,9 +71,20 @@ describe("deck generation", () => {
     expect(deck).toContainEqual(createCard("2", "spades"));
   });
 
+  it("creates an expanded six-suit arena deck", () => {
+    const deck = createDeck("arena-six");
+
+    expect(deck).toHaveLength(78);
+    expect(new Set(deck.map(getCardId))).toHaveLength(78);
+    expect(deck).toContainEqual(createCard("3", "stars"));
+    expect(deck).toContainEqual(createCard("2", "crowns"));
+  });
+
   it("keeps rank and suit constants in rule order", () => {
     expect(RANKS).toEqual(["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"]);
     expect(SUITS).toEqual(["diamonds", "clubs", "hearts", "spades"]);
+    expect(CLASSIC_SUITS).toEqual(["diamonds", "clubs", "hearts", "spades"]);
+    expect(ARENA_SUITS).toEqual(["diamonds", "clubs", "hearts", "spades", "stars", "crowns"]);
   });
 
   it("sorts cards by rank first and suit second", () => {

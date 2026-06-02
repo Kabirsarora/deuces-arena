@@ -2,6 +2,9 @@ export {
   HIGHEST_CARD,
   LOWEST_CARD,
   RANKS,
+  ARENA_HIGHEST_CARD,
+  ARENA_SUITS,
+  CLASSIC_SUITS,
   SUITS,
   compareCards,
   compareRanks,
@@ -15,7 +18,7 @@ export {
   sortCards
 } from "./cards.js";
 
-export type { Card, CardId, Rank, Suit } from "./cards.js";
+export type { Card, CardId, DeckType, Rank, Suit } from "./cards.js";
 
 export { chooseBotMove } from "./bots.js";
 
@@ -39,6 +42,7 @@ export { applyMove, createInitialGame, summarizeGame } from "./game.js";
 export type {
   GameActionResult,
   GameEvent,
+  InitialGameOptions,
   GameState,
   GameStatus,
   PlayerGameSummary,

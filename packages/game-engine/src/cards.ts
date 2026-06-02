@@ -1,8 +1,11 @@
-export const SUITS = ["diamonds", "clubs", "hearts", "spades"] as const;
+export const CLASSIC_SUITS = ["diamonds", "clubs", "hearts", "spades"] as const;
+export const ARENA_SUITS = ["diamonds", "clubs", "hearts", "spades", "stars", "crowns"] as const;
+export const SUITS = CLASSIC_SUITS;
 export const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"] as const;
 
-export type Suit = (typeof SUITS)[number];
+export type Suit = (typeof ARENA_SUITS)[number];
 export type Rank = (typeof RANKS)[number];
+export type DeckType = "classic" | "arena-six";
 
 export type Card = {
   readonly rank: Rank;
@@ -12,7 +15,7 @@ export type Card = {
 export type CardId = `${Rank}-${Suit}`;
 
 const rankStrength = new Map<Rank, number>(RANKS.map((rank, index) => [rank, index]));
-const suitStrength = new Map<Suit, number>(SUITS.map((suit, index) => [suit, index]));
+const suitStrength = new Map<Suit, number>(ARENA_SUITS.map((suit, index) => [suit, index]));
 
 export const LOWEST_CARD: Card = {
   rank: "3",
@@ -22,6 +25,11 @@ export const LOWEST_CARD: Card = {
 export const HIGHEST_CARD: Card = {
   rank: "2",
   suit: "spades"
+};
+
+export const ARENA_HIGHEST_CARD: Card = {
+  rank: "2",
+  suit: "crowns"
 };
 
 export function createCard(rank: Rank, suit: Suit): Card {
@@ -81,6 +89,7 @@ export function sortCards(cards: readonly Card[]): Card[] {
   return [...cards].sort(compareCards);
 }
 
-export function createDeck(): Card[] {
-  return RANKS.flatMap((rank) => SUITS.map((suit) => createCard(rank, suit)));
+export function createDeck(deckType: DeckType = "classic"): Card[] {
+  const suits = deckType === "arena-six" ? ARENA_SUITS : CLASSIC_SUITS;
+  return RANKS.flatMap((rank) => suits.map((suit) => createCard(rank, suit)));
 }
