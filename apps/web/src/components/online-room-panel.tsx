@@ -3235,8 +3235,10 @@ function MatchResultsPanel({
 }) {
   const rows = getPlacementRows(room);
   const [showReview, setShowReview] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
   const review = getPlayerMatchReview(room);
+  const timeline = getMoveTimelineRows(room);
   const selectedStatsPlayer =
     room.players.find((player) => player.id === selectedStatsPlayerId) ?? null;
 
@@ -3315,18 +3317,59 @@ function MatchResultsPanel({
         </motion.div>
       ) : null}
 
+      {showTimeline ? (
+        <motion.div
+          className="mt-3 rounded-[0.9rem] border border-white/10 bg-black/24 p-3"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-black uppercase text-[var(--aqua)]">Move timeline</p>
+            <span className="rounded-full bg-white/8 px-2 py-1 text-[10px] font-black text-zinc-300">
+              {timeline.length} events
+            </span>
+          </div>
+          <ol className="mt-2 max-h-48 space-y-1.5 overflow-y-auto pr-1 text-xs text-zinc-300">
+            {timeline.length === 0 ? (
+              <li className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
+                No replay events were recorded for this completed table.
+              </li>
+            ) : (
+              timeline.map((event) => (
+                <li key={event.id} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-black text-zinc-100">{event.playerName}</span>
+                    <span className="font-mono text-[10px] text-zinc-500">T{event.turnNumber}</span>
+                  </div>
+                  <p className="mt-0.5 text-zinc-300">{event.description}</p>
+                  <p className="mt-0.5 text-[11px] text-zinc-500">{event.cardsRemainingLabel}</p>
+                </li>
+              ))
+            )}
+          </ol>
+        </motion.div>
+      ) : null}
+
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowReview((current) => !current)}>
           <Gauge className="size-4" />
           {showReview ? "Hide review" : "Review decisions"}
         </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setShowTimeline((current) => !current)}
+        >
+          <History className="size-4" />
+          {showTimeline ? "Hide timeline" : "Move timeline"}
+        </Button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <Button size="sm" onClick={onCreateBotGame}>
           <Play className="size-4" />
           New table
         </Button>
-      </div>
-
-      <div className="mt-2 grid">
         <Button size="sm" variant="secondary" onClick={onLeaveRoom}>
           <DoorOpen className="size-4" />
           Leave table
@@ -3599,6 +3642,46 @@ function getPlacementRows(
       (row): row is { readonly player: PublicRoomPlayer; readonly placement: number } =>
         row !== null
     );
+}
+
+type MoveTimelineRow = {
+  readonly id: string;
+  readonly playerName: string;
+  readonly turnNumber: number;
+  readonly description: string;
+  readonly cardsRemainingLabel: string;
+};
+
+function getMoveTimelineRows(room: PublicRoomState): readonly MoveTimelineRow[] {
+  return room.recentEvents.map((event, index) => {
+    const playerName = getRoomPlayerName(room, event.playerId);
+    const cardsAfter = event.cardsRemainingAfter[event.playerId];
+    const cardsRemainingLabel =
+      cardsAfter === undefined
+        ? "Cards remaining unknown"
+        : `${cardsAfter} card${cardsAfter === 1 ? "" : "s"} left`;
+
+    return {
+      id: `${event.turnNumber}-${event.playerId}-${index}`,
+      playerName,
+      turnNumber: event.turnNumber,
+      description: formatTimelineMove(event),
+      cardsRemainingLabel
+    };
+  });
+}
+
+function formatTimelineMove(event: GameEvent): string {
+  if (event.wasPass || event.move.type === "pass") {
+    return "Passed";
+  }
+
+  const handType = getMoveHandType(event);
+  const cardList = event.move.cards.map(formatCard).join(" ");
+  const legalContext =
+    event.legalMoveCount === 1 ? "1 legal option" : `${event.legalMoveCount} legal options`;
+
+  return `${handType === null ? "Played" : formatHandType(handType)}: ${cardList} · ${legalContext}`;
 }
 
 function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
