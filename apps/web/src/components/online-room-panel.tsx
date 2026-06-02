@@ -126,6 +126,12 @@ const FEEDBACK_KIND_OPTIONS: readonly { readonly value: FeedbackKind; readonly l
   { value: "UI", label: "UI" },
   { value: "BALANCE", label: "Balance" }
 ];
+const CLASSIC_CLOCKWISE_SEAT_LAYOUT: readonly string[] = [
+  "bottom-5 left-1/2 -translate-x-1/2",
+  "left-4 top-1/2 -translate-y-1/2 sm:left-6",
+  "left-1/2 top-14 -translate-x-1/2",
+  "right-4 top-1/2 -translate-y-1/2 sm:right-6"
+];
 
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
@@ -2992,16 +2998,7 @@ function OnlineTable({
 }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
-  const yourPlayerIndex = players.findIndex((player) => player.id === room?.yourPlayerId);
-  const seatedPlayers: readonly PublicRoomPlayer[] =
-    yourPlayerIndex === -1 || players.length < 4
-      ? players.slice(0, 4)
-      : [
-          players[(yourPlayerIndex + 2) % players.length],
-          players[(yourPlayerIndex + 1) % players.length],
-          players[(yourPlayerIndex + 3) % players.length],
-          players[yourPlayerIndex]
-        ].filter((player): player is PublicRoomPlayer => player !== undefined);
+  const seatedPlayers = getClockwiseSeatedPlayers(players, room?.yourPlayerId ?? null);
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
   const timerLabel = formatTurnTimer(room, timerNow);
@@ -3020,7 +3017,10 @@ function OnlineTable({
   const trickEntryOffset =
     room === null || lastEvent === null || lastEvent.wasPass
       ? { x: 0, y: 36, rotate: 0 }
-      : getTrickEntryOffset(seatedPlayers.findIndex((player) => player.id === lastEvent.playerId));
+      : getTrickEntryOffset(
+          seatedPlayers.findIndex((player) => player.id === lastEvent.playerId),
+          seatedPlayers.length
+        );
   const [visiblePassKey, setVisiblePassKey] = useState<string | null>(null);
   const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
   const selectedStatsPlayer =
@@ -3080,6 +3080,7 @@ function OnlineTable({
             player={player}
             active={room?.activePlayerId === player.id}
             position={index}
+            seatCount={seatedPlayers.length}
             onOpenStats={() => setSelectedStatsPlayerId(player.id)}
           />
         ))
@@ -3345,26 +3346,23 @@ function OnlineSeat({
   player,
   active,
   position,
+  seatCount,
   onOpenStats
 }: {
   readonly player: PublicRoomPlayer;
   readonly active: boolean;
   readonly position: number;
+  readonly seatCount: number;
   readonly onOpenStats: () => void;
 }) {
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
-  const seatPosition = [
-    "left-1/2 top-14 -translate-x-1/2",
-    "left-3 top-1/2 -translate-y-1/2 sm:left-5",
-    "right-3 top-1/2 -translate-y-1/2 sm:right-5",
-    "bottom-5 left-1/2 -translate-x-1/2"
-  ][position];
+  const seatPosition = getSeatPositionClass(position, seatCount);
 
   return (
     <div
       className={cn(
-        "seat-panel absolute z-20 flex w-[min(14rem,calc(100%-2rem))] items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
+        "seat-panel absolute z-20 flex w-[min(13.5rem,calc(100%-2rem))] items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
         seatPosition,
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
@@ -3843,24 +3841,95 @@ function normalizeManualCardOrder(
   return [...preservedIds, ...missingIds];
 }
 
-function getTrickEntryOffset(position: number): {
+function getClockwiseSeatedPlayers(
+  players: readonly PublicRoomPlayer[],
+  yourPlayerId: string | null
+): readonly PublicRoomPlayer[] {
+  if (players.length <= 1) {
+    return players;
+  }
+
+  const anchorIndex = players.findIndex((player) => player.id === yourPlayerId);
+
+  if (anchorIndex === -1) {
+    return players.slice(0, MAX_CASUAL_PLAYERS_PER_ROOM);
+  }
+
+  const anchoredPlayers = [...players.slice(anchorIndex), ...players.slice(0, anchorIndex)].slice(
+    0,
+    MAX_CASUAL_PLAYERS_PER_ROOM
+  );
+
+  return anchoredPlayers;
+}
+
+function getSeatPositionClass(position: number, seatCount: number): string {
+  const seatLayouts: Readonly<Record<number, readonly string[]>> = {
+    1: ["bottom-5 left-1/2 -translate-x-1/2"],
+    2: ["bottom-5 left-1/2 -translate-x-1/2", "left-1/2 top-14 -translate-x-1/2"],
+    3: [
+      "bottom-5 left-1/2 -translate-x-1/2",
+      "left-4 top-[44%] -translate-y-1/2 sm:left-6",
+      "right-4 top-[44%] -translate-y-1/2 sm:right-6"
+    ],
+    4: [
+      "bottom-5 left-1/2 -translate-x-1/2",
+      "left-4 top-1/2 -translate-y-1/2 sm:left-6",
+      "left-1/2 top-14 -translate-x-1/2",
+      "right-4 top-1/2 -translate-y-1/2 sm:right-6"
+    ],
+    5: [
+      "bottom-5 left-1/2 -translate-x-1/2",
+      "left-4 top-[62%] -translate-y-1/2 sm:left-6",
+      "left-[16%] top-20 -translate-x-1/2",
+      "right-[16%] top-20 translate-x-1/2",
+      "right-4 top-[62%] -translate-y-1/2 sm:right-6"
+    ],
+    6: [
+      "bottom-5 left-1/2 -translate-x-1/2",
+      "left-4 top-[66%] -translate-y-1/2 sm:left-6",
+      "left-4 top-[31%] -translate-y-1/2 sm:left-6",
+      "left-1/2 top-14 -translate-x-1/2",
+      "right-4 top-[31%] -translate-y-1/2 sm:right-6",
+      "right-4 top-[66%] -translate-y-1/2 sm:right-6"
+    ]
+  };
+
+  return (
+    seatLayouts[seatCount]?.[position] ??
+    CLASSIC_CLOCKWISE_SEAT_LAYOUT[position] ??
+    CLASSIC_CLOCKWISE_SEAT_LAYOUT[0] ??
+    ""
+  );
+}
+
+function getTrickEntryOffset(
+  position: number,
+  seatCount: number
+): {
   readonly x: number;
   readonly y: number;
   readonly rotate: number;
 } {
-  if (position === 1) {
-    return { x: -180, y: 8, rotate: -8 };
-  }
-
-  if (position === 2) {
-    return { x: 180, y: 8, rotate: 8 };
-  }
-
-  if (position === 3) {
+  if (position <= 0) {
     return { x: 0, y: 220, rotate: 4 };
   }
 
-  return { x: 0, y: -120, rotate: -4 };
+  const lastIndex = seatCount - 1;
+  const midpoint = lastIndex / 2;
+
+  if (position === Math.round(midpoint) && seatCount % 2 === 0) {
+    return { x: 0, y: -130, rotate: -4 };
+  }
+
+  const side = position <= midpoint ? -1 : 1;
+  const verticalBias = Math.abs(position - midpoint) / Math.max(1, midpoint);
+
+  return {
+    x: side * (150 + verticalBias * 70),
+    y: -32 + verticalBias * 92,
+    rotate: side * (5 + verticalBias * 5)
+  };
 }
 
 function loadHandSortMode(): HandSortMode {
