@@ -72,6 +72,22 @@ textarea {
     radial-gradient(circle at 50% 55%, #103e36 0%, #041916 76%);
 }
 
+.table-theme-lagoon {
+  background:
+    radial-gradient(ellipse at 44% 36%, rgba(255, 255, 255, 0.18), transparent 17rem),
+    radial-gradient(ellipse at 76% 70%, rgba(242, 193, 78, 0.1), transparent 17rem),
+    radial-gradient(ellipse at 25% 72%, rgba(34, 211, 238, 0.22), transparent 20rem),
+    radial-gradient(circle at 50% 55%, #177566 0%, #06342f 76%);
+}
+
+.table-theme-obsidian {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(242, 193, 78, 0.14), transparent 18rem),
+    radial-gradient(ellipse at 28% 68%, rgba(168, 85, 247, 0.08), transparent 18rem),
+    radial-gradient(ellipse at 80% 62%, rgba(0, 0, 0, 0.48), transparent 18rem),
+    radial-gradient(circle at 50% 55%, #17211f 0%, #050607 78%);
+}
+
 .table-oval {
   border-radius: 38% / 13%;
   box-shadow:
@@ -230,4 +246,24 @@ textarea {
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22), transparent 28%),
     repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 7px),
     linear-gradient(145deg, #f43f5e, #7f1d1d 62%, #2a0d14);
+}
+
+.card-back-neon-grid {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.24), transparent 28%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(145deg, #2563eb, #0f172a 58%, #042f2e);
+  background-size:
+    auto,
+    8px 8px,
+    8px 8px,
+    auto;
+}
+
+.card-back-ember-court {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(251, 191, 36, 0.34), transparent 25%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 9px),
+    linear-gradient(145deg, #f97316, #7f1d1d 54%, #1c1917);
 }

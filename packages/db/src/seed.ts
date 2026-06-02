@@ -20,6 +20,42 @@ const starterCosmetics = [
     coinPrice: 500
   },
   {
+    slug: "lagoon-table",
+    kind: "TABLE_THEME" as const,
+    name: "Lagoon Table",
+    description: "A bright teal table theme with a softer casino glow.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 450
+  },
+  {
+    slug: "obsidian-table",
+    kind: "TABLE_THEME" as const,
+    name: "Obsidian Table",
+    description: "A low-light table theme with gold edge lighting.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 800
+  },
+  {
+    slug: "neon-grid-card-back",
+    kind: "CARD_BACK" as const,
+    name: "Neon Grid",
+    description: "A blue circuit-style card back for sharper tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 350
+  },
+  {
+    slug: "ember-court-card-back",
+    kind: "CARD_BACK" as const,
+    name: "Ember Court",
+    description: "A warm red-gold card back for endgame drama.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 650
+  },
+  {
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER" as const,
     name: "Founder Gold",

@@ -2769,7 +2769,7 @@ function CosmeticsSummary({
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
   readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
-  const visibleCosmetics = cosmetics.slice(0, 4);
+  const visibleCosmetics = cosmetics.slice(0, 6);
   const unlocksByCosmeticId = new Map(
     profile?.unlocks.map((unlock) => [unlock.cosmetic.id, unlock]) ?? []
   );
@@ -2923,7 +2923,12 @@ function getCosmeticOwnershipLabel(
 function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
   if (cosmetic.kind === "CARD_BACK") {
     return (
-      <div className="grid h-12 w-9 shrink-0 place-items-center rounded-md border border-white/20 bg-[linear-gradient(135deg,#e11d48,#7f1d1d)] shadow-lg">
+      <div
+        className={cn(
+          "card-back grid h-12 w-9 shrink-0 place-items-center rounded-md border border-white/20 shadow-lg",
+          getCardBackClass(cosmetic)
+        )}
+      >
         <div className="h-7 w-4 rounded-sm border border-white/45" />
       </div>
     );
@@ -2931,7 +2936,12 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
 
   if (cosmetic.kind === "TABLE_THEME") {
     return (
-      <div className="h-10 w-12 shrink-0 rounded-[50%] border border-emerald-200/25 bg-[radial-gradient(circle,#134e4a,#042f2e_70%)] shadow-lg" />
+      <div
+        className={cn(
+          "table-felt relative h-10 w-12 shrink-0 overflow-hidden rounded-[50%] border border-emerald-200/25 shadow-lg",
+          getTableThemeClass(cosmetic)
+        )}
+      />
     );
   }
 
@@ -3681,12 +3691,28 @@ function getTableThemeClass(cosmetic: PublicCosmetic | null): string {
     return "table-theme-midnight-felt";
   }
 
+  if (cosmetic?.slug === "lagoon-table") {
+    return "table-theme-lagoon";
+  }
+
+  if (cosmetic?.slug === "obsidian-table") {
+    return "table-theme-obsidian";
+  }
+
   return "";
 }
 
 function getCardBackClass(cosmetic: PublicCosmetic | null): string {
   if (cosmetic?.slug === "classic-red-card-back") {
     return "card-back-classic-red";
+  }
+
+  if (cosmetic?.slug === "neon-grid-card-back") {
+    return "card-back-neon-grid";
+  }
+
+  if (cosmetic?.slug === "ember-court-card-back") {
+    return "card-back-ember-court";
   }
 
   return "";

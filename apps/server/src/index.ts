@@ -164,6 +164,50 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "starter-lagoon-table",
+    slug: "lagoon-table",
+    kind: "TABLE_THEME",
+    name: "Lagoon Table",
+    description: "A bright teal table theme with a softer casino glow.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 450,
+    previewUrl: null
+  },
+  {
+    id: "starter-obsidian-table",
+    slug: "obsidian-table",
+    kind: "TABLE_THEME",
+    name: "Obsidian Table",
+    description: "A low-light table theme with gold edge lighting.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 800,
+    previewUrl: null
+  },
+  {
+    id: "starter-neon-grid-card-back",
+    slug: "neon-grid-card-back",
+    kind: "CARD_BACK",
+    name: "Neon Grid",
+    description: "A blue circuit-style card back for sharper tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 350,
+    previewUrl: null
+  },
+  {
+    id: "starter-ember-court-card-back",
+    slug: "ember-court-card-back",
+    kind: "CARD_BACK",
+    name: "Ember Court",
+    description: "A warm red-gold card back for endgame drama.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 650,
+    previewUrl: null
+  },
+  {
     id: "starter-founder-gold-border",
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER",
