@@ -83,6 +83,7 @@ describe("realtime rooms", () => {
     }
 
     expect(profile.data.guestId).toBe("guest-profile-cosmetics");
+    expect(profile.data.arenaCoins).toBe(0);
     expect(profile.data.unlocks).toEqual([]);
     expect(profile.data.equippedCosmetics).toEqual([]);
   });

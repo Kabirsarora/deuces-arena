@@ -1901,7 +1901,9 @@ function MinimalProfileCard({
               </span>
             ) : null}
           </div>
-          <p className="text-sm text-zinc-400">{profile?.rating ?? 1000} rating</p>
+          <p className="text-sm text-zinc-400">
+            {profile?.rating ?? 1000} rating · {profile?.arenaCoins ?? 0} coins
+          </p>
         </div>
       </div>
       <div className="mt-4 rounded-[1rem] border border-white/10 bg-black/20 p-3">

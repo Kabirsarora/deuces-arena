@@ -19,6 +19,7 @@ export type PublicPlayerStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
   readonly averagePlacement: number | null;
+  readonly arenaCoins: number;
 };
 
 export type ProfileAvatarKey = "diamond" | "club" | "heart" | "spade";

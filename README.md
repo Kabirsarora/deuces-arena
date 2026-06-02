@@ -12,6 +12,7 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 - Guest profiles with match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, stores the analysis in replay exports, and can persist those records for future AI coach training/evaluation.
 - Cosmetics foundation with catalog APIs, earned unlock tracking, profile loadouts, equip validation, starter progression rewards, and non-pay-to-win supporter-ready data models.
+- Arena Coins soft-currency foundation for earned, non-real-money progression rewards.
 - Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
 - Early ML package for random self-play sample generation and JSONL export of persisted coach evaluations without pretending baseline bots are trained AI.
 
@@ -99,6 +100,7 @@ Current cosmetic progression is intentionally simple:
 - Complete 1 persisted match: unlock `classic-red-card-back`.
 - Win 1 persisted match: unlock `midnight-felt-table`.
 - Supporter cosmetics are modeled separately and do not affect gameplay.
+- Arena Coins are earned from completed matches and are not purchasable or bettable yet.
 
 ## ML Data Export
 

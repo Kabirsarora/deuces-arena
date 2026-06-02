@@ -78,6 +78,7 @@ type GuestProfile = {
   gamesPlayed: number;
   wins: number;
   placementTotal: number;
+  arenaCoins: number;
 };
 
 type Room = {
@@ -124,6 +125,12 @@ const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
+const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
+  first: 120,
+  second: 80,
+  third: 50,
+  other: 25
+};
 const BOT_MOVE_DELAY_RANGES: Readonly<
   Record<PublicBotPace, { readonly minMs: number; readonly maxMs: number }>
 > = {
@@ -1097,6 +1104,7 @@ function applyGuestStats(room: Room, game: GameState): void {
     profile.gamesPlayed += 1;
     profile.wins += placement === 1 ? 1 : 0;
     profile.placementTotal += placement;
+    profile.arenaCoins += getArenaCoinReward(placement);
 
     if (ratingChange !== undefined) {
       profile.rating = ratingChange.ratingAfter;
@@ -1163,6 +1171,7 @@ function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
             rating: profile.rating,
             gamesPlayed: profile.gamesPlayed,
             wins: profile.wins,
+            arenaCoins: profile.arenaCoins,
             averagePlacement:
               profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
           },
@@ -1437,7 +1446,8 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
     rating: 1000,
     gamesPlayed: 0,
     wins: 0,
-    placementTotal: 0
+    placementTotal: 0,
+    arenaCoins: 0
   };
   guestProfiles.set(guestId, profile);
   return profile;
@@ -1453,6 +1463,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     profile.rating = persistedProfile.rating;
     profile.gamesPlayed = persistedProfile.gamesPlayed;
     profile.wins = persistedProfile.wins;
+    profile.arenaCoins = persistedProfile.arenaCoins;
     profile.placementTotal =
       persistedProfile.averagePlacement === null
         ? 0
@@ -1471,6 +1482,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     rating: profile.rating,
     gamesPlayed: profile.gamesPlayed,
     wins: profile.wins,
+    arenaCoins: profile.arenaCoins,
     averagePlacement:
       profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed,
     isAdmin: false,
@@ -1501,6 +1513,7 @@ async function publicLeaderboard(
       rating: profile.rating,
       gamesPlayed: profile.gamesPlayed,
       wins: profile.wins,
+      arenaCoins: profile.arenaCoins,
       averagePlacement:
         profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
     }));
@@ -1657,6 +1670,22 @@ function inferPlacements(game: GameState): readonly string[] {
 
 function toPlacement(value: number): number {
   return Math.max(1, value);
+}
+
+function getArenaCoinReward(placement: number): number {
+  if (placement === 1) {
+    return ARENA_COIN_REWARDS.first;
+  }
+
+  if (placement === 2) {
+    return ARENA_COIN_REWARDS.second;
+  }
+
+  if (placement === 3) {
+    return ARENA_COIN_REWARDS.third;
+  }
+
+  return ARENA_COIN_REWARDS.other;
 }
 
 function toRankedPlacement(value: number): 1 | 2 | 3 | 4 {

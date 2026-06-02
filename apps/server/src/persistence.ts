@@ -61,6 +61,13 @@ type CosmeticProgressionStats = {
   readonly wins: number;
 };
 
+const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
+  first: 120,
+  second: 80,
+  third: 50,
+  other: 25
+};
+
 const COSMETIC_UNLOCK_RULES: readonly {
   readonly slug: string;
   readonly source: "EARNED";
@@ -169,6 +176,7 @@ export async function getPersistedGuestProfile(
         rating: true,
         gamesPlayed: true,
         wins: true,
+        arenaCoins: true,
         placementTotal: true,
         cosmeticUnlocks: {
           orderBy: {
@@ -227,6 +235,7 @@ export async function getPersistedGuestProfile(
       gamesPlayed: user.gamesPlayed,
       wins: user.wins,
       averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed,
+      arenaCoins: user.arenaCoins,
       isAdmin: false,
       unlocks: user.cosmeticUnlocks.map((unlock) => ({
         cosmetic: unlock.cosmetic,
@@ -334,6 +343,7 @@ export async function getPersistedLeaderboard(
         rating: true,
         gamesPlayed: true,
         wins: true,
+        arenaCoins: true,
         placementTotal: true
       }
     });
@@ -348,6 +358,7 @@ export async function getPersistedLeaderboard(
               rating: user.rating,
               gamesPlayed: user.gamesPlayed,
               wins: user.wins,
+              arenaCoins: user.arenaCoins,
               averagePlacement:
                 user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed
             }
@@ -831,6 +842,9 @@ export async function completePersistedMatch(
               },
               placementTotal: {
                 increment: placement
+              },
+              arenaCoins: {
+                increment: getArenaCoinReward(placement)
               }
             }
           })
@@ -841,6 +855,22 @@ export async function completePersistedMatch(
   } catch (error) {
     console.error("Unable to persist match completion.", error);
   }
+}
+
+function getArenaCoinReward(placement: number): number {
+  if (placement === 1) {
+    return ARENA_COIN_REWARDS.first;
+  }
+
+  if (placement === 2) {
+    return ARENA_COIN_REWARDS.second;
+  }
+
+  if (placement === 3) {
+    return ARENA_COIN_REWARDS.third;
+  }
+
+  return ARENA_COIN_REWARDS.other;
 }
 
 async function awardEarnedCosmetics(
