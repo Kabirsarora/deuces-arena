@@ -311,6 +311,10 @@ export type ClientToServerEvents = {
     payload: { readonly guestId: string; readonly cosmeticId: string },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
   ) => void;
+  "cosmetics:purchase": (
+    payload: { readonly guestId: string; readonly cosmeticId: string },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
   "profile:history": (
     payload: { readonly guestId: string; readonly limit?: number },
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void

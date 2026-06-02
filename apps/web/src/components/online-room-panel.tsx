@@ -742,6 +742,24 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     );
   }
 
+  function purchaseCosmetic(cosmetic: PublicCosmetic) {
+    socketRef.current?.emit(
+      "cosmetics:purchase",
+      {
+        guestId: getActiveProfileId(),
+        cosmeticId: cosmetic.id
+      },
+      (ack) => {
+        if (ack.ok) {
+          setProfile(ack.data);
+          setMessage(`${cosmetic.name} unlocked.`);
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
     setSelectedCardIds((current) =>
@@ -892,6 +910,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onBotDifficultyChange={setBotDifficulty}
         onBotPaceChange={setBotPace}
         onEquipCosmetic={equipCosmetic}
+        onPurchaseCosmetic={purchaseCosmetic}
         onSubmitFeedback={submitFeedback}
       />
     );
@@ -1214,6 +1233,7 @@ function OnlineLobbyHub({
   onBotDifficultyChange,
   onBotPaceChange,
   onEquipCosmetic,
+  onPurchaseCosmetic,
   onSubmitFeedback
 }: {
   readonly connected: boolean;
@@ -1262,6 +1282,7 @@ function OnlineLobbyHub({
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
   readonly onBotPaceChange: (pace: PublicBotPace) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
+  readonly onPurchaseCosmetic: (cosmetic: PublicCosmetic) => void;
   readonly onSubmitFeedback: (input: {
     readonly kind: FeedbackKind;
     readonly body: string;
@@ -1454,6 +1475,7 @@ function OnlineLobbyHub({
                   cosmetics={cosmetics}
                   profile={profile}
                   onEquip={onEquipCosmetic}
+                  onPurchase={onPurchaseCosmetic}
                 />
               </div>
             </details>
@@ -2739,11 +2761,13 @@ function FeedbackSummary({
 function CosmeticsSummary({
   cosmetics,
   profile,
-  onEquip
+  onEquip,
+  onPurchase
 }: {
   readonly cosmetics: readonly PublicCosmetic[];
   readonly profile: PublicGuestProfile | null;
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
+  readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
   const visibleCosmetics = cosmetics.slice(0, 4);
   const unlocksByCosmeticId = new Map(
@@ -2790,7 +2814,9 @@ function CosmeticsSummary({
                 cosmetic={cosmetic}
                 owned={unlockedIds.has(cosmetic.id)}
                 equipped={equippedIds.has(cosmetic.id)}
+                coinBalance={coinBalance}
                 onEquip={onEquip}
+                onPurchase={onPurchase}
               />
             </div>
           ))
@@ -2804,12 +2830,16 @@ function CosmeticAction({
   cosmetic,
   owned,
   equipped,
-  onEquip
+  coinBalance,
+  onEquip,
+  onPurchase
 }: {
   readonly cosmetic: PublicCosmetic;
   readonly owned: boolean;
   readonly equipped: boolean;
+  readonly coinBalance: number;
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
+  readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
   if (equipped) {
     return (
@@ -2824,6 +2854,26 @@ function CosmeticAction({
       <Button className="h-7 shrink-0 px-2 text-[10px]" size="sm" onClick={() => onEquip(cosmetic)}>
         Equip
       </Button>
+    );
+  }
+
+  if (!cosmetic.isSupporter && cosmetic.coinPrice !== null && cosmetic.coinPrice > 0) {
+    if (coinBalance >= cosmetic.coinPrice) {
+      return (
+        <Button
+          className="h-7 shrink-0 px-2 text-[10px]"
+          size="sm"
+          onClick={() => onPurchase(cosmetic)}
+        >
+          Unlock
+        </Button>
+      );
+    }
+
+    return (
+      <span className="shrink-0 rounded-full bg-white/8 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
+        {cosmetic.coinPrice} coins
+      </span>
     );
   }
 

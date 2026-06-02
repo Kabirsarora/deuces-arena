@@ -53,7 +53,7 @@
 - Done: add cosmetic schema, seed data, catalog API, profile unlocks, equipment validation, and public loadouts.
 - Done: add earned starter cosmetics after completed matches/wins.
 - Done: add Arena Coins as a non-real-money soft-currency foundation for future cosmetics.
-- Done: add cosmetic coin-price metadata and display locked prices without enabling purchases yet.
+- Done: add server-validated Arena Coin cosmetic unlocks for priced non-supporter cosmetics.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
 - Next: make equipped card backs and table themes visibly alter the table.
 - Later: add Stripe support for optional supporter features.

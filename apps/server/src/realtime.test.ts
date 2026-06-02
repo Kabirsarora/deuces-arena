@@ -158,6 +158,22 @@ describe("realtime rooms", () => {
     expect(equipAck.error).toContain("database");
   });
 
+  it("rejects cosmetic purchase requests when persistence is unavailable", async () => {
+    const socket = await connectTestSocket();
+    const purchaseAck = await purchaseCosmetic(socket, {
+      guestId: "guest-profile-cosmetics",
+      cosmeticId: "starter-midnight-felt-table"
+    });
+
+    expect(purchaseAck.ok).toBe(false);
+
+    if (purchaseAck.ok) {
+      return;
+    }
+
+    expect(purchaseAck.error).toContain("database");
+  });
+
   it("allows configured admin profiles to equip any cosmetic without progression", async () => {
     const socket = await connectTestSocket();
     const catalog = await listCosmetics(socket);
@@ -959,6 +975,17 @@ function equipCosmetic(
 ): Promise<ServerAck<PublicGuestProfile>> {
   return new Promise((resolve) => {
     socket.emit("cosmetics:equip", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function purchaseCosmetic(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly cosmeticId: string }
+): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("cosmetics:purchase", payload, (ack) => {
       resolve(ack);
     });
   });

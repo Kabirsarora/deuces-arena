@@ -57,6 +57,7 @@ import {
   persistCoachEvaluation,
   persistFeedbackReport,
   persistMoveEvent,
+  purchasePersistedCosmetic,
   updatePersistedGuestProfile,
   type PersistedMatch
 } from "./persistence.js";
@@ -539,6 +540,32 @@ io.on("connection", (socket) => {
     }
 
     callback(fail(getEquipCosmeticError(result.reason)));
+  });
+
+  socket.on("cosmetics:purchase", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const cosmeticId = payload.cosmeticId.trim();
+
+    if (guestId === null || cosmeticId === "") {
+      callback(fail("Cosmetic not found."));
+      return;
+    }
+
+    if (isAdminGuestId(guestId)) {
+      callback(ok(await publicGuestProfile(guestId)));
+      return;
+    }
+
+    const result = await purchasePersistedCosmetic(guestId, cosmeticId);
+
+    if (result.ok) {
+      guestEquippedCosmetics.set(guestId, result.profile.equippedCosmetics);
+      callback(ok(result.profile));
+      emitRoomStatesForGuest(guestId);
+      return;
+    }
+
+    callback(fail(getPurchaseCosmeticError(result.reason)));
   });
 
   socket.on("profile:history", async (payload, callback) => {
@@ -1579,6 +1606,38 @@ function getEquipCosmeticError(
   }
 
   return "You have not unlocked this cosmetic.";
+}
+
+function getPurchaseCosmeticError(
+  reason:
+    | "database-unavailable"
+    | "profile-not-found"
+    | "cosmetic-not-found"
+    | "cosmetic-not-purchasable"
+    | "cosmetic-already-owned"
+    | "insufficient-coins"
+): string {
+  if (reason === "database-unavailable") {
+    return "Cosmetic purchases require a connected database.";
+  }
+
+  if (reason === "profile-not-found") {
+    return "Guest profile not found.";
+  }
+
+  if (reason === "cosmetic-not-purchasable") {
+    return "This cosmetic is not available for Arena Coins.";
+  }
+
+  if (reason === "cosmetic-already-owned") {
+    return "You already own this cosmetic.";
+  }
+
+  if (reason === "insufficient-coins") {
+    return "Not enough Arena Coins.";
+  }
+
+  return "Cosmetic not found.";
 }
 
 async function publicMatchHistory(

@@ -46,6 +46,22 @@ export type EquipCosmeticResult =
       readonly reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned";
     };
 
+export type PurchaseCosmeticResult =
+  | {
+      readonly ok: true;
+      readonly profile: PublicGuestProfile;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "database-unavailable"
+        | "profile-not-found"
+        | "cosmetic-not-found"
+        | "cosmetic-not-purchasable"
+        | "cosmetic-already-owned"
+        | "insufficient-coins";
+    };
+
 export type UpdateProfileResult =
   | {
       readonly ok: true;
@@ -502,6 +518,123 @@ export async function equipPersistedCosmetic(
     };
   } catch (error) {
     console.error("Unable to equip cosmetic.", error);
+    return {
+      ok: false,
+      reason: "profile-not-found"
+    };
+  }
+}
+
+export async function purchasePersistedCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<PurchaseCosmeticResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    const result = await db.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: {
+          guestId
+        },
+        select: {
+          id: true,
+          arenaCoins: true
+        }
+      });
+
+      if (user === null) {
+        return { ok: false as const, reason: "profile-not-found" as const };
+      }
+
+      const cosmetic = await tx.cosmetic.findFirst({
+        where: {
+          id: cosmeticId,
+          isActive: true
+        },
+        select: {
+          id: true,
+          coinPrice: true,
+          isSupporter: true
+        }
+      });
+
+      if (cosmetic === null) {
+        return { ok: false as const, reason: "cosmetic-not-found" as const };
+      }
+
+      if (cosmetic.isSupporter || cosmetic.coinPrice === null) {
+        return { ok: false as const, reason: "cosmetic-not-purchasable" as const };
+      }
+
+      const existingUnlock = await tx.userCosmeticUnlock.findUnique({
+        where: {
+          userId_cosmeticId: {
+            userId: user.id,
+            cosmeticId
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (existingUnlock !== null) {
+        return { ok: false as const, reason: "cosmetic-already-owned" as const };
+      }
+
+      if (user.arenaCoins < cosmetic.coinPrice) {
+        return { ok: false as const, reason: "insufficient-coins" as const };
+      }
+
+      await tx.user.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          arenaCoins: {
+            decrement: cosmetic.coinPrice
+          }
+        }
+      });
+
+      await tx.userCosmeticUnlock.create({
+        data: {
+          userId: user.id,
+          cosmeticId,
+          source: "EARNED"
+        }
+      });
+
+      return { ok: true as const };
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    const profile = await getPersistedGuestProfile(guestId);
+
+    if (profile === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    return {
+      ok: true,
+      profile
+    };
+  } catch (error) {
+    console.error("Unable to purchase cosmetic.", error);
     return {
       ok: false,
       reason: "profile-not-found"
