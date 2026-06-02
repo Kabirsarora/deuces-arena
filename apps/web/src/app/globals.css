@@ -134,6 +134,40 @@ textarea {
     0 16px 34px rgba(0, 0, 0, 0.26);
 }
 
+.profile-border-aqua {
+  border-color: rgba(103, 232, 249, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(103, 232, 249, 0.18),
+    0 16px 34px rgba(0, 0, 0, 0.26),
+    0 0 34px rgba(34, 211, 238, 0.16);
+}
+
+.profile-border-founder-gold {
+  border-color: rgba(242, 193, 78, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(242, 193, 78, 0.24),
+    0 16px 34px rgba(0, 0, 0, 0.26),
+    0 0 42px rgba(242, 193, 78, 0.18);
+}
+
+.avatar-cosmetic-aqua {
+  border-color: rgba(103, 232, 249, 0.55);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(145deg, rgba(34, 211, 238, 0.32), rgba(13, 148, 136, 0.16));
+  color: rgb(224, 252, 255);
+}
+
+.avatar-cosmetic-crown {
+  border-color: rgba(242, 193, 78, 0.68);
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.3), transparent 28%),
+    linear-gradient(145deg, rgba(242, 193, 78, 0.36), rgba(120, 53, 15, 0.18));
+  color: rgb(254, 243, 199);
+}
+
 .trick-island {
   border-radius: 999px;
   background:

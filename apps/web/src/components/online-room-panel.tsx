@@ -2769,7 +2769,7 @@ function CosmeticsSummary({
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
   readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
-  const visibleCosmetics = cosmetics.slice(0, 6);
+  const visibleCosmetics = cosmetics;
   const unlocksByCosmeticId = new Map(
     profile?.unlocks.map((unlock) => [unlock.cosmetic.id, unlock]) ?? []
   );
@@ -2947,8 +2947,26 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
 
   if (cosmetic.kind === "PROFILE_BORDER") {
     return (
-      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[var(--gold)] bg-black/30 shadow-lg">
+      <div
+        className={cn(
+          "grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 bg-black/30 shadow-lg",
+          getProfileBorderClass(cosmetic)
+        )}
+      >
         <Sparkles className="size-4 text-[var(--gold)]" />
+      </div>
+    );
+  }
+
+  if (cosmetic.kind === "AVATAR") {
+    return (
+      <div
+        className={cn(
+          "grid h-11 w-11 shrink-0 place-items-center rounded-full border text-sm font-black shadow-lg",
+          getAvatarCosmeticClass(cosmetic)
+        )}
+      >
+        {getAvatarCosmeticSymbol(cosmetic)}
       </div>
     );
   }
@@ -3557,6 +3575,7 @@ function OnlineSeat({
   readonly onOpenStats: () => void;
 }) {
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
+  const avatarCosmetic = getEquippedCosmetic(player, "AVATAR");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = getSeatPositionClass(position, seatCount);
 
@@ -3568,19 +3587,23 @@ function OnlineSeat({
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
           : profileBorder !== null
-            ? "border-[var(--gold)]/55"
+            ? getProfileBorderClass(profileBorder)
             : "border-white/10"
       )}
     >
       <div
         className={cn(
           "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-black",
-          player.connected
-            ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
-            : "border-zinc-500/35 bg-zinc-500/12 text-zinc-300"
+          avatarCosmetic === null
+            ? player.connected
+              ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
+              : "border-zinc-500/35 bg-zinc-500/12 text-zinc-300"
+            : getAvatarCosmeticClass(avatarCosmetic)
         )}
       >
-        {player.name.slice(0, 1).toUpperCase()}
+        {avatarCosmetic === null
+          ? player.name.slice(0, 1).toUpperCase()
+          : getAvatarCosmeticSymbol(avatarCosmetic)}
       </div>
       <div className="min-w-0 flex-1">
         <button
@@ -3716,6 +3739,42 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
   }
 
   return "";
+}
+
+function getProfileBorderClass(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic?.slug === "aqua-profile-border") {
+    return "profile-border-aqua";
+  }
+
+  if (cosmetic?.slug === "founder-gold-border") {
+    return "profile-border-founder-gold";
+  }
+
+  return "border-[var(--gold)]/55";
+}
+
+function getAvatarCosmeticClass(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic?.slug === "aqua-pulse-avatar") {
+    return "avatar-cosmetic-aqua";
+  }
+
+  if (cosmetic?.slug === "crown-chip-avatar") {
+    return "avatar-cosmetic-crown";
+  }
+
+  return "border-emerald-200/35 bg-emerald-400/12 text-emerald-100";
+}
+
+function getAvatarCosmeticSymbol(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic?.slug === "crown-chip-avatar") {
+    return "C";
+  }
+
+  if (cosmetic?.slug === "aqua-pulse-avatar") {
+    return "A";
+  }
+
+  return "P";
 }
 
 function formatTurnTimer(room: PublicRoomState | null, now: number): string | null {

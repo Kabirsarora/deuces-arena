@@ -55,6 +55,7 @@
 - Done: add Arena Coins as a non-real-money soft-currency foundation for future cosmetics.
 - Done: add server-validated Arena Coin cosmetic unlocks for priced non-supporter cosmetics.
 - Done: make equipped card backs and table themes visibly alter the table.
+- Done: add avatar and profile-border cosmetics to player seats.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add profile borders and avatar cosmetics to player seats/profile surfaces.
+- Next: add cosmetic inventory filters and clearer unlock/equip flows.
 - Later: add Stripe support for optional supporter features.

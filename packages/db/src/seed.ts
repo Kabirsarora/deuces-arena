@@ -56,6 +56,33 @@ const starterCosmetics = [
     coinPrice: 650
   },
   {
+    slug: "aqua-pulse-avatar",
+    kind: "AVATAR" as const,
+    name: "Aqua Pulse",
+    description: "A clean glowing avatar mark for table seats.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 300
+  },
+  {
+    slug: "crown-chip-avatar",
+    kind: "AVATAR" as const,
+    name: "Crown Chip",
+    description: "A gold chip avatar mark for players who like a little pressure.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 700
+  },
+  {
+    slug: "aqua-profile-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Aqua Rail",
+    description: "A cool cyan seat border for online tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 550
+  },
+  {
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER" as const,
     name: "Founder Gold",

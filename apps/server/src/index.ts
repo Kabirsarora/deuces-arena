@@ -208,6 +208,39 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "starter-aqua-pulse-avatar",
+    slug: "aqua-pulse-avatar",
+    kind: "AVATAR",
+    name: "Aqua Pulse",
+    description: "A clean glowing avatar mark for table seats.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 300,
+    previewUrl: null
+  },
+  {
+    id: "starter-crown-chip-avatar",
+    slug: "crown-chip-avatar",
+    kind: "AVATAR",
+    name: "Crown Chip",
+    description: "A gold chip avatar mark for players who like a little pressure.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 700,
+    previewUrl: null
+  },
+  {
+    id: "starter-aqua-profile-border",
+    slug: "aqua-profile-border",
+    kind: "PROFILE_BORDER",
+    name: "Aqua Rail",
+    description: "A cool cyan seat border for online tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 550,
+    previewUrl: null
+  },
+  {
     id: "starter-founder-gold-border",
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER",
