@@ -1455,6 +1455,7 @@ function OnlineLobbyHub({
               playerName={playerName}
               authUser={authUser}
               profile={profile}
+              matchHistory={matchHistory}
               profileDisplayName={profileDisplayName}
               profileAvatarKey={profileAvatarKey}
               onPlayerNameChange={onPlayerNameChange}
@@ -1893,6 +1894,7 @@ function MinimalProfileCard({
   playerName,
   authUser,
   profile,
+  matchHistory,
   profileDisplayName,
   profileAvatarKey,
   onPlayerNameChange,
@@ -1903,6 +1905,7 @@ function MinimalProfileCard({
   readonly playerName: string;
   readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
+  readonly matchHistory: readonly PublicMatchHistoryItem[];
   readonly profileDisplayName: string;
   readonly profileAvatarKey: ProfileAvatarKey;
   readonly onPlayerNameChange: (value: string) => void;
@@ -1989,7 +1992,74 @@ function MinimalProfileCard({
           </Button>
         </form>
       </details>
+      <ProfileDetails profile={profile} matchHistory={matchHistory} />
     </section>
+  );
+}
+
+function ProfileDetails({
+  profile,
+  matchHistory
+}: {
+  readonly profile: PublicGuestProfile | null;
+  readonly matchHistory: readonly PublicMatchHistoryItem[];
+}) {
+  const gamesPlayed = profile?.gamesPlayed ?? 0;
+  const wins = profile?.wins ?? 0;
+  const winRate = gamesPlayed === 0 ? null : Math.round((wins / gamesPlayed) * 100);
+  const recentMatch = matchHistory[0] ?? null;
+  const unlockedCount = profile?.unlocks.length ?? 0;
+  const equippedCount = profile?.equippedCosmetics.length ?? 0;
+
+  return (
+    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-black text-zinc-300">
+        Profile details
+        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-[10px] font-black uppercase text-zinc-400">
+          {gamesPlayed} games
+        </span>
+      </summary>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ProfileMetric label="Wins" value={wins} />
+        <ProfileMetric label="Win rate" value={winRate === null ? "-" : `${winRate}%`} />
+        <ProfileMetric
+          label="Avg place"
+          value={
+            profile?.averagePlacement === null || profile === null
+              ? "-"
+              : profile.averagePlacement.toFixed(2)
+          }
+        />
+        <ProfileMetric label="Unlocked" value={unlockedCount} />
+      </div>
+
+      <div className="mt-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-black">Loadout</p>
+          <span className="rounded-full bg-black/24 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
+            {equippedCount} equipped
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-zinc-400">
+          Card backs, tables, avatars, and borders are cosmetic only.
+        </p>
+      </div>
+
+      <div className="mt-2 rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-black">Latest match</p>
+          <span className="text-[11px] font-bold text-zinc-400">
+            {recentMatch?.roomCode ?? "none yet"}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-zinc-400">
+          {recentMatch === null
+            ? "Completed online games will summarize here."
+            : `${recentMatch.placement === null ? "Unplaced" : ordinal(recentMatch.placement)} · ${formatRatingDelta(recentMatch.ratingDelta)} · ${recentMatch.movesPlayed ?? 0} moves`}
+        </p>
+      </div>
+    </details>
   );
 }
 

@@ -57,6 +57,7 @@
 - Done: make equipped card backs and table themes visibly alter the table.
 - Done: add avatar and profile-border cosmetics to player seats.
 - Done: add cosmetic inventory filters and clearer owned/equipped counts.
+- Done: add a compact profile details panel with stats, loadout, and latest match context.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add richer profile pages with cosmetic inventory and match summaries.
+- Next: add a dedicated profile page with shareable match summaries.
 - Later: add Stripe support for optional supporter features.
