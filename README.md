@@ -101,6 +101,7 @@ Current cosmetic progression is intentionally simple:
 - Win 1 persisted match: unlock `midnight-felt-table`.
 - Supporter cosmetics are modeled separately and do not affect gameplay.
 - Arena Coins are earned from completed matches and are not purchasable or bettable yet.
+- Cosmetic coin prices are modeled and displayed, but coin purchases/unlocks are intentionally deferred.
 
 ## ML Data Export
 

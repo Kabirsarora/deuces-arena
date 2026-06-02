@@ -7,7 +7,8 @@ const starterCosmetics = [
     name: "Classic Red",
     description: "A clean starter card back for every table.",
     rarity: "common",
-    isSupporter: false
+    isSupporter: false,
+    coinPrice: 0
   },
   {
     slug: "midnight-felt-table",
@@ -15,7 +16,8 @@ const starterCosmetics = [
     name: "Midnight Felt",
     description: "The default dark table theme.",
     rarity: "common",
-    isSupporter: false
+    isSupporter: false,
+    coinPrice: 500
   },
   {
     slug: "founder-gold-border",
@@ -23,7 +25,8 @@ const starterCosmetics = [
     name: "Founder Gold",
     description: "A future supporter profile border with no gameplay advantage.",
     rarity: "supporter",
-    isSupporter: true
+    isSupporter: true,
+    coinPrice: null
   }
 ];
 

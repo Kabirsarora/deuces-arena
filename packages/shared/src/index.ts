@@ -46,6 +46,7 @@ export type PublicCosmetic = {
   readonly description: string | null;
   readonly rarity: string;
   readonly isSupporter: boolean;
+  readonly coinPrice: number | null;
   readonly previewUrl: string | null;
 };
 

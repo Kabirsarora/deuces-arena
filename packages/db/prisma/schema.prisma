@@ -186,6 +186,7 @@ model Cosmetic {
   description String?
   rarity      String         @default("common")
   isSupporter Boolean        @default(false)
+  coinPrice   Int?
   isActive    Boolean        @default(true)
   previewUrl  String?
   metadata    Json?

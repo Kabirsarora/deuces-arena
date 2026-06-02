@@ -194,6 +194,7 @@ export async function getPersistedGuestProfile(
                 description: true,
                 rarity: true,
                 isSupporter: true,
+                coinPrice: true,
                 previewUrl: true
               }
             }
@@ -215,6 +216,7 @@ export async function getPersistedGuestProfile(
                 description: true,
                 rarity: true,
                 isSupporter: true,
+                coinPrice: true,
                 previewUrl: true
               }
             }
@@ -401,6 +403,7 @@ export async function getPersistedCosmetics(): Promise<readonly PublicCosmetic[]
         description: true,
         rarity: true,
         isSupporter: true,
+        coinPrice: true,
         previewUrl: true
       }
     });

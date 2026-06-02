@@ -118,6 +118,9 @@ describe("realtime rooms", () => {
 
     expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("classic-red-card-back");
     expect(socketCatalog.data.some((cosmetic) => cosmetic.isSupporter)).toBe(true);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "midnight-felt-table")?.coinPrice
+    ).toBe(500);
 
     const restResponse = await fetch(`${serverUrl}/cosmetics`);
 

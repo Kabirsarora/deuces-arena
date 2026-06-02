@@ -2753,6 +2753,7 @@ function CosmeticsSummary({
   const equippedIds = new Set(
     profile?.equippedCosmetics.map((equippedCosmetic) => equippedCosmetic.cosmetic.id) ?? []
   );
+  const coinBalance = profile?.arenaCoins ?? 0;
 
   return (
     <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -2762,7 +2763,7 @@ function CosmeticsSummary({
           Cosmetics
         </span>
         <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
-          {cosmetics.length}
+          {coinBalance} coins
         </span>
       </summary>
 
@@ -2833,9 +2834,21 @@ function CosmeticAction({
         cosmetic.isSupporter ? "bg-[var(--gold)]/18 text-[var(--gold)]" : "bg-white/8 text-zinc-300"
       )}
     >
-      {cosmetic.isSupporter ? "Supporter" : cosmetic.rarity}
+      {getLockedCosmeticLabel(cosmetic)}
     </span>
   );
+}
+
+function getLockedCosmeticLabel(cosmetic: PublicCosmetic): string {
+  if (cosmetic.isSupporter) {
+    return "Supporter";
+  }
+
+  if (cosmetic.coinPrice !== null) {
+    return cosmetic.coinPrice === 0 ? "Earned" : `${cosmetic.coinPrice} coins`;
+  }
+
+  return cosmetic.rarity;
 }
 
 function getCosmeticOwnershipLabel(
@@ -2848,6 +2861,10 @@ function getCosmeticOwnershipLabel(
 
   if (cosmetic.isSupporter) {
     return "supporter";
+  }
+
+  if (cosmetic.coinPrice !== null && cosmetic.coinPrice > 0) {
+    return `${cosmetic.coinPrice} coins`;
   }
 
   return cosmetic.rarity;

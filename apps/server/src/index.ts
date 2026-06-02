@@ -148,6 +148,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A clean starter card back for every table.",
     rarity: "common",
     isSupporter: false,
+    coinPrice: 0,
     previewUrl: null
   },
   {
@@ -158,6 +159,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "The default dark table theme.",
     rarity: "common",
     isSupporter: false,
+    coinPrice: 500,
     previewUrl: null
   },
   {
@@ -168,6 +170,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A future supporter profile border with no gameplay advantage.",
     rarity: "supporter",
     isSupporter: true,
+    coinPrice: null,
     previewUrl: null
   }
 ];
