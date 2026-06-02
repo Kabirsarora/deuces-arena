@@ -4,6 +4,7 @@ export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
 export type PublicBotDifficulty = "easy" | "normal" | "hard";
+export type PublicBotPace = "quick" | "normal" | "relaxed";
 export type CosmeticKind =
   | "CARD_BACK"
   | "TABLE_THEME"
@@ -166,6 +167,7 @@ export type PublicRoomState = {
   readonly status: RoomStatus;
   readonly rules: PublicRoomRules;
   readonly botDifficulty: PublicBotDifficulty;
+  readonly botPace: PublicBotPace;
   readonly players: readonly PublicRoomPlayer[];
   readonly activePlayerId: string | null;
   readonly currentTrick: CurrentTrick | null;
@@ -269,6 +271,7 @@ export type ClientToServerEvents = {
       };
       readonly rules?: PublicRoomRules;
       readonly botDifficulty?: PublicBotDifficulty;
+      readonly botPace?: PublicBotPace;
     },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;

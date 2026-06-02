@@ -21,6 +21,7 @@ import type {
   InterServerEvents,
   MatchMode,
   PublicBotDifficulty,
+  PublicBotPace,
   PublicChatMessage,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
@@ -92,6 +93,7 @@ type Room = {
   timer: RoomTimerSettings;
   rules: RoomRuleSettings;
   botDifficulty: PublicBotDifficulty;
+  botPace: PublicBotPace;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
 };
@@ -122,8 +124,13 @@ const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
-const MIN_BOT_MOVE_DELAY_MS = 3_800;
-const MAX_BOT_MOVE_DELAY_MS = 5_400;
+const BOT_MOVE_DELAY_RANGES: Readonly<
+  Record<PublicBotPace, { readonly minMs: number; readonly maxMs: number }>
+> = {
+  quick: { minMs: 2_200, maxMs: 3_400 },
+  normal: { minMs: 3_800, maxMs: 5_400 },
+  relaxed: { minMs: 5_800, maxMs: 8_000 }
+};
 const RANKED_REQUIRED_PLAYERS = 4;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
@@ -351,6 +358,7 @@ io.on("connection", (socket) => {
     room.timer = normalizeTimerSettings(payload.timer);
     room.rules = rules;
     room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
+    room.botPace = normalizeBotPace(payload.botPace);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
       shuffleDeck(room.rules.deckType, room.rules.playerCount, room.rules.cardsPerPlayer),
@@ -785,6 +793,7 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
       cardsPerPlayer: DEFAULT_CARDS_PER_PLAYER
     },
     botDifficulty: "normal",
+    botPace: "relaxed",
     turnDeadlineAt: null,
     timerTimeout: null
   };
@@ -930,6 +939,10 @@ function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): Pu
   return difficulty === "easy" || difficulty === "hard" ? difficulty : "normal";
 }
 
+function normalizeBotPace(pace: PublicBotPace | undefined): PublicBotPace {
+  return pace === "quick" || pace === "normal" ? pace : "relaxed";
+}
+
 function resetTurnTimer(room: Room): void {
   clearTurnTimer(room);
 
@@ -976,7 +989,7 @@ function scheduleAutomatedTurn(room: Room): void {
     clearTurnTimer(room);
     room.timerTimeout = setTimeout(
       () => applyAutomatedMove(room, activePlayer.id, botStrategyForDifficulty(room.botDifficulty)),
-      botMoveDelayMs()
+      botMoveDelayMs(room.botPace)
     );
     room.timerTimeout.unref();
     return;
@@ -994,11 +1007,10 @@ function scheduleAutomatedTurn(room: Room): void {
   room.timerTimeout.unref();
 }
 
-function botMoveDelayMs(): number {
-  return (
-    MIN_BOT_MOVE_DELAY_MS +
-    Math.floor(Math.random() * (MAX_BOT_MOVE_DELAY_MS - MIN_BOT_MOVE_DELAY_MS + 1))
-  );
+function botMoveDelayMs(pace: PublicBotPace): number {
+  const range = BOT_MOVE_DELAY_RANGES[pace];
+
+  return range.minMs + Math.floor(Math.random() * (range.maxMs - range.minMs + 1));
 }
 
 function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy): void {
@@ -1105,6 +1117,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     status: room.game?.status ?? "waiting",
     rules: room.rules,
     botDifficulty: room.botDifficulty,
+    botPace: room.botPace,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     activePlayerId: room.game?.activePlayerId ?? null,
     currentTrick: room.game?.currentTrick ?? null,

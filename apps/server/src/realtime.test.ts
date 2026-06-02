@@ -529,6 +529,7 @@ describe("realtime rooms", () => {
     const startedRoom = await startRoom(host, {
       roomCode: createdRoom.data.roomCode,
       botCount: 3,
+      botPace: "quick",
       rules: {
         bombEndsTrick: true,
         deckType: "arena-six",
@@ -549,6 +550,7 @@ describe("realtime rooms", () => {
       playerCount: 4,
       cardsPerPlayer: 15
     });
+    expect(startedRoom.data.botPace).toBe("quick");
     expect(startedRoom.data.yourHand).toHaveLength(15);
   });
 
@@ -870,6 +872,7 @@ function startRoom(
       readonly secondsPerTurn: number;
     };
     readonly rules?: PublicRoomState["rules"];
+    readonly botPace?: PublicRoomState["botPace"];
   }
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {

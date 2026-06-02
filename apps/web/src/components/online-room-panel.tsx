@@ -17,6 +17,7 @@ import type {
   ClientToServerEvents,
   FeedbackKind,
   PublicBotDifficulty,
+  PublicBotPace,
   PublicChatMessage,
   PublicCosmetic,
   PublicFeedbackReceipt,
@@ -111,6 +112,14 @@ const BOT_DIFFICULTY_OPTIONS: readonly {
   { value: "normal", label: "Normal" },
   { value: "hard", label: "Hard" }
 ];
+const BOT_PACE_OPTIONS: readonly {
+  readonly value: PublicBotPace;
+  readonly label: string;
+}[] = [
+  { value: "relaxed", label: "Relaxed" },
+  { value: "normal", label: "Normal" },
+  { value: "quick", label: "Quick" }
+];
 const DEUCES_RULES: readonly string[] = [
   "3 of diamonds starts and must be included in the first play.",
   "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
@@ -157,6 +166,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [manualCardOrderIds, setManualCardOrderIds] = useState<readonly string[]>([]);
   const [botSeats, setBotSeats] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState<PublicBotDifficulty>("normal");
+  const [botPace, setBotPace] = useState<PublicBotPace>("relaxed");
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [playerCount, setPlayerCount] = useState(4);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(DEFAULT_CARDS_PER_PLAYER);
@@ -481,7 +491,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
               playerCount: selectedPlayerCount,
               cardsPerPlayer: selectedCardsPerPlayer
             },
-            botDifficulty
+            botDifficulty,
+            botPace
           },
           handleRoomAck("Started a bot table.")
         );
@@ -580,7 +591,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           playerCount: selectedPlayerCount,
           cardsPerPlayer: selectedCardsPerPlayer
         },
-        botDifficulty
+        botDifficulty,
+        botPace
       },
       handleRoomAck("Game started.")
     );
@@ -855,6 +867,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
         botDifficulty={botDifficulty}
+        botPace={botPace}
         message={message}
         onPlayerNameChange={setPlayerName}
         onProfileDisplayNameChange={setProfileDisplayName}
@@ -876,6 +889,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
         onBotDifficultyChange={setBotDifficulty}
+        onBotPaceChange={setBotPace}
         onEquipCosmetic={equipCosmetic}
         onSubmitFeedback={submitFeedback}
       />
@@ -897,6 +911,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
         botDifficulty={botDifficulty}
+        botPace={botPace}
         roomCanStart={roomCanStart}
         yourReady={yourPlayer?.ready ?? false}
         onCopyRoomCode={() => {
@@ -918,6 +933,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
         onBotDifficultyChange={setBotDifficulty}
+        onBotPaceChange={setBotPace}
       />
     );
   }
@@ -1173,6 +1189,7 @@ function OnlineLobbyHub({
   timerSeconds,
   bombEndsTrick,
   botDifficulty,
+  botPace,
   message,
   onPlayerNameChange,
   onProfileDisplayNameChange,
@@ -1194,6 +1211,7 @@ function OnlineLobbyHub({
   onTimerSecondsChange,
   onBombEndsTrickChange,
   onBotDifficultyChange,
+  onBotPaceChange,
   onEquipCosmetic,
   onSubmitFeedback
 }: {
@@ -1219,6 +1237,7 @@ function OnlineLobbyHub({
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
   readonly botDifficulty: PublicBotDifficulty;
+  readonly botPace: PublicBotPace;
   readonly message: string;
   readonly onPlayerNameChange: (value: string) => void;
   readonly onProfileDisplayNameChange: (value: string) => void;
@@ -1240,6 +1259,7 @@ function OnlineLobbyHub({
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
+  readonly onBotPaceChange: (pace: PublicBotPace) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
   readonly onSubmitFeedback: (input: {
     readonly kind: FeedbackKind;
@@ -1346,6 +1366,7 @@ function OnlineLobbyHub({
                       onSecondsChange={onTimerSecondsChange}
                     />
                     <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
+                    <CompactBotPace value={botPace} onChange={onBotPaceChange} />
                     <CompactRuleToggle
                       label="Bomb ends trick"
                       enabled={bombEndsTrick}
@@ -1608,6 +1629,40 @@ function CompactBotDifficulty({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CompactBotPace({
+  value,
+  onChange
+}: {
+  readonly value: PublicBotPace;
+  readonly onChange: (pace: PublicBotPace) => void;
+}) {
+  return (
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+      <p className="mb-2">Bot pace</p>
+      <div className="grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
+        {BOT_PACE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            className={cn(
+              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              value === option.value
+                ? "bg-[var(--gold)] text-black"
+                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+            )}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs font-semibold text-zinc-400">
+        Relaxed adds a longer pause before each bot move.
+      </p>
     </div>
   );
 }
@@ -2030,6 +2085,7 @@ function OnlineWaitingRoom({
   timerSeconds,
   bombEndsTrick,
   botDifficulty,
+  botPace,
   roomCanStart,
   yourReady,
   onCopyRoomCode,
@@ -2044,7 +2100,8 @@ function OnlineWaitingRoom({
   onTimerEnabledChange,
   onTimerSecondsChange,
   onBombEndsTrickChange,
-  onBotDifficultyChange
+  onBotDifficultyChange,
+  onBotPaceChange
 }: {
   readonly room: PublicRoomState;
   readonly connected: boolean;
@@ -2058,6 +2115,7 @@ function OnlineWaitingRoom({
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
   readonly botDifficulty: PublicBotDifficulty;
+  readonly botPace: PublicBotPace;
   readonly roomCanStart: boolean;
   readonly yourReady: boolean;
   readonly onCopyRoomCode: () => void;
@@ -2073,6 +2131,7 @@ function OnlineWaitingRoom({
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
+  readonly onBotPaceChange: (pace: PublicBotPace) => void;
 }) {
   const seatedHumans = room.players.filter((player) => player.kind === "human").length;
   const seatsNeeded = Math.max(0, playerCount - room.players.length - botSeats);
@@ -2180,6 +2239,7 @@ function OnlineWaitingRoom({
             onSecondsChange={onTimerSecondsChange}
           />
           <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
+          <CompactBotPace value={botPace} onChange={onBotPaceChange} />
           <CompactRuleToggle
             label="Bomb ends trick"
             enabled={bombEndsTrick}
