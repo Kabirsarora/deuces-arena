@@ -183,6 +183,7 @@ describe("realtime rooms", () => {
     expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
       supporterCosmetic.id
     );
+    expect(profile.data.isAdmin).toBe(true);
 
     const equipAck = await equipCosmetic(socket, {
       guestId: "guest-admin-cosmetics",
@@ -230,6 +231,7 @@ describe("realtime rooms", () => {
     expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
       supporterCosmetic.id
     );
+    expect(profile.data.isAdmin).toBe(true);
   });
 
   it("creates rooms and exposes them through lobby activity", async () => {

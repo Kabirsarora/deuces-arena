@@ -1473,6 +1473,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     wins: profile.wins,
     averagePlacement:
       profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed,
+    isAdmin: false,
     unlocks: [],
     equippedCosmetics: []
   };
@@ -1540,6 +1541,7 @@ async function withAdminCosmeticAccess(profile: PublicGuestProfile): Promise<Pub
 
   return {
     ...profile,
+    isAdmin: true,
     unlocks: (await publicCosmetics()).map((cosmetic) => ({
       cosmetic,
       source: "ADMIN_GRANT",

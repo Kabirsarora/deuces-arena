@@ -27,6 +27,7 @@ export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
   readonly displayName: string | null;
   readonly avatarKey: ProfileAvatarKey;
+  readonly isAdmin: boolean;
   readonly unlocks: readonly PublicCosmeticUnlock[];
   readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };

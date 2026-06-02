@@ -383,6 +383,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       displayName: profile?.displayName ?? profileDisplayName,
       avatarKey: profile?.avatarKey ?? profileAvatarKey,
       ...player.stats,
+      isAdmin: profile?.isAdmin ?? false,
       unlocks: profile?.unlocks ?? [],
       equippedCosmetics: profile?.equippedCosmetics ?? []
     });
@@ -1892,7 +1893,14 @@ function MinimalProfileCard({
       <div className="flex items-center gap-3">
         <ProfileAvatar avatarKey={profile?.avatarKey ?? profileAvatarKey} />
         <div className="min-w-0">
-          <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
+            {profile?.isAdmin === true ? (
+              <span className="shrink-0 rounded-full bg-[var(--gold)]/18 px-2 py-0.5 text-[10px] font-black uppercase text-[var(--gold)]">
+                Creator
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm text-zinc-400">{profile?.rating ?? 1000} rating</p>
         </div>
       </div>
@@ -2736,7 +2744,10 @@ function CosmeticsSummary({
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
 }) {
   const visibleCosmetics = cosmetics.slice(0, 4);
-  const unlockedIds = new Set(profile?.unlocks.map((unlock) => unlock.cosmetic.id) ?? []);
+  const unlocksByCosmeticId = new Map(
+    profile?.unlocks.map((unlock) => [unlock.cosmetic.id, unlock]) ?? []
+  );
+  const unlockedIds = new Set(unlocksByCosmeticId.keys());
   const equippedIds = new Set(
     profile?.equippedCosmetics.map((equippedCosmetic) => equippedCosmetic.cosmetic.id) ?? []
   );
@@ -2768,7 +2779,8 @@ function CosmeticsSummary({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-bold">{cosmetic.name}</p>
                 <p className="text-[11px] text-zinc-400">
-                  {formatCosmeticKind(cosmetic.kind)} · {getCosmeticOwnershipLabel(cosmetic)}
+                  {formatCosmeticKind(cosmetic.kind)} ·{" "}
+                  {getCosmeticOwnershipLabel(cosmetic, unlocksByCosmeticId.get(cosmetic.id))}
                 </p>
               </div>
               <CosmeticAction
@@ -2824,7 +2836,14 @@ function CosmeticAction({
   );
 }
 
-function getCosmeticOwnershipLabel(cosmetic: PublicCosmetic): string {
+function getCosmeticOwnershipLabel(
+  cosmetic: PublicCosmetic,
+  unlock: PublicGuestProfile["unlocks"][number] | undefined
+): string {
+  if (unlock?.source === "ADMIN_GRANT") {
+    return "creator access";
+  }
+
   if (cosmetic.isSupporter) {
     return "supporter";
   }

@@ -227,6 +227,7 @@ export async function getPersistedGuestProfile(
       gamesPlayed: user.gamesPlayed,
       wins: user.wins,
       averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed,
+      isAdmin: false,
       unlocks: user.cosmeticUnlocks.map((unlock) => ({
         cosmetic: unlock.cosmetic,
         source: unlock.source,
