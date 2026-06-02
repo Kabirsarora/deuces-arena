@@ -56,6 +56,7 @@
 - Done: add server-validated Arena Coin cosmetic unlocks for priced non-supporter cosmetics.
 - Done: make equipped card backs and table themes visibly alter the table.
 - Done: add avatar and profile-border cosmetics to player seats.
+- Done: add cosmetic inventory filters and clearer owned/equipped counts.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add cosmetic inventory filters and clearer unlock/equip flows.
+- Next: add richer profile pages with cosmetic inventory and match summaries.
 - Later: add Stripe support for optional supporter features.

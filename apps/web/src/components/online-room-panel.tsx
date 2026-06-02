@@ -15,6 +15,7 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  CosmeticKind,
   FeedbackKind,
   PublicBotDifficulty,
   PublicBotPace,
@@ -78,6 +79,7 @@ import { cn } from "@/lib/utils";
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
+type CosmeticFilterKind = "ALL" | CosmeticKind;
 type AuthUser = {
   readonly profileId: string;
   readonly name: string | null;
@@ -2769,7 +2771,10 @@ function CosmeticsSummary({
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
   readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
-  const visibleCosmetics = cosmetics;
+  const [activeFilter, setActiveFilter] = useState<CosmeticFilterKind>("ALL");
+  const visibleCosmetics = cosmetics.filter(
+    (cosmetic) => activeFilter === "ALL" || cosmetic.kind === activeFilter
+  );
   const unlocksByCosmeticId = new Map(
     profile?.unlocks.map((unlock) => [unlock.cosmetic.id, unlock]) ?? []
   );
@@ -2778,6 +2783,8 @@ function CosmeticsSummary({
     profile?.equippedCosmetics.map((equippedCosmetic) => equippedCosmetic.cosmetic.id) ?? []
   );
   const coinBalance = profile?.arenaCoins ?? 0;
+  const equippedCount = equippedIds.size;
+  const ownedCount = unlockedIds.size;
 
   return (
     <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
@@ -2791,10 +2798,37 @@ function CosmeticsSummary({
         </span>
       </summary>
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3 grid gap-3">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400">
+          <span>
+            {ownedCount}/{cosmetics.length} owned
+          </span>
+          <span>{equippedCount} equipped</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {COSMETIC_FILTERS.map((filter) => (
+            <button
+              key={filter.kind}
+              className={cn(
+                "rounded-full border px-2 py-1.5 text-[10px] font-black uppercase transition",
+                activeFilter === filter.kind
+                  ? "border-[var(--gold)] bg-[var(--gold)] text-black"
+                  : "border-white/10 bg-white/7 text-zinc-300 hover:border-white/20 hover:bg-white/10"
+              )}
+              type="button"
+              onClick={() => setActiveFilter(filter.kind)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
         {visibleCosmetics.length === 0 ? (
           <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
-            Cosmetic catalog loads from the realtime server.
+            {cosmetics.length === 0
+              ? "Cosmetic catalog loads from the realtime server."
+              : "No cosmetics in this category yet."}
           </p>
         ) : (
           visibleCosmetics.map((cosmetic) => (
@@ -2825,6 +2859,17 @@ function CosmeticsSummary({
     </details>
   );
 }
+
+const COSMETIC_FILTERS: readonly {
+  readonly kind: CosmeticFilterKind;
+  readonly label: string;
+}[] = [
+  { kind: "ALL", label: "All" },
+  { kind: "CARD_BACK", label: "Cards" },
+  { kind: "TABLE_THEME", label: "Tables" },
+  { kind: "AVATAR", label: "Avatars" },
+  { kind: "PROFILE_BORDER", label: "Borders" }
+];
 
 function CosmeticAction({
   cosmetic,
