@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "prebuild": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
     "predev": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
+    "pretest": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
     "pretypecheck": "npm run build --workspace @deuces-arena/game-engine && npm run build --workspace @deuces-arena/shared && npm run build --workspace @deuces-arena/db",
     "start": "node dist/index.js",
     "test": "vitest run src --passWithNoTests",
