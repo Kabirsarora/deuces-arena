@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
-
 import { auth } from "@/auth";
 import { OnlineRoomPanel } from "@/components/online-room-panel";
+import { createAuthProfileId } from "@/lib/auth-profile";
 
 export async function GameShell() {
   const session = await auth();
@@ -20,8 +19,4 @@ export async function GameShell() {
       }
     />
   );
-}
-
-function createAuthProfileId(identifier: string): string {
-  return `auth-${createHash("sha256").update(identifier.toLowerCase()).digest("hex").slice(0, 32)}`;
 }

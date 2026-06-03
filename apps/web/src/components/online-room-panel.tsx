@@ -61,6 +61,7 @@ import {
   Users,
   X
 } from "lucide-react";
+import Link from "next/link";
 import {
   useEffect,
   useLayoutEffect,
@@ -1946,7 +1947,15 @@ function MinimalProfileCard({
           <>
             <p className="text-xs font-bold uppercase text-emerald-300">Signed in</p>
             <p className="mt-1 truncate text-sm font-bold text-zinc-200">{accountName}</p>
-            <SignOutButton className="mt-3 h-10 w-full" />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link
+                className="inline-flex h-10 items-center justify-center rounded-md border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
+                href="/profile"
+              >
+                Profile
+              </Link>
+              <SignOutButton className="h-10 w-full" />
+            </div>
           </>
         )}
       </div>

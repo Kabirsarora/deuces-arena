@@ -285,6 +285,30 @@ app.get("/cosmetics", async (_request, response) => {
   response.json(await publicCosmetics());
 });
 
+app.get("/profiles/:guestId", async (request, response) => {
+  const guestId = normalizeGuestId(request.params.guestId);
+
+  if (guestId === null) {
+    response.status(400).json({ error: "Profile not found." });
+    return;
+  }
+
+  response.json(await publicGuestProfile(guestId));
+});
+
+app.get("/profiles/:guestId/history", async (request, response) => {
+  const guestId = normalizeGuestId(request.params.guestId);
+  const limit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : undefined;
+
+  if (guestId === null) {
+    response.status(400).json({ error: "Profile not found." });
+    return;
+  }
+
+  response.json(await publicMatchHistory(guestId, Number.isNaN(limit) ? undefined : limit));
+});
+
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(
   httpServer,

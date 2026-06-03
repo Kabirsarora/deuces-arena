@@ -149,6 +149,24 @@ describe("realtime rooms", () => {
     expect(leaderboard.length).toBeLessThanOrEqual(3);
   });
 
+  it("serves profile and match history over REST", async () => {
+    const profileResponse = await fetch(`${serverUrl}/profiles/guest-rest-profile`);
+
+    expect(profileResponse.ok).toBe(true);
+
+    const profile = (await profileResponse.json()) as PublicGuestProfile;
+    expect(profile.guestId).toBe("guest-rest-profile");
+    expect(profile.rating).toBe(1000);
+    expect(profile.unlocks).toEqual([]);
+
+    const historyResponse = await fetch(`${serverUrl}/profiles/guest-rest-profile/history?limit=3`);
+
+    expect(historyResponse.ok).toBe(true);
+
+    const history = (await historyResponse.json()) as unknown[];
+    expect(history).toEqual([]);
+  });
+
   it("rejects cosmetic equip requests when persistence is unavailable", async () => {
     const socket = await connectTestSocket();
     const equipAck = await equipCosmetic(socket, {

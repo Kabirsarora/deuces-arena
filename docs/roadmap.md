@@ -58,6 +58,7 @@
 - Done: add avatar and profile-border cosmetics to player seats.
 - Done: add cosmetic inventory filters and clearer owned/equipped counts.
 - Done: add a compact profile details panel with stats, loadout, and latest match context.
+- Done: add a dedicated signed-in profile page backed by REST profile/history endpoints.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add a dedicated profile page with shareable match summaries.
+- Next: add shareable match summaries and public profile cards.
 - Later: add Stripe support for optional supporter features.
