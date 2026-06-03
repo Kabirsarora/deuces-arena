@@ -45,6 +45,7 @@ export default async function ProfilePage() {
     fetchCosmetics()
   ]);
   const displayName = profile?.displayName ?? session.user.name ?? "Arena Player";
+  const publicProfilePath = `/profile/${encodeURIComponent(profileId)}`;
   const unlockedIds = new Set(profile?.unlocks.map((unlock) => unlock.cosmetic.id) ?? []);
   const equippedIds = new Set(
     profile?.equippedCosmetics.map((equipped) => equipped.cosmetic.id) ?? []
@@ -69,6 +70,26 @@ export default async function ProfilePage() {
             Back to table
           </Link>
         </header>
+
+        <section className="online-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-black">Public profile card</p>
+            <p className="mt-1 break-all text-xs text-zinc-400">{publicProfilePath}</p>
+          </div>
+          <div className="flex gap-2">
+            <Link
+              className="inline-flex h-9 items-center justify-center rounded-md border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
+              href={publicProfilePath}
+            >
+              Open
+            </Link>
+            <CopyMatchSummaryButton
+              copiedLabel="Copied"
+              label="Copy link"
+              summary={publicProfilePath}
+            />
+          </div>
+        </section>
 
         {profile === null ? (
           <section className="online-panel p-5">

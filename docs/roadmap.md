@@ -60,6 +60,7 @@
 - Done: add a compact profile details panel with stats, loadout, and latest match context.
 - Done: add a dedicated signed-in profile page backed by REST profile/history endpoints.
 - Done: add copyable share text for profile match summaries.
+- Done: add public profile cards for sharing player stats.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add public profile cards.
+- Next: add richer replay review screens.
 - Later: add Stripe support for optional supporter features.

@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-export function CopyMatchSummaryButton({ summary }: { readonly summary: string }) {
+export function CopyMatchSummaryButton({
+  summary,
+  label = "Copy",
+  copiedLabel = "Copied"
+}: {
+  readonly summary: string;
+  readonly label?: string;
+  readonly copiedLabel?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function copySummary() {
@@ -17,7 +25,7 @@ export function CopyMatchSummaryButton({ summary }: { readonly summary: string }
       type="button"
       onClick={() => void copySummary()}
     >
-      {copied ? "Copied" : "Copy"}
+      {copied ? copiedLabel : label}
     </button>
   );
 }
