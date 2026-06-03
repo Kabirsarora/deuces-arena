@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { SignInWithGoogleButton } from "@/components/auth-buttons";
+import { CopyMatchSummaryButton } from "@/components/copy-match-summary-button";
 import { createAuthProfileId } from "@/lib/auth-profile";
 
 export const dynamic = "force-dynamic";
@@ -171,18 +172,29 @@ function ProfileStat({
 }
 
 function MatchHistoryRow({ match }: { readonly match: PublicMatchHistoryItem }) {
+  const matchSummary = formatShareableMatchSummary(match);
+
   return (
     <div className="rounded-[1rem] border border-white/10 bg-white/7 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-black">
-          {match.placement === null ? "Unplaced" : ordinal(match.placement)}
-        </p>
-        <span className="rounded-full bg-black/24 px-2 py-1 text-xs font-black">
-          {formatRatingDelta(match.ratingDelta)}
-        </span>
+        <div>
+          <p className="text-sm font-black">
+            {match.placement === null ? "Unplaced" : ordinal(match.placement)}
+          </p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{formatMatchMode(match.mode)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-full bg-black/24 px-2 py-1 text-xs font-black">
+            {formatRatingDelta(match.ratingDelta)}
+          </span>
+          <CopyMatchSummaryButton summary={matchSummary} />
+        </div>
       </div>
       <p className="mt-1 text-xs text-zinc-400">
         {match.movesPlayed ?? 0} moves · {match.bombsPlayed} bombs · {match.roomCode ?? "archived"}
+      </p>
+      <p className="mt-2 rounded-[0.8rem] border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-zinc-400">
+        {matchSummary}
       </p>
     </div>
   );
@@ -232,6 +244,27 @@ function formatRatingDelta(delta: number | null): string {
   }
 
   return delta >= 0 ? `+${delta}` : `${delta}`;
+}
+
+function formatShareableMatchSummary(match: PublicMatchHistoryItem): string {
+  const placement = match.placement === null ? "unplaced" : `${ordinal(match.placement)} place`;
+  const rating = formatRatingDelta(match.ratingDelta);
+  const moves = match.movesPlayed ?? 0;
+  const room = match.roomCode ?? "archived match";
+
+  return `Deuces Arena ${formatMatchMode(match.mode)}: ${placement}, ${rating} rating, ${moves} moves, ${match.bombsPlayed} bombs (${room}).`;
+}
+
+function formatMatchMode(mode: PublicMatchHistoryItem["mode"]): string {
+  if (mode === "RANKED") {
+    return "Ranked";
+  }
+
+  if (mode === "LOCAL_DEMO") {
+    return "Demo";
+  }
+
+  return "Casual";
 }
 
 function ordinal(value: number): string {
