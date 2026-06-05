@@ -67,6 +67,7 @@ model User {
   equippedCosmetics UserEquippedCosmetic[]
   oauthAccounts   OAuthAccount[]
   feedbackReports FeedbackReport[]
+  replayLabels    ReplayLabel[]
 
   @@index([rating])
 }
@@ -101,6 +102,7 @@ model Match {
   players     MatchPlayer[]
   moves       MoveEvent[]
   coachEvaluations CoachEvaluation[]
+  replayLabels ReplayLabel[]
 
   @@index([mode, status])
   @@index([startedAt])
@@ -176,6 +178,20 @@ model CoachEvaluation {
   @@index([matchId, turnNumber])
   @@index([matchPlayerId])
   @@index([roomCode, createdAt])
+}
+
+model ReplayLabel {
+  id        String   @id @default(cuid())
+  userId    String
+  matchId   String
+  label     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId, label])
+  @@index([matchId])
+  @@index([userId, createdAt])
 }
 
 model Cosmetic {

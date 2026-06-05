@@ -58,6 +58,7 @@ import {
   persistFeedbackReport,
   persistMoveEvent,
   purchasePersistedCosmetic,
+  savePersistedReplayLabel,
   updatePersistedGuestProfile,
   type PersistedMatch
 } from "./persistence.js";
@@ -255,6 +256,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
+const guestReplayLabels = new Map<string, readonly string[]>();
 let rankedQueue: RankedQueuedPlayer[] = [];
 
 const app = express();
@@ -678,6 +680,35 @@ io.on("connection", (socket) => {
     }
 
     callback(ok(await publicMatchHistory(guestId, payload.limit)));
+  });
+
+  socket.on("profile:label-replay", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const matchId = payload.matchId.trim();
+    const label = normalizeReplayLabel(payload.label);
+
+    if (guestId === null || matchId === "") {
+      callback(fail("Match not found."));
+      return;
+    }
+
+    if (label === null) {
+      callback(fail("Replay label must be 2-24 characters."));
+      return;
+    }
+
+    const persistedLabel = await savePersistedReplayLabel(guestId, matchId, label);
+
+    if (persistedLabel.ok || persistedLabel.reason === "database-unavailable") {
+      if (!persistedLabel.ok) {
+        addInMemoryReplayLabel(guestId, matchId, label);
+      }
+
+      callback(ok(await publicMatchHistory(guestId, 10)));
+      return;
+    }
+
+    callback(fail(getSaveReplayLabelError(persistedLabel.reason)));
   });
 
   socket.on("lobby:get", (callback) => {
@@ -1535,6 +1566,16 @@ function normalizeContactEmail(email: string | undefined): string | null {
   return normalized.length <= 254 && normalized.includes("@") ? normalized : null;
 }
 
+function normalizeReplayLabel(label: string | undefined): string | null {
+  const normalized = label?.replace(/\s+/g, " ").trim();
+
+  if (normalized === undefined || normalized.length < 2 || normalized.length > 24) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function normalizeUserAgent(userAgent: string | undefined): string | null {
   const normalized = userAgent?.trim();
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 320);
@@ -1582,6 +1623,25 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
   };
   guestProfiles.set(guestId, profile);
   return profile;
+}
+
+function addInMemoryReplayLabel(guestId: string, matchId: string, label: string): void {
+  const key = getReplayLabelKey(guestId, matchId);
+  const labels = guestReplayLabels.get(key) ?? [];
+
+  if (labels.includes(label)) {
+    return;
+  }
+
+  guestReplayLabels.set(key, [label, ...labels].slice(0, 5));
+}
+
+function getInMemoryReplayLabels(guestId: string, matchId: string): readonly string[] {
+  return guestReplayLabels.get(getReplayLabelKey(guestId, matchId)) ?? [];
+}
+
+function getReplayLabelKey(guestId: string, matchId: string): string {
+  return `${guestId}:${matchId}`;
 }
 
 async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> {
@@ -1741,6 +1801,14 @@ function getPurchaseCosmeticError(
   return "Cosmetic not found.";
 }
 
+function getSaveReplayLabelError(reason: "profile-not-found" | "match-not-found"): string {
+  if (reason === "profile-not-found") {
+    return "Guest profile not found.";
+  }
+
+  return "Match not found.";
+}
+
 async function publicMatchHistory(
   guestId: string,
   limit: number | undefined
@@ -1813,6 +1881,7 @@ function toInMemoryMatchHistoryItem(room: Room, guestId: string): PublicMatchHis
     cardsRemaining: summary?.cardsRemaining ?? null,
     bombsPlayed: summary?.bombsPlayed ?? 0,
     movesPlayed: summary?.movesPlayed ?? null,
+    labels: getInMemoryReplayLabels(guestId, room.persistedMatch?.matchId ?? room.code),
     opponents: room.players.map((roomPlayer) => ({
       name: roomPlayer.name,
       kind: roomPlayer.kind,

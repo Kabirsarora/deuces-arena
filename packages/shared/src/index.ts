@@ -80,6 +80,7 @@ export type PublicMatchHistoryItem = {
   readonly cardsRemaining: number | null;
   readonly bombsPlayed: number;
   readonly movesPlayed: number | null;
+  readonly labels: readonly string[];
   readonly opponents: readonly PublicMatchHistoryPlayer[];
 };
 
@@ -317,6 +318,10 @@ export type ClientToServerEvents = {
   ) => void;
   "profile:history": (
     payload: { readonly guestId: string; readonly limit?: number },
+    callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
+  ) => void;
+  "profile:label-replay": (
+    payload: { readonly guestId: string; readonly matchId: string; readonly label: string },
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
   ) => void;
   "lobby:get": (callback: (ack: ServerAck<PublicLobbyState>) => void) => void;

@@ -14,6 +14,7 @@ import type {
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
+  PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
   PublicRoomState,
@@ -165,6 +166,23 @@ describe("realtime rooms", () => {
 
     const history = (await historyResponse.json()) as unknown[];
     expect(history).toEqual([]);
+  });
+
+  it("accepts replay labels without requiring database persistence", async () => {
+    const socket = await connectTestSocket();
+    const labelAck = await labelReplay(socket, {
+      guestId: "guest-rest-profile",
+      matchId: "local-match",
+      label: "Close finish"
+    });
+
+    expect(labelAck.ok).toBe(true);
+
+    if (!labelAck.ok) {
+      return;
+    }
+
+    expect(labelAck.data).toEqual([]);
   });
 
   it("rejects cosmetic equip requests when persistence is unavailable", async () => {
@@ -1011,6 +1029,17 @@ function purchaseCosmetic(
 ): Promise<ServerAck<PublicGuestProfile>> {
   return new Promise((resolve) => {
     socket.emit("cosmetics:purchase", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function labelReplay(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly matchId: string; readonly label: string }
+): Promise<ServerAck<readonly PublicMatchHistoryItem[]>> {
+  return new Promise((resolve) => {
+    socket.emit("profile:label-replay", payload, (ack) => {
       resolve(ack);
     });
   });

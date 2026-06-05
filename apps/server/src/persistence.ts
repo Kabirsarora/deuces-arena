@@ -72,6 +72,15 @@ export type UpdateProfileResult =
       readonly reason: "database-unavailable";
     };
 
+export type SaveReplayLabelResult =
+  | {
+      readonly ok: true;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "database-unavailable" | "profile-not-found" | "match-not-found";
+    };
+
 type CosmeticProgressionStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -690,6 +699,19 @@ export async function getPersistedMatchHistory(
                 kind: true,
                 placement: true
               }
+            },
+            replayLabels: {
+              where: {
+                user: {
+                  guestId
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              select: {
+                label: true
+              }
             }
           }
         }
@@ -711,6 +733,7 @@ export async function getPersistedMatchHistory(
       cardsRemaining: matchPlayer.cardsRemaining,
       bombsPlayed: matchPlayer.bombsPlayed,
       movesPlayed: matchPlayer.averageMoveCount,
+      labels: matchPlayer.match.replayLabels.map((replayLabel) => replayLabel.label),
       opponents: matchPlayer.match.players.map((player) => ({
         name: player.playerLabel,
         kind: fromDbPlayerKind(player.kind),
@@ -757,6 +780,85 @@ export async function persistCoachEvaluation(
     });
   } catch (error) {
     console.error("Unable to persist coach evaluation.", error);
+  }
+}
+
+export async function savePersistedReplayLabel(
+  guestId: string,
+  matchId: string,
+  label: string
+): Promise<SaveReplayLabelResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: {
+        guestId
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (user === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    const matchPlayer = await db.prisma.matchPlayer.findFirst({
+      where: {
+        matchId,
+        userId: user.id,
+        match: {
+          status: "COMPLETED"
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (matchPlayer === null) {
+      return {
+        ok: false,
+        reason: "match-not-found"
+      };
+    }
+
+    await db.prisma.replayLabel.upsert({
+      where: {
+        userId_matchId_label: {
+          userId: user.id,
+          matchId,
+          label
+        }
+      },
+      create: {
+        userId: user.id,
+        matchId,
+        label
+      },
+      update: {}
+    });
+
+    return {
+      ok: true
+    };
+  } catch (error) {
+    console.error("Unable to save replay label.", error);
+    return {
+      ok: false,
+      reason: "match-not-found"
+    };
   }
 }
 

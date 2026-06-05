@@ -763,6 +763,25 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     );
   }
 
+  function labelReplay(matchId: string, label: string) {
+    socketRef.current?.emit(
+      "profile:label-replay",
+      {
+        guestId: getActiveProfileId(),
+        matchId,
+        label
+      },
+      (ack) => {
+        if (ack.ok) {
+          setMatchHistory(ack.data);
+          setMessage("Replay label saved.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
     setSelectedCardIds((current) =>
@@ -914,6 +933,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         onBotPaceChange={setBotPace}
         onEquipCosmetic={equipCosmetic}
         onPurchaseCosmetic={purchaseCosmetic}
+        onLabelReplay={labelReplay}
         onSubmitFeedback={submitFeedback}
       />
     );
@@ -1237,6 +1257,7 @@ function OnlineLobbyHub({
   onBotPaceChange,
   onEquipCosmetic,
   onPurchaseCosmetic,
+  onLabelReplay,
   onSubmitFeedback
 }: {
   readonly connected: boolean;
@@ -1286,6 +1307,7 @@ function OnlineLobbyHub({
   readonly onBotPaceChange: (pace: PublicBotPace) => void;
   readonly onEquipCosmetic: (cosmetic: PublicCosmetic) => void;
   readonly onPurchaseCosmetic: (cosmetic: PublicCosmetic) => void;
+  readonly onLabelReplay: (matchId: string, label: string) => void;
   readonly onSubmitFeedback: (input: {
     readonly kind: FeedbackKind;
     readonly body: string;
@@ -1469,7 +1491,7 @@ function OnlineLobbyHub({
               <summary className="cursor-pointer list-none text-sm font-black">More</summary>
               <div className="mt-3 grid gap-3">
                 <LeaderboardSummary entries={leaderboard} />
-                <MatchHistorySummary entries={matchHistory} />
+                <MatchHistorySummary entries={matchHistory} onLabelReplay={onLabelReplay} />
                 <FeedbackSummary
                   defaultEmail={authUser?.email ?? ""}
                   onSubmitFeedback={onSubmitFeedback}
@@ -2614,7 +2636,13 @@ function getAvatarSymbol(avatarKey: ProfileAvatarKey): string {
   return "D";
 }
 
-function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMatchHistoryItem[] }) {
+function MatchHistorySummary({
+  entries,
+  onLabelReplay
+}: {
+  readonly entries: readonly PublicMatchHistoryItem[];
+  readonly onLabelReplay: (matchId: string, label: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [placementFilter, setPlacementFilter] = useState<MatchHistoryPlacementFilter>("all");
   const filteredEntries = entries.filter(
@@ -2671,7 +2699,11 @@ function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMat
                 </p>
               ) : (
                 filteredEntries.map((entry) => (
-                  <MatchHistoryCard key={entry.matchId} entry={entry} />
+                  <MatchHistoryCard
+                    key={entry.matchId}
+                    entry={entry}
+                    onLabelReplay={onLabelReplay}
+                  />
                 ))
               )}
             </div>
@@ -2694,7 +2726,21 @@ const MATCH_HISTORY_PLACEMENT_FILTERS: readonly {
   { value: "losses", label: "Losses" }
 ];
 
-function MatchHistoryCard({ entry }: { readonly entry: PublicMatchHistoryItem }) {
+function MatchHistoryCard({
+  entry,
+  onLabelReplay
+}: {
+  readonly entry: PublicMatchHistoryItem;
+  readonly onLabelReplay: (matchId: string, label: string) => void;
+}) {
+  const [labelDraft, setLabelDraft] = useState("");
+
+  function submitLabel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onLabelReplay(entry.matchId, labelDraft);
+    setLabelDraft("");
+  }
+
   return (
     <div className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2">
       <div className="flex items-center justify-between gap-2">
@@ -2723,6 +2769,34 @@ function MatchHistoryCard({ entry }: { readonly entry: PublicMatchHistoryItem })
           vs {entry.opponents.map((opponent) => opponent.name).join(", ")}
         </p>
       ) : null}
+      {entry.labels.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {entry.labels.map((label) => (
+            <span
+              key={label}
+              className="rounded-full border border-[var(--gold)]/25 bg-[var(--gold)]/12 px-2 py-0.5 text-[10px] font-black uppercase text-[var(--gold)]"
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <form className="mt-2 flex gap-1.5" onSubmit={submitLabel}>
+        <input
+          className="min-w-0 flex-1 rounded-full border border-white/10 bg-black/24 px-2 py-1 text-[11px] outline-none placeholder:text-zinc-600 focus:border-[var(--gold)]"
+          maxLength={24}
+          placeholder="Add label"
+          value={labelDraft}
+          onChange={(event) => setLabelDraft(event.target.value)}
+        />
+        <button
+          className="rounded-full border border-white/10 bg-white/8 px-2 text-[10px] font-black uppercase text-zinc-300 transition hover:bg-white/12 disabled:opacity-45"
+          disabled={labelDraft.trim().length < 2}
+          type="submit"
+        >
+          Save
+        </button>
+      </form>
     </div>
   );
 }
@@ -2757,6 +2831,7 @@ function matchesHistorySearch(entry: PublicMatchHistoryItem, query: string): boo
     entry.roomCode ?? "archived",
     formatMatchMode(entry.mode),
     entry.placement === null ? "unplaced" : ordinal(entry.placement),
+    ...entry.labels,
     ...entry.opponents.flatMap((opponent) => [
       opponent.name,
       opponent.kind,
