@@ -889,6 +889,38 @@ describe("realtime rooms", () => {
 
     expect(feedback.ok).toBe(false);
   });
+
+  it("rate limits repeated feedback submissions per socket", async () => {
+    const socket = await connectTestSocket();
+    const payload = {
+      kind: "UI",
+      body: "The table view feels easier to read after the cleanup.",
+      guestId: "guest-feedback-rate"
+    } satisfies FeedbackPayload;
+
+    const first = await submitFeedback(socket, payload);
+    const second = await submitFeedback(socket, {
+      ...payload,
+      body: "The buttons feel better, but the room list could be clearer."
+    });
+    const third = await submitFeedback(socket, {
+      ...payload,
+      body: "The hand controls are smoother after the latest pass."
+    });
+    const fourth = await submitFeedback(socket, {
+      ...payload,
+      body: "This fourth message should be blocked by the rate limiter."
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(third.ok).toBe(true);
+    expect(fourth.ok).toBe(false);
+
+    if (!fourth.ok) {
+      expect(fourth.error).toContain("wait");
+    }
+  });
 });
 
 async function connectTestSocket(): Promise<TestSocket> {

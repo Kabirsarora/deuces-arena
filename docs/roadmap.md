@@ -29,7 +29,8 @@
 - Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
 - Done: add Socket.IO event contracts and server-authoritative move validation.
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
-- Next: add stronger disconnect/abandon handling and production rate limits.
+- Done: add in-memory rate limits for noisy realtime actions.
+- Next: add stronger disconnect/abandon handling.
 
 ## Phase 5: Accounts, Stats, and Replays
 
@@ -38,7 +39,7 @@
 - Done: expose profile, leaderboard, match history, and replay export in the online UI.
 - Done: add full account auth, profile pages, and a richer replay review screen.
 - Done: add searchable match history filters.
-- Next: add saved replay labels.
+- Done: add saved replay labels.
 
 ## Phase 6: Ranked and AI
 
@@ -63,6 +64,6 @@
 - Done: add a dedicated signed-in profile page backed by REST profile/history endpoints.
 - Done: add copyable share text for profile match summaries.
 - Done: add public profile cards for sharing player stats.
+- Done: add saved replay labels.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add saved replay labels.
 - Later: add Stripe support for optional supporter features.

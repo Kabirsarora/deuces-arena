@@ -108,6 +108,14 @@ type RoomTimerSettings = {
 
 type RoomRuleSettings = PublicRoomRules;
 
+type RateLimitBucket = "chat" | "coach" | "feedback" | "replay-label";
+
+type RateLimitRule = {
+  readonly maxEvents: number;
+  readonly windowMs: number;
+  readonly message: string;
+};
+
 type RankedQueuedPlayer = {
   readonly socketId: string;
   readonly playerName: string;
@@ -127,6 +135,28 @@ const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
+const RATE_LIMITS: Readonly<Record<RateLimitBucket, RateLimitRule>> = {
+  chat: {
+    maxEvents: 8,
+    windowMs: 10_000,
+    message: "Slow down before sending more chat messages."
+  },
+  coach: {
+    maxEvents: 6,
+    windowMs: 60_000,
+    message: "Move Lab is cooling down. Try again in a moment."
+  },
+  feedback: {
+    maxEvents: 3,
+    windowMs: 60_000,
+    message: "Please wait before sending more feedback."
+  },
+  "replay-label": {
+    maxEvents: 10,
+    windowMs: 60_000,
+    message: "Please wait before saving more replay labels."
+  }
+};
 const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
   first: 120,
   second: 80,
@@ -257,6 +287,10 @@ const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
 const guestReplayLabels = new Map<string, readonly string[]>();
+const socketRateLimitEvents = new Map<
+  string,
+  Partial<Record<RateLimitBucket, readonly number[]>>
+>();
 let rankedQueue: RankedQueuedPlayer[] = [];
 
 const app = express();
@@ -697,6 +731,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const rateLimitError = checkSocketRateLimit(socket.id, "replay-label");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
     const persistedLabel = await savePersistedReplayLabel(guestId, matchId, label);
 
     if (persistedLabel.ok || persistedLabel.reason === "database-unavailable") {
@@ -803,6 +844,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const rateLimitError = checkSocketRateLimit(socket.id, "chat");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
     const message: PublicChatMessage = {
       id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       playerId: player.id,
@@ -833,6 +881,13 @@ io.on("connection", (socket) => {
 
     if (room.game.activePlayerId !== player.id) {
       callback(fail("Move evaluation is only available on your turn."));
+      return;
+    }
+
+    const rateLimitError = checkSocketRateLimit(socket.id, "coach");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
       return;
     }
 
@@ -869,6 +924,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const rateLimitError = checkSocketRateLimit(socket.id, "feedback");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
     const roomCode =
       payload.roomCode === undefined || payload.roomCode.trim() === ""
         ? null
@@ -888,6 +950,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    clearSocketRateLimits(socket.id);
     removeRankedQueueEntry(socket.id);
     emitRankedQueueState();
 
@@ -1579,6 +1642,33 @@ function normalizeReplayLabel(label: string | undefined): string | null {
 function normalizeUserAgent(userAgent: string | undefined): string | null {
   const normalized = userAgent?.trim();
   return normalized === undefined || normalized === "" ? null : normalized.slice(0, 320);
+}
+
+function checkSocketRateLimit(socketId: string, bucket: RateLimitBucket): string | null {
+  const rule = RATE_LIMITS[bucket];
+  const now = Date.now();
+  const socketBuckets = socketRateLimitEvents.get(socketId) ?? {};
+  const recentEvents = (socketBuckets[bucket] ?? []).filter(
+    (timestamp) => now - timestamp < rule.windowMs
+  );
+
+  if (recentEvents.length >= rule.maxEvents) {
+    socketRateLimitEvents.set(socketId, {
+      ...socketBuckets,
+      [bucket]: recentEvents
+    });
+    return rule.message;
+  }
+
+  socketRateLimitEvents.set(socketId, {
+    ...socketBuckets,
+    [bucket]: [...recentEvents, now]
+  });
+  return null;
+}
+
+function clearSocketRateLimits(socketId: string): void {
+  socketRateLimitEvents.delete(socketId);
 }
 
 function parseClientOrigins(value: string | undefined): string[] {
