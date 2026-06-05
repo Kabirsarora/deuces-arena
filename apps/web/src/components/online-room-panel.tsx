@@ -3478,6 +3478,7 @@ function MatchResultsPanel({
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
   const review = getPlayerMatchReview(room);
+  const reviewTargets = getReplayReviewTargets(room);
   const timeline = getMoveTimelineRows(room);
   const selectedStatsPlayer =
     room.players.find((player) => player.id === selectedStatsPlayerId) ?? null;
@@ -3547,6 +3548,38 @@ function MatchResultsPanel({
           animate={{ opacity: 1, y: 0 }}
         >
           <p className="text-xs font-black uppercase text-[var(--aqua)]">Decision review</p>
+          <div className="mt-2 grid gap-1.5">
+            {reviewTargets.length === 0 ? (
+              <p className="rounded-[0.7rem] bg-white/7 px-2 py-1.5 text-xs text-zinc-300">
+                No high-signal replay targets were detected yet. Play more turns or run Move Lab
+                during close spots.
+              </p>
+            ) : (
+              reviewTargets.map((target) => (
+                <div
+                  key={target.id}
+                  className="rounded-[0.7rem] border border-white/10 bg-white/7 px-2 py-1.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black text-zinc-100">{target.title}</p>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-black uppercase",
+                        target.severity === "high"
+                          ? "bg-red-400/15 text-red-200"
+                          : target.severity === "medium"
+                            ? "bg-[var(--gold)]/18 text-[var(--gold)]"
+                            : "bg-white/8 text-zinc-300"
+                      )}
+                    >
+                      T{target.turnNumber}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-400">{target.description}</p>
+                </div>
+              ))
+            )}
+          </div>
           <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
             {review.map((item) => (
               <li key={item} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
@@ -3949,6 +3982,14 @@ type MoveTimelineRow = {
   readonly cardsRemainingLabel: string;
 };
 
+type ReplayReviewTarget = {
+  readonly id: string;
+  readonly turnNumber: number;
+  readonly title: string;
+  readonly description: string;
+  readonly severity: "low" | "medium" | "high";
+};
+
 function getMoveTimelineRows(room: PublicRoomState): readonly MoveTimelineRow[] {
   return room.recentEvents.map((event, index) => {
     const playerName = getRoomPlayerName(room, event.playerId);
@@ -3979,6 +4020,111 @@ function formatTimelineMove(event: GameEvent): string {
     event.legalMoveCount === 1 ? "1 legal option" : `${event.legalMoveCount} legal options`;
 
   return `${handType === null ? "Played" : formatHandType(handType)}: ${cardList} · ${legalContext}`;
+}
+
+function getReplayReviewTargets(room: PublicRoomState): readonly ReplayReviewTarget[] {
+  const playerId = room.yourPlayerId;
+
+  if (playerId === null) {
+    return [];
+  }
+
+  const targets = room.recentEvents.flatMap((event, index): ReplayReviewTarget[] => {
+    if (event.playerId !== playerId) {
+      return [];
+    }
+
+    const cardsAfter = event.cardsRemainingAfter[event.playerId] ?? null;
+    const id = `${event.turnNumber}-${event.playerId}-${index}`;
+
+    if (event.wasPass || event.move.type === "pass") {
+      if (event.legalMoveCount > 1) {
+        return [
+          {
+            id,
+            turnNumber: event.turnNumber,
+            title: "Optional pass",
+            description: `${event.legalMoveCount} legal responses were available. This is a good candidate for future rollout comparison.`,
+            severity: "medium"
+          }
+        ];
+      }
+
+      return [];
+    }
+
+    const handType = getMoveHandType(event);
+
+    if (handType === "bomb") {
+      return [
+        {
+          id,
+          turnNumber: event.turnNumber,
+          title: "Bomb timing",
+          description:
+            "Bombs swing trick control. Later coach analysis should compare this play against saving the bomb.",
+          severity: "high"
+        }
+      ];
+    }
+
+    if (event.move.cards.length >= 4) {
+      return [
+        {
+          id,
+          turnNumber: event.turnNumber,
+          title: "Large shed",
+          description: `${event.move.cards.length} cards left your hand at once. Multi-card sheds often decide tempo and should be replayed closely.`,
+          severity: "medium"
+        }
+      ];
+    }
+
+    if (event.currentTrickBefore === null) {
+      return [
+        {
+          id,
+          turnNumber: event.turnNumber,
+          title: "Lead choice",
+          description: `${formatHandType(handType ?? "single")} opened the trick. Lead choices shape what everyone else is allowed to answer.`,
+          severity: "low"
+        }
+      ];
+    }
+
+    if (cardsAfter !== null && cardsAfter <= 3) {
+      return [
+        {
+          id,
+          turnNumber: event.turnNumber,
+          title: "Endgame pressure",
+          description: `You dropped to ${cardsAfter} ${pluralize("card", cardsAfter)}. These low-hand spots are important for mistake review.`,
+          severity: "high"
+        }
+      ];
+    }
+
+    return [];
+  });
+
+  return targets
+    .sort(
+      (left, right) =>
+        getReviewSeverityScore(right.severity) - getReviewSeverityScore(left.severity)
+    )
+    .slice(0, 4);
+}
+
+function getReviewSeverityScore(severity: ReplayReviewTarget["severity"]): number {
+  if (severity === "high") {
+    return 3;
+  }
+
+  if (severity === "medium") {
+    return 2;
+  }
+
+  return 1;
 }
 
 function getPlayerMatchReview(room: PublicRoomState): readonly string[] {

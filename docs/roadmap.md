@@ -36,7 +36,8 @@
 - Done: add guest profiles.
 - Done: store match history, move history, placements, bombs played, rating, cards remaining, and replay timelines.
 - Done: expose profile, leaderboard, match history, and replay export in the online UI.
-- Next: add full account auth, profile pages, and a richer replay review screen.
+- Done: add full account auth, profile pages, and a richer replay review screen.
+- Next: add searchable match history and saved replay labels.
 
 ## Phase 6: Ranked and AI
 
@@ -62,5 +63,5 @@
 - Done: add copyable share text for profile match summaries.
 - Done: add public profile cards for sharing player stats.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
-- Next: add richer replay review screens.
+- Next: add searchable match history and saved replay labels.
 - Later: add Stripe support for optional supporter features.
