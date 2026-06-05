@@ -2615,6 +2615,13 @@ function getAvatarSymbol(avatarKey: ProfileAvatarKey): string {
 }
 
 function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMatchHistoryItem[] }) {
+  const [query, setQuery] = useState("");
+  const [placementFilter, setPlacementFilter] = useState<MatchHistoryPlacementFilter>("all");
+  const filteredEntries = entries.filter(
+    (entry) =>
+      matchesHistoryPlacementFilter(entry, placementFilter) && matchesHistorySearch(entry, query)
+  );
+
   return (
     <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
@@ -2627,45 +2634,139 @@ function MatchHistorySummary({ entries }: { readonly entries: readonly PublicMat
         </span>
       </summary>
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3 grid gap-3">
         {entries.length === 0 ? (
           <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
             Completed online matches will appear here.
           </p>
         ) : (
-          entries.map((entry) => (
-            <div
-              key={entry.matchId}
-              className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-bold">
-                  {entry.placement === null ? "Unplaced" : ordinal(entry.placement)}
-                </p>
-                <span
+          <>
+            <input
+              className="h-9 rounded-full border border-white/10 bg-black/24 px-3 text-xs outline-none transition placeholder:text-zinc-600 focus:border-[var(--gold)]"
+              placeholder="Search room, mode, opponent"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            <div className="grid grid-cols-4 gap-1.5">
+              {MATCH_HISTORY_PLACEMENT_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
                   className={cn(
-                    "rounded-md px-2 py-1 text-[11px] font-black",
-                    entry.ratingDelta === null
-                      ? "bg-white/7 text-zinc-300"
-                      : entry.ratingDelta >= 0
-                        ? "bg-emerald-400/15 text-emerald-200"
-                        : "bg-red-400/15 text-red-200"
+                    "rounded-full border px-2 py-1.5 text-[10px] font-black uppercase transition",
+                    placementFilter === filter.value
+                      ? "border-[var(--gold)] bg-[var(--gold)] text-black"
+                      : "border-white/10 bg-white/7 text-zinc-300 hover:border-white/20 hover:bg-white/10"
                   )}
+                  type="button"
+                  onClick={() => setPlacementFilter(filter.value)}
                 >
-                  {formatRatingDelta(entry.ratingDelta)}
-                </span>
-              </div>
-              <p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
-                <Gauge className="size-3" />
-                {entry.movesPlayed ?? 0} moves · {entry.bombsPlayed} bombs ·{" "}
-                {entry.roomCode ?? "archived"}
-              </p>
+                  {filter.label}
+                </button>
+              ))}
             </div>
-          ))
+            <div className="grid gap-2">
+              {filteredEntries.length === 0 ? (
+                <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+                  No saved matches match those filters.
+                </p>
+              ) : (
+                filteredEntries.map((entry) => (
+                  <MatchHistoryCard key={entry.matchId} entry={entry} />
+                ))
+              )}
+            </div>
+          </>
         )}
       </div>
     </details>
   );
+}
+
+type MatchHistoryPlacementFilter = "all" | "wins" | "podium" | "losses";
+
+const MATCH_HISTORY_PLACEMENT_FILTERS: readonly {
+  readonly value: MatchHistoryPlacementFilter;
+  readonly label: string;
+}[] = [
+  { value: "all", label: "All" },
+  { value: "wins", label: "Wins" },
+  { value: "podium", label: "Podium" },
+  { value: "losses", label: "Losses" }
+];
+
+function MatchHistoryCard({ entry }: { readonly entry: PublicMatchHistoryItem }) {
+  return (
+    <div className="rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold">
+          {entry.placement === null ? "Unplaced" : ordinal(entry.placement)}
+        </p>
+        <span
+          className={cn(
+            "rounded-md px-2 py-1 text-[11px] font-black",
+            entry.ratingDelta === null
+              ? "bg-white/7 text-zinc-300"
+              : entry.ratingDelta >= 0
+                ? "bg-emerald-400/15 text-emerald-200"
+                : "bg-red-400/15 text-red-200"
+          )}
+        >
+          {formatRatingDelta(entry.ratingDelta)}
+        </span>
+      </div>
+      <p className="mt-1 flex items-center gap-1 text-[11px] text-zinc-400">
+        <Gauge className="size-3" />
+        {entry.movesPlayed ?? 0} moves · {entry.bombsPlayed} bombs · {entry.roomCode ?? "archived"}
+      </p>
+      {entry.opponents.length > 0 ? (
+        <p className="mt-1 truncate text-[11px] text-zinc-500">
+          vs {entry.opponents.map((opponent) => opponent.name).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function matchesHistoryPlacementFilter(
+  entry: PublicMatchHistoryItem,
+  filter: MatchHistoryPlacementFilter
+): boolean {
+  if (filter === "wins") {
+    return entry.placement === 1;
+  }
+
+  if (filter === "podium") {
+    return entry.placement !== null && entry.placement <= 3;
+  }
+
+  if (filter === "losses") {
+    return entry.placement !== null && entry.placement >= 3;
+  }
+
+  return true;
+}
+
+function matchesHistorySearch(entry: PublicMatchHistoryItem, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  if (normalizedQuery === "") {
+    return true;
+  }
+
+  const haystack = [
+    entry.roomCode ?? "archived",
+    formatMatchMode(entry.mode),
+    entry.placement === null ? "unplaced" : ordinal(entry.placement),
+    ...entry.opponents.flatMap((opponent) => [
+      opponent.name,
+      opponent.kind,
+      opponent.placement === null ? "unplaced" : ordinal(opponent.placement)
+    ])
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(normalizedQuery);
 }
 
 function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLeaderboardEntry[] }) {
