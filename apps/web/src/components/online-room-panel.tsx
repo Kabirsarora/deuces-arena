@@ -87,6 +87,19 @@ type AuthUser = {
   readonly email: string | null;
   readonly image: string | null;
 };
+type PublicServerHealth = {
+  readonly ok: boolean;
+  readonly service: string;
+  readonly version: string;
+  readonly environment: string;
+  readonly uptimeSeconds: number;
+  readonly rooms: number;
+  readonly config: {
+    readonly database: "configured" | "memory-fallback";
+    readonly redis: "configured" | "disabled";
+    readonly disconnectedAutoMoveDelayMs: number;
+  };
+};
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
@@ -160,6 +173,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
+  const [serverHealth, setServerHealth] = useState<PublicServerHealth | null>(null);
   const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
@@ -312,6 +326,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       setMessage(`Invite loaded for room ${inviteCode}.`);
     }
 
+    void refreshServerHealth(setServerHealth);
+
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
       autoConnect: true
     });
@@ -320,6 +336,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
+      void refreshServerHealth(setServerHealth);
       refreshProfile(socket, getActiveProfileId(), setProfile);
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
@@ -339,6 +356,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     });
     socket.on("disconnect", () => {
       setConnected(false);
+      setServerHealth(null);
       setMessage("Disconnected from realtime server.");
     });
     socket.on("room:state", (state) => {
@@ -895,6 +913,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         hubMode={hubMode}
         joinCode={joinCode}
         lobby={lobby}
+        serverHealth={serverHealth}
         rankedQueue={rankedQueue}
         leaderboard={leaderboard}
         matchHistory={matchHistory}
@@ -1219,6 +1238,7 @@ function OnlineLobbyHub({
   hubMode,
   joinCode,
   lobby,
+  serverHealth,
   rankedQueue,
   leaderboard,
   matchHistory,
@@ -1269,6 +1289,7 @@ function OnlineLobbyHub({
   readonly hubMode: OnlineHubMode;
   readonly joinCode: string;
   readonly lobby: PublicLobbyState | null;
+  readonly serverHealth: PublicServerHealth | null;
   readonly rankedQueue: PublicRankedQueueState | null;
   readonly leaderboard: readonly PublicLeaderboardEntry[];
   readonly matchHistory: readonly PublicMatchHistoryItem[];
@@ -1333,6 +1354,7 @@ function OnlineLobbyHub({
                   {activity?.connectedUsers ?? 0} online · {activity?.playersInActiveGames ?? 0}{" "}
                   playing · {activity?.openRooms ?? 0} open rooms
                 </p>
+                <ServerHealthPills serverHealth={serverHealth} connected={connected} />
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -2599,6 +2621,63 @@ function refreshCosmetics(
       setCosmetics(ack.data);
     }
   });
+}
+
+async function refreshServerHealth(
+  setServerHealth: (health: PublicServerHealth | null) => void
+): Promise<void> {
+  try {
+    const response = await fetch(`${SERVER_URL}/health`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      setServerHealth(null);
+      return;
+    }
+
+    setServerHealth((await response.json()) as PublicServerHealth);
+  } catch {
+    setServerHealth(null);
+  }
+}
+
+function ServerHealthPills({
+  serverHealth,
+  connected
+}: {
+  readonly serverHealth: PublicServerHealth | null;
+  readonly connected: boolean;
+}) {
+  const persistenceLabel =
+    serverHealth?.config.database === "configured" ? "Postgres on" : "Memory mode";
+  const redisLabel = serverHealth?.config.redis === "configured" ? "Redis on" : "Single server";
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 text-[0.68rem] font-black uppercase tracking-wide">
+      <span
+        className={cn(
+          "rounded-full border px-2.5 py-1",
+          connected
+            ? "border-emerald-200/20 bg-emerald-300/10 text-emerald-200"
+            : "border-red-200/20 bg-red-300/10 text-red-200"
+        )}
+      >
+        Socket {connected ? "live" : "offline"}
+      </span>
+      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-300">
+        {persistenceLabel}
+      </span>
+      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-300">
+        {redisLabel}
+      </span>
+      {serverHealth !== null ? (
+        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-400">
+          {Math.round(serverHealth.config.disconnectedAutoMoveDelayMs / 1000)}s grace
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function ProfileAvatar({ avatarKey }: { readonly avatarKey: ProfileAvatarKey }) {
