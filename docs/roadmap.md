@@ -30,7 +30,8 @@
 - Done: add Socket.IO event contracts and server-authoritative move validation.
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
 - Done: add in-memory rate limits for noisy realtime actions.
-- Next: add stronger disconnect/abandon handling.
+- Done: add disconnect grace auto-moves so active abandoned seats do not freeze a table.
+- Next: add Redis-backed room durability for multi-instance hosting.
 
 ## Phase 5: Accounts, Stats, and Replays
 

@@ -42,6 +42,7 @@ beforeAll(async () => {
   process.env.CLIENT_ORIGIN = "http://localhost:3000, https://preview.example.com ";
   process.env.ADMIN_GUEST_IDS = "guest-admin-cosmetics";
   process.env.ADMIN_EMAILS = "creator@example.com";
+  process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS = "10";
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -518,6 +519,96 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.turnTimer?.enabled).toBe(true);
     expect(startedRoom.data.turnTimer?.secondsPerTurn).toBe(30);
     expect(startedRoom.data.turnTimer?.deadlineAt).not.toBeNull();
+  });
+
+  it("keeps a started room moving when the active player disconnects", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Unable to create test sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Host",
+      guestId: "guest-disconnect-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    for (const [socket, playerName, guestId] of [
+      [second, "Second", "guest-disconnect-second"],
+      [third, "Third", "guest-disconnect-third"],
+      [fourth, "Fourth", "guest-disconnect-fourth"]
+    ] as const) {
+      const joinedRoom = await joinRoom(socket, {
+        roomCode: createdRoom.data.roomCode,
+        playerName,
+        guestId
+      });
+
+      expect(joinedRoom.ok).toBe(true);
+    }
+
+    for (const socket of players) {
+      const readyRoom = await setReady(socket, {
+        roomCode: createdRoom.data.roomCode,
+        ready: true
+      });
+
+      expect(readyRoom.ok).toBe(true);
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 0
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok || startedRoom.data.activePlayerId === null) {
+      return;
+    }
+
+    const socketsByPlayerId = new Map(
+      startedRoom.data.players.map((player, index) => [player.id, players[index]])
+    );
+    const activeSocket = socketsByPlayerId.get(startedRoom.data.activePlayerId);
+    const observer = players.find((socket) => socket !== activeSocket);
+
+    if (activeSocket === undefined || observer === undefined) {
+      throw new Error("Unable to resolve active player socket.");
+    }
+
+    const disconnectedStatePromise = waitForRoomStateMatching(observer, (state) =>
+      state.players.some(
+        (player) => player.id === startedRoom.data.activePlayerId && !player.connected
+      )
+    );
+    activeSocket.disconnect();
+    const disconnectedState = await disconnectedStatePromise;
+
+    expect(
+      disconnectedState.players.find((player) => player.id === startedRoom.data.activePlayerId)
+        ?.connected
+    ).toBe(false);
+
+    const advancedState = await waitForRoomStateMatching(
+      observer,
+      (state) => state.turnNumber > startedRoom.data.turnNumber
+    );
+
+    expect(advancedState.turnNumber).toBeGreaterThan(startedRoom.data.turnNumber);
+    expect(advancedState.activePlayerId).not.toBe(startedRoom.data.activePlayerId);
   });
 
   it("uses the requested casual bot count when starting rooms", async () => {
@@ -1006,6 +1097,24 @@ function waitForRoomState(socket: TestSocket): Promise<PublicRoomState> {
     socket.once("room:state", (state) => {
       resolve(state);
     });
+  });
+}
+
+function waitForRoomStateMatching(
+  socket: TestSocket,
+  predicate: (state: PublicRoomState) => boolean
+): Promise<PublicRoomState> {
+  return new Promise((resolve) => {
+    const handleRoomState = (state: PublicRoomState): void => {
+      if (!predicate(state)) {
+        return;
+      }
+
+      socket.off("room:state", handleRoomState);
+      resolve(state);
+    };
+
+    socket.on("room:state", handleRoomState);
   });
 }
 

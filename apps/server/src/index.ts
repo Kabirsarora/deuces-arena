@@ -135,6 +135,12 @@ const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
+const DISCONNECTED_AUTO_MOVE_DELAY_MS = parseIntegerSetting(
+  process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS,
+  15_000,
+  10,
+  120_000
+);
 const RATE_LIMITS: Readonly<Record<RateLimitBucket, RateLimitRule>> = {
   chat: {
     maxEvents: 8,
@@ -464,6 +470,7 @@ io.on("connection", (socket) => {
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
+    scheduleAutomatedTurn(room);
   });
 
   socket.on("room:start", async (payload, callback) => {
@@ -1069,6 +1076,7 @@ function leaveRoom(room: Room, playerId: string): void {
   );
   emitRoomState(room);
   emitLobbyState();
+  scheduleAutomatedTurn(room);
 }
 
 function createHumanPlayer(
@@ -1206,8 +1214,9 @@ function publicTurnTimer(room: Room) {
 }
 
 function scheduleAutomatedTurn(room: Room): void {
+  clearTurnTimer(room);
+
   if (room.game === null || room.game.status === "complete") {
-    clearTurnTimer(room);
     return;
   }
 
@@ -1218,10 +1227,18 @@ function scheduleAutomatedTurn(room: Room): void {
   }
 
   if (activePlayer.kind === "bot") {
-    clearTurnTimer(room);
     room.timerTimeout = setTimeout(
       () => applyAutomatedMove(room, activePlayer.id, botStrategyForDifficulty(room.botDifficulty)),
       botMoveDelayMs(room.botPace)
+    );
+    room.timerTimeout.unref();
+    return;
+  }
+
+  if (activePlayer.socketId === null) {
+    room.timerTimeout = setTimeout(
+      () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
+      DISCONNECTED_AUTO_MOVE_DELAY_MS
     );
     room.timerTimeout.unref();
     return;
@@ -1231,7 +1248,6 @@ function scheduleAutomatedTurn(room: Room): void {
     return;
   }
 
-  clearTurnTimer(room);
   room.timerTimeout = setTimeout(
     () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
     Math.max(0, room.turnDeadlineAt.getTime() - Date.now())
@@ -1684,6 +1700,21 @@ function parseCommaList(value: string | undefined): string[] {
       .map((item) => item.trim())
       .filter((item) => item !== "") ?? []
   );
+}
+
+function parseIntegerSetting(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = value === undefined ? Number.NaN : Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return clampInteger(parsed, min, max);
 }
 
 function isAdminGuestId(guestId: string): boolean {
