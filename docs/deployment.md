@@ -46,6 +46,9 @@ Server:
 PORT="4000"
 CLIENT_ORIGIN="https://your-web-app.example.com"
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/deuces_arena"
+DISCONNECTED_AUTO_MOVE_DELAY_MS="15000"
+ADMIN_EMAILS="creator@example.com"
+ADMIN_GUEST_IDS=""
 ```
 
 `CLIENT_ORIGIN` also accepts a comma-separated allowlist for deploy previews:
@@ -62,6 +65,8 @@ COACH_EVALUATION_EXPORT_LIMIT="1000"
 ```
 
 The app can run without `DATABASE_URL`, but match history, move persistence, durable guest stats, coach-evaluation persistence, and earned cosmetic unlocks require PostgreSQL.
+
+`GET /health` returns safe deployment metadata such as allowed origins, uptime, room counts, whether PostgreSQL/Redis are configured, and the disconnected-player grace delay. It does not expose secret connection strings.
 
 ## Build Commands
 
@@ -117,6 +122,7 @@ Run migrations from a trusted machine or CI job with database access. Do not run
 
 - Keep the server as the authority for all online moves.
 - Set `CLIENT_ORIGIN` to the exact deployed web origin, or a tight comma-separated allowlist, before enabling public traffic.
+- Use `GET /health` after every deploy to confirm the server is running with the expected origin allowlist, persistence mode, and disconnect grace setting.
 - Use one server instance until Redis-backed presence and room state are added.
 - Do not claim the bot or coach is AI until recommendations are grounded in simulations or model outputs.
 - Enable HTTPS for both web and server origins; browsers require secure contexts for production WebSocket usage in most deployments.

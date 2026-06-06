@@ -69,9 +69,27 @@ describe("realtime rooms", () => {
 
     expect(response.ok).toBe(true);
 
-    const health = (await response.json()) as { readonly allowedOrigins: readonly string[] };
+    const health = (await response.json()) as {
+      readonly allowedOrigins: readonly string[];
+      readonly config: {
+        readonly database: string;
+        readonly redis: string;
+        readonly disconnectedAutoMoveDelayMs: number;
+      };
+      readonly environment: string;
+      readonly service: string;
+      readonly uptimeSeconds: number;
+    };
 
     expect(health.allowedOrigins).toEqual(["http://localhost:3000", "https://preview.example.com"]);
+    expect(health.service).toBe("@deuces-arena/server");
+    expect(health.environment).toBe("test");
+    expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(health.config).toEqual({
+      database: "memory-fallback",
+      redis: "disabled",
+      disconnectedAutoMoveDelayMs: 10
+    });
   });
 
   it("returns cosmetic ownership fields with guest profiles", async () => {

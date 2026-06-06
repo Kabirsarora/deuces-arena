@@ -73,7 +73,7 @@ URI as `http://localhost:3000/api/auth/callback/google`.
 
 Useful backend endpoints:
 
-- `GET /health`: service health and active room count.
+- `GET /health`: service health, safe config metadata, uptime, and active room count.
 - `GET /lobby`: public room/activity snapshot.
 - `GET /leaderboard`: persisted or in-memory guest leaderboard.
 - `GET /cosmetics`: active cosmetic catalog.
@@ -126,7 +126,7 @@ npm run build
 
 Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
 
-The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`.
+The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`, and confirm the active value through `GET /health`.
 
 ## Deployment
 

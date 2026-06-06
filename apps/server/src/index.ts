@@ -125,10 +125,13 @@ type RankedQueuedPlayer = {
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
+const SERVICE_VERSION = process.env.npm_package_version ?? "0.1.0";
 const ADMIN_GUEST_IDS = [
   ...parseCommaList(process.env.ADMIN_GUEST_IDS),
   ...parseCommaList(process.env.ADMIN_EMAILS).map(createAuthProfileId)
 ];
+const DATABASE_CONFIGURED = isConfiguredEnvironmentValue(process.env.DATABASE_URL);
+const REDIS_CONFIGURED = isConfiguredEnvironmentValue(process.env.REDIS_URL);
 const CLASSIC_PLAYER_COUNT = 4;
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
@@ -307,8 +310,16 @@ app.get("/health", (_request, response) => {
   response.json({
     ok: true,
     service: "@deuces-arena/server",
+    version: SERVICE_VERSION,
+    environment: process.env.NODE_ENV ?? "development",
+    uptimeSeconds: Math.floor(process.uptime()),
     rooms: rooms.size,
     allowedOrigins: CLIENT_ORIGINS,
+    config: {
+      database: DATABASE_CONFIGURED ? "configured" : "memory-fallback",
+      redis: REDIS_CONFIGURED ? "configured" : "disabled",
+      disconnectedAutoMoveDelayMs: DISCONNECTED_AUTO_MOVE_DELAY_MS
+    },
     activity: publicLobbyState().activity
   });
 });
@@ -1715,6 +1726,10 @@ function parseIntegerSetting(
   }
 
   return clampInteger(parsed, min, max);
+}
+
+function isConfiguredEnvironmentValue(value: string | undefined): boolean {
+  return value !== undefined && value.trim() !== "";
 }
 
 function isAdminGuestId(guestId: string): boolean {
