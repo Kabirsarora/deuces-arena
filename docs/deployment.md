@@ -123,6 +123,7 @@ Run migrations from a trusted machine or CI job with database access. Do not run
 - Keep the server as the authority for all online moves.
 - Set `CLIENT_ORIGIN` to the exact deployed web origin, or a tight comma-separated allowlist, before enabling public traffic.
 - Use `GET /health` after every deploy to confirm the server is running with the expected origin allowlist, persistence mode, and disconnect grace setting.
+- Run through [demo-readiness.md](demo-readiness.md) before sharing the public link.
 - Use one server instance until Redis-backed presence and room state are added.
 - Do not claim the bot or coach is AI until recommendations are grounded in simulations or model outputs.
 - Enable HTTPS for both web and server origins; browsers require secure contexts for production WebSocket usage in most deployments.

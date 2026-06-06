@@ -131,6 +131,7 @@ The server defaults to a 15-second disconnected-player grace delay before it mak
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for web, server, database, and environment variable deployment notes.
+Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted link or recording a walkthrough.
 
 ## Roadmap
 
