@@ -1072,6 +1072,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                         : "text-zinc-400 hover:bg-white/8 hover:text-white"
                     )}
                     type="button"
+                    aria-pressed={handSortMode === option.mode}
                     onClick={() => setHandSortMode(option.mode)}
                   >
                     {option.label}
@@ -1167,6 +1168,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                 {(handDealtVisible ? displayedHand : []).map((card, index) => {
                   const selected = selectedCardIds.includes(getCardId(card));
                   const playable = isYourTurn && playableCardIds.has(getCardId(card));
+                  const cardName = formatCardName(card);
 
                   return (
                     <motion.button
@@ -1174,6 +1176,11 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       layout
                       type="button"
                       className="shrink-0 rounded-md disabled:cursor-default"
+                      aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
+                        playable ? ", legal option" : ""
+                      }`}
+                      aria-pressed={selected}
+                      title={cardName}
                       initial={
                         dealAnimationKey === null
                           ? { opacity: 0, y: 42, scale: 0.96 }
@@ -4623,6 +4630,54 @@ function OnlineCard({
 
 function formatCard(card: Card): string {
   return `${card.rank}${suitSymbol(card.suit)}`;
+}
+
+function formatCardName(card: Card): string {
+  return `${formatRankName(card.rank)} of ${formatSuitName(card.suit)}`;
+}
+
+function formatRankName(rank: Card["rank"]): string {
+  if (rank === "J") {
+    return "Jack";
+  }
+
+  if (rank === "Q") {
+    return "Queen";
+  }
+
+  if (rank === "K") {
+    return "King";
+  }
+
+  if (rank === "A") {
+    return "Ace";
+  }
+
+  return rank;
+}
+
+function formatSuitName(suit: Card["suit"]): string {
+  if (suit === "diamonds") {
+    return "diamonds";
+  }
+
+  if (suit === "clubs") {
+    return "clubs";
+  }
+
+  if (suit === "hearts") {
+    return "hearts";
+  }
+
+  if (suit === "spades") {
+    return "spades";
+  }
+
+  if (suit === "stars") {
+    return "stars";
+  }
+
+  return "crowns";
 }
 
 function sortHandForDisplay(
