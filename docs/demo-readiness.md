@@ -33,7 +33,7 @@ npm run build --workspace @deuces-arena/web
 
 - Open the deployed web URL and confirm the lobby loads without console-breaking errors.
 - Confirm the browser tab title, install metadata, and social preview text identify the app as Deuces Arena.
-- Confirm the lobby shows current online users, peak users, total users, and open rooms.
+- Confirm the lobby shows current online users, open rooms, and active rooms.
 - Create a casual bot table and start a game.
 - Create a casual room, copy the invite link, and join from another browser profile or incognito window.
 - Send one table chat message and confirm it appears for both clients.
@@ -44,7 +44,7 @@ npm run build --workspace @deuces-arena/web
 
 ## Demo Script
 
-1. Start in the lobby and point out current online users, peak users, total users, and open-room counts.
+1. Start in the lobby and point out current online users, open rooms, and active rooms.
 2. Create a room with bots to show the app is playable solo.
 3. Open lobby settings and mention casual variants: timer, bot difficulty, player count, cards per player, bomb rule, and Arena 6 deck.
 4. Start a hand and show server-authoritative validation by selecting cards and playing a legal move.

@@ -1347,7 +1347,6 @@ function OnlineLobbyHub({
   const activity = lobby?.activity;
   const openRooms = lobby?.openRooms ?? [];
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
-  const totalUsers = activity?.totalUsers ?? (profile === null ? 0 : 1);
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
@@ -1361,8 +1360,8 @@ function OnlineLobbyHub({
                 </p>
                 <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
                 <p className="mt-2 text-sm font-semibold text-zinc-400">
-                  {activity?.connectedUsers ?? 0} online · peak {activity?.peakConnectedUsers ?? 0}{" "}
-                  · {totalUsers} total users · {activity?.openRooms ?? 0} open rooms
+                  {activity?.connectedUsers ?? 0} online · {activity?.openRooms ?? 0} open rooms ·{" "}
+                  {activity?.activeRooms ?? 0} active rooms
                 </p>
               </div>
               <div className="flex items-center gap-3">

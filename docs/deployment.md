@@ -68,6 +68,8 @@ The app can run without `DATABASE_URL`, but match history, move persistence, dur
 
 `GET /health` returns safe deployment metadata such as allowed origins, uptime, room counts, whether PostgreSQL/Redis are configured, and the disconnected-player grace delay. It does not expose secret connection strings.
 
+The lobby payload tracks `peakConnectedUsers` and `totalUsers` for later admin analytics/resume reporting, but the player-facing lobby only shows current online users, open rooms, and active rooms.
+
 ## Build Commands
 
 Install:
