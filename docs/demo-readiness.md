@@ -33,20 +33,18 @@ npm run build --workspace @deuces-arena/web
 
 - Open the deployed web URL and confirm the lobby loads without console-breaking errors.
 - Confirm the browser tab title, install metadata, and social preview text identify the app as Deuces Arena.
-- Confirm the lobby health pills show `Socket live`.
-- Confirm `Postgres on` appears if the hosted backend has `DATABASE_URL`; `Memory mode` is acceptable for a temporary no-database demo.
-- Confirm `Single server` appears until Redis-backed scaling is intentionally added.
+- Confirm the lobby shows current online users, peak users, total users, and open rooms.
 - Create a casual bot table and start a game.
 - Create a casual room, copy the invite link, and join from another browser profile or incognito window.
 - Send one table chat message and confirm it appears for both clients.
 - Play at least one legal move and one pass.
 - Submit a short feedback report from the feedback panel.
 - Open a profile page and confirm public stats render.
-- Visit the server `/health` endpoint and verify the allowed origin, persistence mode, and disconnected-player grace delay.
+- Visit the server `/health` endpoint and verify the allowed origin, persistence mode, Redis mode, and disconnected-player grace delay.
 
 ## Demo Script
 
-1. Start in the lobby and point out live open-room/player counts.
+1. Start in the lobby and point out current online users, peak users, total users, and open-room counts.
 2. Create a room with bots to show the app is playable solo.
 3. Open lobby settings and mention casual variants: timer, bot difficulty, player count, cards per player, bomb rule, and Arena 6 deck.
 4. Start a hand and show server-authoritative validation by selecting cards and playing a legal move.

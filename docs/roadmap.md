@@ -29,6 +29,7 @@
 
 - Done: add rooms, lobby, ready states, reconnects, leave-room flow, and room links.
 - Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
+- Done: make lobby activity human-centered with peak and total user counters.
 - Done: add Socket.IO event contracts and server-authoritative move validation.
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
 - Done: add in-memory rate limits for noisy realtime actions.

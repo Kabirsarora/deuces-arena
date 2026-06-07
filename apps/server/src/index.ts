@@ -301,6 +301,7 @@ const socketRateLimitEvents = new Map<
   Partial<Record<RateLimitBucket, readonly number[]>>
 >();
 let rankedQueue: RankedQueuedPlayer[] = [];
+let peakConnectedUsers = 0;
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGINS }));
@@ -373,6 +374,9 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 );
 
 io.on("connection", (socket) => {
+  peakConnectedUsers = Math.max(peakConnectedUsers, io.engine.clientsCount);
+  emitLobbyState();
+
   function leaveCurrentRoomForSocket(): void {
     if (socket.data.roomCode === undefined || socket.data.playerId === undefined) {
       return;
@@ -971,6 +975,7 @@ io.on("connection", (socket) => {
     clearSocketRateLimits(socket.id);
     removeRankedQueueEntry(socket.id);
     emitRankedQueueState();
+    emitLobbyState();
 
     const roomCode = socket.data.roomCode;
     const playerId = socket.data.playerId;
@@ -1489,13 +1494,16 @@ function publicLobbyState(): PublicLobbyState {
     (room) => room.game !== null && room.game.status === "in-progress"
   );
   const completedRooms = roomList.filter((room) => room.game?.status === "complete");
+  const connectedUsers = io.engine.clientsCount;
 
   return {
     activity: {
       openRooms: openRooms.length,
       activeRooms: activeRooms.length,
       completedRooms: completedRooms.length,
-      connectedUsers: io.engine.clientsCount,
+      connectedUsers,
+      peakConnectedUsers: Math.max(peakConnectedUsers, connectedUsers),
+      totalUsers: guestProfiles.size,
       seatedHumans: roomList.reduce(
         (total, room) => total + room.players.filter((player) => player.kind === "human").length,
         0
@@ -1505,7 +1513,10 @@ function publicLobbyState(): PublicLobbyState {
         0
       ),
       playersInOpenRooms: openRooms.reduce((total, room) => total + room.seatedPlayers, 0),
-      playersInActiveGames: activeRooms.reduce((total, room) => total + room.players.length, 0)
+      playersInActiveGames: activeRooms.reduce(
+        (total, room) => total + room.players.filter((player) => player.kind === "human").length,
+        0
+      )
     },
     openRooms
   };

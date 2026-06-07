@@ -87,19 +87,6 @@ type AuthUser = {
   readonly email: string | null;
   readonly image: string | null;
 };
-type PublicServerHealth = {
-  readonly ok: boolean;
-  readonly service: string;
-  readonly version: string;
-  readonly environment: string;
-  readonly uptimeSeconds: number;
-  readonly rooms: number;
-  readonly config: {
-    readonly database: "configured" | "memory-fallback";
-    readonly redis: "configured" | "disabled";
-    readonly disconnectedAutoMoveDelayMs: number;
-  };
-};
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
@@ -174,7 +161,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
-  const [serverHealth, setServerHealth] = useState<PublicServerHealth | null>(null);
   const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
@@ -332,8 +318,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       setMessage(`Invite loaded for room ${inviteCode}.`);
     }
 
-    void refreshServerHealth(setServerHealth);
-
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
       autoConnect: true
     });
@@ -342,7 +326,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socket.on("connect", () => {
       setConnected(true);
       setMessage("Connected to realtime server.");
-      void refreshServerHealth(setServerHealth);
       refreshProfile(socket, getActiveProfileId(), setProfile);
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
@@ -362,7 +345,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     });
     socket.on("disconnect", () => {
       setConnected(false);
-      setServerHealth(null);
       setMessage("Disconnected from realtime server.");
     });
     socket.on("room:state", (state) => {
@@ -919,7 +901,6 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         hubMode={hubMode}
         joinCode={joinCode}
         lobby={lobby}
-        serverHealth={serverHealth}
         rankedQueue={rankedQueue}
         leaderboard={leaderboard}
         matchHistory={matchHistory}
@@ -1268,7 +1249,6 @@ function OnlineLobbyHub({
   hubMode,
   joinCode,
   lobby,
-  serverHealth,
   rankedQueue,
   leaderboard,
   matchHistory,
@@ -1319,7 +1299,6 @@ function OnlineLobbyHub({
   readonly hubMode: OnlineHubMode;
   readonly joinCode: string;
   readonly lobby: PublicLobbyState | null;
-  readonly serverHealth: PublicServerHealth | null;
   readonly rankedQueue: PublicRankedQueueState | null;
   readonly leaderboard: readonly PublicLeaderboardEntry[];
   readonly matchHistory: readonly PublicMatchHistoryItem[];
@@ -1368,6 +1347,7 @@ function OnlineLobbyHub({
   const activity = lobby?.activity;
   const openRooms = lobby?.openRooms ?? [];
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
+  const totalUsers = activity?.totalUsers ?? (profile === null ? 0 : 1);
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
@@ -1381,20 +1361,25 @@ function OnlineLobbyHub({
                 </p>
                 <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
                 <p className="mt-2 text-sm font-semibold text-zinc-400">
-                  {activity?.connectedUsers ?? 0} online · {activity?.playersInActiveGames ?? 0}{" "}
-                  playing · {activity?.openRooms ?? 0} open rooms
+                  {activity?.connectedUsers ?? 0} online · peak {activity?.peakConnectedUsers ?? 0}{" "}
+                  · {totalUsers} total users · {activity?.openRooms ?? 0} open rooms
                 </p>
-                <ServerHealthPills serverHealth={serverHealth} connected={connected} />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <span
                   className={cn(
-                    "rounded-full px-3 py-1 text-xs font-black",
+                    "hidden rounded-full px-3 py-1 text-xs font-black sm:inline-flex",
                     connected ? "bg-emerald-300 text-emerald-950" : "bg-red-300 text-red-950"
                   )}
                 >
                   {connected ? "Online" : "Offline"}
                 </span>
+                <HeaderAccountControl
+                  authUser={authUser}
+                  profile={profile}
+                  profileAvatarKey={profileAvatarKey}
+                  playerName={playerName}
+                />
               </div>
             </header>
 
@@ -1479,7 +1464,9 @@ function OnlineLobbyHub({
                 <HubPlayCard
                   icon={<Users className="size-12" />}
                   title="Casual Rooms"
-                  meta={`${activity?.openRooms ?? 0} open · ${activity?.playersInActiveGames ?? 0} playing`}
+                  meta={`${activity?.openRooms ?? 0} open · ${
+                    activity?.playersInActiveGames ?? 0
+                  } humans playing`}
                   actionLabel="Create Room"
                   disabled={!connected}
                   onAction={onCreateRoom}
@@ -1965,6 +1952,64 @@ function HubRankedCard({
   );
 }
 
+function HeaderAccountControl({
+  authUser,
+  profile,
+  profileAvatarKey,
+  playerName
+}: {
+  readonly authUser: AuthUser | null;
+  readonly profile: PublicGuestProfile | null;
+  readonly profileAvatarKey: ProfileAvatarKey;
+  readonly playerName: string;
+}) {
+  const displayName = profile?.displayName ?? authUser?.name ?? playerName;
+
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/25 p-1.5 shadow-lg backdrop-blur">
+      <AccountAvatar
+        imageUrl={authUser?.image ?? null}
+        fallback={authUser === null ? getAvatarSymbol(profileAvatarKey) : getInitial(displayName)}
+      />
+      {authUser === null ? (
+        <SignInWithGoogleButton className="h-9 rounded-full px-3 text-xs sm:text-sm" />
+      ) : (
+        <div className="flex items-center gap-1">
+          <Link
+            className="hidden h-9 items-center rounded-full px-3 text-sm font-black text-white transition hover:bg-white/10 sm:inline-flex"
+            href="/profile"
+          >
+            Profile
+          </Link>
+          <SignOutButton className="h-9 rounded-full px-3 text-xs sm:text-sm" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccountAvatar({
+  imageUrl,
+  fallback
+}: {
+  readonly imageUrl: string | null;
+  readonly fallback: string;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="grid size-9 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 bg-cover bg-center text-sm font-black text-white"
+      style={imageUrl === null ? undefined : { backgroundImage: `url(${imageUrl})` }}
+    >
+      {imageUrl === null ? fallback : null}
+    </div>
+  );
+}
+
+function getInitial(value: string): string {
+  return value.trim().charAt(0).toUpperCase() || "P";
+}
+
 function MinimalProfileCard({
   playerName,
   authUser,
@@ -2011,25 +2056,15 @@ function MinimalProfileCard({
       <div className="mt-4 rounded-[1rem] border border-white/10 bg-black/20 p-3">
         {authUser === null ? (
           <>
-            <p className="text-xs font-bold uppercase text-zinc-500">Guest profile</p>
+            <p className="text-xs font-bold uppercase text-zinc-500">Guest mode</p>
             <p className="mt-1 text-sm text-zinc-300">
-              Sign in to keep rating, match history, and cosmetics across devices.
+              Sign in from the top-right profile control.
             </p>
-            <SignInWithGoogleButton className="mt-3 h-10 w-full" />
           </>
         ) : (
           <>
             <p className="text-xs font-bold uppercase text-emerald-300">Signed in</p>
             <p className="mt-1 truncate text-sm font-bold text-zinc-200">{accountName}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link
-                className="inline-flex h-10 items-center justify-center rounded-md border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
-                href="/profile"
-              >
-                Profile
-              </Link>
-              <SignOutButton className="h-10 w-full" />
-            </div>
           </>
         )}
       </div>
@@ -2651,63 +2686,6 @@ function refreshCosmetics(
       setCosmetics(ack.data);
     }
   });
-}
-
-async function refreshServerHealth(
-  setServerHealth: (health: PublicServerHealth | null) => void
-): Promise<void> {
-  try {
-    const response = await fetch(`${SERVER_URL}/health`, {
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      setServerHealth(null);
-      return;
-    }
-
-    setServerHealth((await response.json()) as PublicServerHealth);
-  } catch {
-    setServerHealth(null);
-  }
-}
-
-function ServerHealthPills({
-  serverHealth,
-  connected
-}: {
-  readonly serverHealth: PublicServerHealth | null;
-  readonly connected: boolean;
-}) {
-  const persistenceLabel =
-    serverHealth?.config.database === "configured" ? "Postgres on" : "Memory mode";
-  const redisLabel = serverHealth?.config.redis === "configured" ? "Redis on" : "Single server";
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-2 text-[0.68rem] font-black uppercase tracking-wide">
-      <span
-        className={cn(
-          "rounded-full border px-2.5 py-1",
-          connected
-            ? "border-emerald-200/20 bg-emerald-300/10 text-emerald-200"
-            : "border-red-200/20 bg-red-300/10 text-red-200"
-        )}
-      >
-        Socket {connected ? "live" : "offline"}
-      </span>
-      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-300">
-        {persistenceLabel}
-      </span>
-      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-300">
-        {redisLabel}
-      </span>
-      {serverHealth !== null ? (
-        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-400">
-          {Math.round(serverHealth.config.disconnectedAutoMoveDelayMs / 1000)}s grace
-        </span>
-      ) : null}
-    </div>
-  );
 }
 
 function ProfileAvatar({ avatarKey }: { readonly avatarKey: ProfileAvatarKey }) {
