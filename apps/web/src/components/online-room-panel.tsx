@@ -34,7 +34,7 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -163,6 +163,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const lastDealAnimationKeyRef = useRef<string | null>(null);
   const lastObservedChatKeyRef = useRef<string | null>(null);
+  const shouldReduceMotion = useReducedMotion();
   const [connected, setConnected] = useState(false);
   const [playerName, setPlayerName] = useState("Player");
   const [profileDisplayName, setProfileDisplayName] = useState("Player");
@@ -291,7 +292,12 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }, [room?.yourHand]);
 
   useLayoutEffect(() => {
-    if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0) {
+    if (
+      shouldReduceMotion ||
+      room?.status !== "in-progress" ||
+      room.turnNumber !== 0 ||
+      room.yourHand.length === 0
+    ) {
       setDealAnimationKey(null);
       setHandDealtVisible(true);
       return;
@@ -316,7 +322,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       window.clearTimeout(revealHandTimeout);
       window.clearTimeout(clearDealTimeout);
     };
-  }, [room]);
+  }, [room, shouldReduceMotion]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -1036,7 +1042,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           <OnlineTable
             room={room}
             timerNow={timerNow}
-            dealAnimationKey={dealAnimationKey}
+            dealAnimationKey={shouldReduceMotion ? null : dealAnimationKey}
             onCreateBotGame={createBotGame}
             onLeaveRoom={leaveRoom}
           />
@@ -1182,30 +1188,47 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       aria-pressed={selected}
                       title={cardName}
                       initial={
-                        dealAnimationKey === null
-                          ? { opacity: 0, y: 42, scale: 0.96 }
+                        shouldReduceMotion
+                          ? false
+                          : dealAnimationKey === null
+                            ? { opacity: 0, y: 42, scale: 0.96 }
+                            : {
+                                opacity: 0,
+                                x: 220 - index * 18,
+                                y: -260,
+                                scale: 0.72,
+                                rotate: index % 2 === 0 ? -8 : 8
+                              }
+                      }
+                      animate={{
+                        opacity: 1,
+                        y: shouldReduceMotion ? 0 : selected ? -18 : 0,
+                        scale: shouldReduceMotion ? 1 : selected ? 1.03 : 1
+                      }}
+                      exit={
+                        shouldReduceMotion
+                          ? { opacity: 0 }
                           : {
                               opacity: 0,
-                              x: 220 - index * 18,
-                              y: -260,
+                              x: Math.max(
+                                -140,
+                                Math.min(140, (index - displayedHand.length / 2) * 18)
+                              ),
+                              y: -280,
                               scale: 0.72,
-                              rotate: index % 2 === 0 ? -8 : 8
+                              rotate: index % 2 === 0 ? -10 : 10
                             }
                       }
-                      animate={{ opacity: 1, y: selected ? -18 : 0, scale: selected ? 1.03 : 1 }}
-                      exit={{
-                        opacity: 0,
-                        x: Math.max(-140, Math.min(140, (index - displayedHand.length / 2) * 18)),
-                        y: -280,
-                        scale: 0.72,
-                        rotate: index % 2 === 0 ? -10 : 10
-                      }}
                       transition={{
-                        delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.045),
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 32,
-                        mass: 0.85
+                        ...(shouldReduceMotion
+                          ? { duration: 0 }
+                          : {
+                              delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.045),
+                              type: "spring",
+                              stiffness: 300,
+                              damping: 32,
+                              mass: 0.85
+                            })
                       }}
                       drag="x"
                       dragSnapToOrigin
@@ -1213,7 +1236,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       dragMomentum={false}
                       onDragStart={() => setHandSortMode("manual")}
                       onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
-                      {...(isYourTurn
+                      {...(isYourTurn && !shouldReduceMotion
                         ? {
                             whileHover: {
                               y: selected ? -20 : -8

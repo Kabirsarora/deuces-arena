@@ -22,6 +22,7 @@
 - Done: add human vs baseline bots.
 - Done: use `random-legal`, `lowest-legal`, and `simple-heuristic` bots only as honest baselines, not as claimed AI.
 - Done: add accessible card selection labels and pressed states for the hand controls.
+- Done: respect reduced-motion preferences for deal and card-selection motion.
 - In progress: continue polishing table layout, card motion, and visual identity so the UI feels less generic.
 
 ## Phase 4: Online Multiplayer
