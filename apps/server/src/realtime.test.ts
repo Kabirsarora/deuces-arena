@@ -6,11 +6,15 @@ import type {
   ClientToServerEvents,
   ChatPayload,
   CreateRoomPayload,
+  FeedbackPayload,
   JoinRoomPayload,
   PublicChatMessage,
   PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
+  PublicLeaderboardEntry,
   PublicLobbyState,
+  PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
   PublicRoomState,
@@ -36,6 +40,9 @@ beforeAll(async () => {
   process.env.PORT = "0";
   process.env.DATABASE_URL = "";
   process.env.CLIENT_ORIGIN = "http://localhost:3000, https://preview.example.com ";
+  process.env.ADMIN_GUEST_IDS = "guest-admin-cosmetics";
+  process.env.ADMIN_EMAILS = "creator@example.com";
+  process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS = "10";
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -62,9 +69,27 @@ describe("realtime rooms", () => {
 
     expect(response.ok).toBe(true);
 
-    const health = (await response.json()) as { readonly allowedOrigins: readonly string[] };
+    const health = (await response.json()) as {
+      readonly allowedOrigins: readonly string[];
+      readonly config: {
+        readonly database: string;
+        readonly redis: string;
+        readonly disconnectedAutoMoveDelayMs: number;
+      };
+      readonly environment: string;
+      readonly service: string;
+      readonly uptimeSeconds: number;
+    };
 
     expect(health.allowedOrigins).toEqual(["http://localhost:3000", "https://preview.example.com"]);
+    expect(health.service).toBe("@deuces-arena/server");
+    expect(health.environment).toBe("test");
+    expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(health.config).toEqual({
+      database: "memory-fallback",
+      redis: "disabled",
+      disconnectedAutoMoveDelayMs: 10
+    });
   });
 
   it("returns cosmetic ownership fields with guest profiles", async () => {
@@ -78,6 +103,7 @@ describe("realtime rooms", () => {
     }
 
     expect(profile.data.guestId).toBe("guest-profile-cosmetics");
+    expect(profile.data.arenaCoins).toBe(0);
     expect(profile.data.unlocks).toEqual([]);
     expect(profile.data.equippedCosmetics).toEqual([]);
   });
@@ -111,7 +137,17 @@ describe("realtime rooms", () => {
     }
 
     expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("classic-red-card-back");
+    expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("lagoon-table");
+    expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("neon-grid-card-back");
+    expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("aqua-pulse-avatar");
+    expect(socketCatalog.data.map((cosmetic) => cosmetic.slug)).toContain("aqua-profile-border");
     expect(socketCatalog.data.some((cosmetic) => cosmetic.isSupporter)).toBe(true);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "midnight-felt-table")?.coinPrice
+    ).toBe(500);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "obsidian-table")?.coinPrice
+    ).toBe(800);
 
     const restResponse = await fetch(`${serverUrl}/cosmetics`);
 
@@ -121,6 +157,51 @@ describe("realtime rooms", () => {
     expect(restCatalog.map((cosmetic) => cosmetic.slug)).toEqual(
       socketCatalog.data.map((cosmetic) => cosmetic.slug)
     );
+  });
+
+  it("serves the public leaderboard over REST", async () => {
+    const response = await fetch(`${serverUrl}/leaderboard?limit=3`);
+
+    expect(response.ok).toBe(true);
+
+    const leaderboard = (await response.json()) as PublicLeaderboardEntry[];
+    expect(Array.isArray(leaderboard)).toBe(true);
+    expect(leaderboard.length).toBeLessThanOrEqual(3);
+  });
+
+  it("serves profile and match history over REST", async () => {
+    const profileResponse = await fetch(`${serverUrl}/profiles/guest-rest-profile`);
+
+    expect(profileResponse.ok).toBe(true);
+
+    const profile = (await profileResponse.json()) as PublicGuestProfile;
+    expect(profile.guestId).toBe("guest-rest-profile");
+    expect(profile.rating).toBe(1000);
+    expect(profile.unlocks).toEqual([]);
+
+    const historyResponse = await fetch(`${serverUrl}/profiles/guest-rest-profile/history?limit=3`);
+
+    expect(historyResponse.ok).toBe(true);
+
+    const history = (await historyResponse.json()) as unknown[];
+    expect(history).toEqual([]);
+  });
+
+  it("accepts replay labels without requiring database persistence", async () => {
+    const socket = await connectTestSocket();
+    const labelAck = await labelReplay(socket, {
+      guestId: "guest-rest-profile",
+      matchId: "local-match",
+      label: "Close finish"
+    });
+
+    expect(labelAck.ok).toBe(true);
+
+    if (!labelAck.ok) {
+      return;
+    }
+
+    expect(labelAck.data).toEqual([]);
   });
 
   it("rejects cosmetic equip requests when persistence is unavailable", async () => {
@@ -137,6 +218,102 @@ describe("realtime rooms", () => {
     }
 
     expect(equipAck.error).toContain("database");
+  });
+
+  it("rejects cosmetic purchase requests when persistence is unavailable", async () => {
+    const socket = await connectTestSocket();
+    const purchaseAck = await purchaseCosmetic(socket, {
+      guestId: "guest-profile-cosmetics",
+      cosmeticId: "starter-midnight-felt-table"
+    });
+
+    expect(purchaseAck.ok).toBe(false);
+
+    if (purchaseAck.ok) {
+      return;
+    }
+
+    expect(purchaseAck.error).toContain("database");
+  });
+
+  it("allows configured admin profiles to equip any cosmetic without progression", async () => {
+    const socket = await connectTestSocket();
+    const catalog = await listCosmetics(socket);
+
+    expect(catalog.ok).toBe(true);
+
+    if (!catalog.ok) {
+      return;
+    }
+
+    const supporterCosmetic = catalog.data.find((cosmetic) => cosmetic.isSupporter);
+
+    expect(supporterCosmetic).toBeDefined();
+
+    if (supporterCosmetic === undefined) {
+      return;
+    }
+
+    const profile = await getProfile(socket, "guest-admin-cosmetics");
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
+    expect(profile.data.isAdmin).toBe(true);
+
+    const equipAck = await equipCosmetic(socket, {
+      guestId: "guest-admin-cosmetics",
+      cosmeticId: supporterCosmetic.id
+    });
+
+    expect(equipAck.ok).toBe(true);
+
+    if (!equipAck.ok) {
+      return;
+    }
+
+    expect(equipAck.data.equippedCosmetics.map((equipped) => equipped.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
+  });
+
+  it("allows configured admin emails to equip any cosmetic", async () => {
+    const socket = await connectTestSocket();
+    const catalog = await listCosmetics(socket);
+
+    expect(catalog.ok).toBe(true);
+
+    if (!catalog.ok) {
+      return;
+    }
+
+    const supporterCosmetic = catalog.data.find((cosmetic) => cosmetic.isSupporter);
+
+    expect(supporterCosmetic).toBeDefined();
+
+    if (supporterCosmetic === undefined) {
+      return;
+    }
+
+    const adminProfileId = "auth-758f27d1f066779a62a65665242b8780";
+    const profile = await getProfile(socket, adminProfileId);
+
+    expect(profile.ok).toBe(true);
+
+    if (!profile.ok) {
+      return;
+    }
+
+    expect(profile.data.unlocks.map((unlock) => unlock.cosmetic.id)).toContain(
+      supporterCosmetic.id
+    );
+    expect(profile.data.isAdmin).toBe(true);
   });
 
   it("creates rooms and exposes them through lobby activity", async () => {
@@ -362,6 +539,96 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.turnTimer?.deadlineAt).not.toBeNull();
   });
 
+  it("keeps a started room moving when the active player disconnects", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Unable to create test sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Host",
+      guestId: "guest-disconnect-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    for (const [socket, playerName, guestId] of [
+      [second, "Second", "guest-disconnect-second"],
+      [third, "Third", "guest-disconnect-third"],
+      [fourth, "Fourth", "guest-disconnect-fourth"]
+    ] as const) {
+      const joinedRoom = await joinRoom(socket, {
+        roomCode: createdRoom.data.roomCode,
+        playerName,
+        guestId
+      });
+
+      expect(joinedRoom.ok).toBe(true);
+    }
+
+    for (const socket of players) {
+      const readyRoom = await setReady(socket, {
+        roomCode: createdRoom.data.roomCode,
+        ready: true
+      });
+
+      expect(readyRoom.ok).toBe(true);
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 0
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok || startedRoom.data.activePlayerId === null) {
+      return;
+    }
+
+    const socketsByPlayerId = new Map(
+      startedRoom.data.players.map((player, index) => [player.id, players[index]])
+    );
+    const activeSocket = socketsByPlayerId.get(startedRoom.data.activePlayerId);
+    const observer = players.find((socket) => socket !== activeSocket);
+
+    if (activeSocket === undefined || observer === undefined) {
+      throw new Error("Unable to resolve active player socket.");
+    }
+
+    const disconnectedStatePromise = waitForRoomStateMatching(observer, (state) =>
+      state.players.some(
+        (player) => player.id === startedRoom.data.activePlayerId && !player.connected
+      )
+    );
+    activeSocket.disconnect();
+    const disconnectedState = await disconnectedStatePromise;
+
+    expect(
+      disconnectedState.players.find((player) => player.id === startedRoom.data.activePlayerId)
+        ?.connected
+    ).toBe(false);
+
+    const advancedState = await waitForRoomStateMatching(
+      observer,
+      (state) => state.turnNumber > startedRoom.data.turnNumber
+    );
+
+    expect(advancedState.turnNumber).toBeGreaterThan(startedRoom.data.turnNumber);
+    expect(advancedState.activePlayerId).not.toBe(startedRoom.data.activePlayerId);
+  });
+
   it("uses the requested casual bot count when starting rooms", async () => {
     const host = await connectTestSocket();
     const createdRoom = await createRoom(host, {
@@ -402,6 +669,101 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(3);
   });
 
+  it("publishes casual room rule variants in room and lobby state", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Rules Host",
+      guestId: "guest-rules-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const lobbyBeforeStart = await emitLobbyGet(host);
+
+    expect(lobbyBeforeStart.ok).toBe(true);
+
+    if (!lobbyBeforeStart.ok) {
+      return;
+    }
+
+    expect(
+      lobbyBeforeStart.data.openRooms.find((room) => room.roomCode === createdRoom.data.roomCode)
+        ?.rules
+    ).toEqual({
+      bombEndsTrick: false,
+      deckType: "classic",
+      playerCount: 4,
+      cardsPerPlayer: 13
+    });
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 3,
+      botPace: "quick",
+      rules: {
+        bombEndsTrick: true,
+        deckType: "arena-six",
+        playerCount: 4,
+        cardsPerPlayer: 15
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.rules).toEqual({
+      bombEndsTrick: true,
+      deckType: "arena-six",
+      playerCount: 4,
+      cardsPerPlayer: 15
+    });
+    expect(startedRoom.data.botPace).toBe("quick");
+    expect(startedRoom.data.yourHand).toHaveLength(15);
+  });
+
+  it("starts six-player arena tables with expanded suits", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Arena Host",
+      guestId: "guest-arena-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 5,
+      rules: {
+        bombEndsTrick: false,
+        deckType: "arena-six",
+        playerCount: 6,
+        cardsPerPlayer: 13
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    expect(startedRoom.data.players).toHaveLength(6);
+    expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(5);
+    expect(startedRoom.data.yourHand).toHaveLength(13);
+    expect(startedRoom.data.rules.deckType).toBe("arena-six");
+  });
+
   it("matches ranked queues with four humans and no bots", async () => {
     const players = await Promise.all([
       connectTestSocket(),
@@ -430,6 +792,32 @@ describe("realtime rooms", () => {
     expect(states[0]?.players).toHaveLength(4);
     expect(states[0]?.players.every((player) => player.kind === "human")).toBe(true);
     expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);
+  });
+
+  it("reports ranked queue position before a match starts", async () => {
+    const first = await connectTestSocket();
+    const second = await connectTestSocket();
+    const firstJoin = await joinRanked(first, {
+      playerName: "Queue One",
+      guestId: "guest-ranked-position-1"
+    });
+    const secondJoin = await joinRanked(second, {
+      playerName: "Queue Two",
+      guestId: "guest-ranked-position-2"
+    });
+
+    expect(firstJoin.ok).toBe(true);
+    expect(secondJoin.ok).toBe(true);
+
+    if (!firstJoin.ok || !secondJoin.ok) {
+      return;
+    }
+
+    expect(firstJoin.data.joined).toBe(true);
+    expect(firstJoin.data.queuePosition).toBe(1);
+    expect(secondJoin.data.joined).toBe(true);
+    expect(secondJoin.data.queuePosition).toBe(2);
+    expect(secondJoin.data.queuedPlayers).toBe(2);
   });
 
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
@@ -579,6 +967,69 @@ describe("realtime rooms", () => {
     expect(replay.data.coachEvaluations[0]?.playerId).toBe(startedRoom.data.activePlayerId);
     expect(replay.data.coachEvaluations[0]?.evaluations).toHaveLength(activeEvaluation.data.length);
   });
+
+  it("accepts structured feedback without requiring database persistence", async () => {
+    const socket = await connectTestSocket();
+    const feedback = await submitFeedback(socket, {
+      kind: "UI",
+      body: "The table view feels easier to read after the cleanup.",
+      guestId: "guest-feedback",
+      roomCode: "abc123",
+      contactEmail: "PLAYER@EXAMPLE.COM"
+    });
+
+    expect(feedback.ok).toBe(true);
+
+    if (!feedback.ok) {
+      return;
+    }
+
+    expect(feedback.data.id).toMatch(/^feedback-/);
+    expect(feedback.data.stored).toBe(false);
+    expect(Date.parse(feedback.data.createdAt)).not.toBeNaN();
+  });
+
+  it("rejects feedback that is too short", async () => {
+    const socket = await connectTestSocket();
+    const feedback = await submitFeedback(socket, {
+      kind: "BUG",
+      body: "bad"
+    });
+
+    expect(feedback.ok).toBe(false);
+  });
+
+  it("rate limits repeated feedback submissions per socket", async () => {
+    const socket = await connectTestSocket();
+    const payload = {
+      kind: "UI",
+      body: "The table view feels easier to read after the cleanup.",
+      guestId: "guest-feedback-rate"
+    } satisfies FeedbackPayload;
+
+    const first = await submitFeedback(socket, payload);
+    const second = await submitFeedback(socket, {
+      ...payload,
+      body: "The buttons feel better, but the room list could be clearer."
+    });
+    const third = await submitFeedback(socket, {
+      ...payload,
+      body: "The hand controls are smoother after the latest pass."
+    });
+    const fourth = await submitFeedback(socket, {
+      ...payload,
+      body: "This fourth message should be blocked by the rate limiter."
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(third.ok).toBe(true);
+    expect(fourth.ok).toBe(false);
+
+    if (!fourth.ok) {
+      expect(fourth.error).toContain("wait");
+    }
+  });
 });
 
 async function connectTestSocket(): Promise<TestSocket> {
@@ -626,6 +1077,8 @@ function startRoom(
       readonly enabled: boolean;
       readonly secondsPerTurn: number;
     };
+    readonly rules?: PublicRoomState["rules"];
+    readonly botPace?: PublicRoomState["botPace"];
   }
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {
@@ -662,6 +1115,24 @@ function waitForRoomState(socket: TestSocket): Promise<PublicRoomState> {
     socket.once("room:state", (state) => {
       resolve(state);
     });
+  });
+}
+
+function waitForRoomStateMatching(
+  socket: TestSocket,
+  predicate: (state: PublicRoomState) => boolean
+): Promise<PublicRoomState> {
+  return new Promise((resolve) => {
+    const handleRoomState = (state: PublicRoomState): void => {
+      if (!predicate(state)) {
+        return;
+      }
+
+      socket.off("room:state", handleRoomState);
+      resolve(state);
+    };
+
+    socket.on("room:state", handleRoomState);
   });
 }
 
@@ -711,6 +1182,28 @@ function equipCosmetic(
   });
 }
 
+function purchaseCosmetic(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly cosmeticId: string }
+): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("cosmetics:purchase", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function labelReplay(
+  socket: TestSocket,
+  payload: { readonly guestId: string; readonly matchId: string; readonly label: string }
+): Promise<ServerAck<readonly PublicMatchHistoryItem[]>> {
+  return new Promise((resolve) => {
+    socket.emit("profile:label-replay", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
 function evaluateMoves(
   socket: TestSocket,
   payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number }
@@ -728,6 +1221,17 @@ function exportReplay(
 ): Promise<ServerAck<RoomReplayExport>> {
   return new Promise((resolve) => {
     socket.emit("room:replay", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function submitFeedback(
+  socket: TestSocket,
+  payload: FeedbackPayload
+): Promise<ServerAck<PublicFeedbackReceipt>> {
+  return new Promise((resolve) => {
+    socket.emit("feedback:submit", payload, (ack) => {
       resolve(ack);
     });
   });

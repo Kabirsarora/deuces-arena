@@ -16,6 +16,7 @@ export type {
   Match,
   MatchPlayer,
   MoveEvent,
+  ReplayLabel,
   User,
   UserCosmeticUnlock,
   UserEquippedCosmetic

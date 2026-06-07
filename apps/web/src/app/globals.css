@@ -7,7 +7,6 @@
   --muted: #a7b0be;
   --table: #0f3b32;
   --table-deep: #09251f;
-  --felt-line: rgba(255, 255, 255, 0.08);
   --gold: #f2c14e;
   --ruby: #ef476f;
   --aqua: #3dd6d0;
@@ -57,28 +56,72 @@ textarea {
 
 .table-felt {
   background:
-    radial-gradient(ellipse at 48% 38%, rgba(255, 255, 255, 0.13), transparent 18rem),
-    radial-gradient(ellipse at 50% 72%, rgba(0, 0, 0, 0.24), transparent 22rem),
-    radial-gradient(circle at 18% 18%, rgba(61, 214, 208, 0.09), transparent 18rem),
-    radial-gradient(circle at 82% 20%, rgba(242, 193, 78, 0.07), transparent 17rem),
-    linear-gradient(135deg, rgba(18, 88, 73, 0.95), rgba(8, 39, 33, 0.98) 56%, #061b17);
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.12), transparent 19rem),
+    radial-gradient(ellipse at 24% 62%, rgba(61, 214, 208, 0.06), transparent 18rem),
+    radial-gradient(ellipse at 82% 64%, rgba(242, 193, 78, 0.05), transparent 17rem),
+    linear-gradient(115deg, rgba(255, 255, 255, 0.035), transparent 38%),
+    radial-gradient(ellipse at center, rgba(22, 91, 72, 0.98), rgba(5, 28, 24, 0.99) 73%),
+    linear-gradient(135deg, #0d3b32, #061b17);
 }
 
 .table-theme-midnight-felt {
   background:
-    radial-gradient(ellipse at 46% 38%, rgba(61, 214, 208, 0.16), transparent 18rem),
-    radial-gradient(ellipse at 50% 75%, rgba(0, 0, 0, 0.34), transparent 24rem),
-    radial-gradient(circle at 50% 55%, #12433a 0%, #061c18 76%);
+    radial-gradient(ellipse at 48% 38%, rgba(61, 214, 208, 0.12), transparent 18rem),
+    radial-gradient(ellipse at 30% 68%, rgba(242, 193, 78, 0.045), transparent 17rem),
+    radial-gradient(ellipse at 50% 75%, rgba(0, 0, 0, 0.36), transparent 24rem),
+    radial-gradient(circle at 50% 55%, #103e36 0%, #041916 76%);
+}
+
+.table-theme-lagoon {
+  background:
+    radial-gradient(ellipse at 44% 36%, rgba(255, 255, 255, 0.18), transparent 17rem),
+    radial-gradient(ellipse at 76% 70%, rgba(242, 193, 78, 0.1), transparent 17rem),
+    radial-gradient(ellipse at 25% 72%, rgba(34, 211, 238, 0.22), transparent 20rem),
+    radial-gradient(circle at 50% 55%, #177566 0%, #06342f 76%);
+}
+
+.table-theme-obsidian {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(242, 193, 78, 0.14), transparent 18rem),
+    radial-gradient(ellipse at 28% 68%, rgba(168, 85, 247, 0.08), transparent 18rem),
+    radial-gradient(ellipse at 80% 62%, rgba(0, 0, 0, 0.48), transparent 18rem),
+    radial-gradient(circle at 50% 55%, #17211f 0%, #050607 78%);
 }
 
 .table-oval {
   border-radius: 38% / 13%;
   box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.07),
-    inset 0 0 0 18px rgba(4, 8, 9, 0.28),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.075),
+    inset 0 0 0 18px rgba(3, 7, 8, 0.28),
+    inset 0 0 0 22px rgba(255, 255, 255, 0.035),
     inset 0 0 48px rgba(255, 255, 255, 0.04),
-    inset 0 -44px 100px rgba(0, 0, 0, 0.28),
+    inset 0 -50px 110px rgba(0, 0, 0, 0.34),
     0 34px 92px rgba(0, 0, 0, 0.5);
+}
+
+.table-felt::before,
+.table-felt::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.table-felt::before {
+  border-radius: inherit;
+  background:
+    linear-gradient(95deg, transparent 0%, rgba(255, 255, 255, 0.045) 43%, transparent 58%),
+    radial-gradient(ellipse at 50% 50%, transparent 48%, rgba(0, 0, 0, 0.24) 100%);
+  mix-blend-mode: screen;
+  opacity: 0.24;
+}
+
+.table-felt::after {
+  inset: 2.8rem;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 70px rgba(255, 255, 255, 0.03),
+    inset 0 0 0 999px rgba(0, 0, 0, 0.015);
 }
 
 .seat-panel {
@@ -89,6 +132,40 @@ textarea {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 16px 34px rgba(0, 0, 0, 0.26);
+}
+
+.profile-border-aqua {
+  border-color: rgba(103, 232, 249, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(103, 232, 249, 0.18),
+    0 16px 34px rgba(0, 0, 0, 0.26),
+    0 0 34px rgba(34, 211, 238, 0.16);
+}
+
+.profile-border-founder-gold {
+  border-color: rgba(242, 193, 78, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(242, 193, 78, 0.24),
+    0 16px 34px rgba(0, 0, 0, 0.26),
+    0 0 42px rgba(242, 193, 78, 0.18);
+}
+
+.avatar-cosmetic-aqua {
+  border-color: rgba(103, 232, 249, 0.55);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.24), transparent 34%),
+    linear-gradient(145deg, rgba(34, 211, 238, 0.32), rgba(13, 148, 136, 0.16));
+  color: rgb(224, 252, 255);
+}
+
+.avatar-cosmetic-crown {
+  border-color: rgba(242, 193, 78, 0.68);
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.3), transparent 28%),
+    linear-gradient(145deg, rgba(242, 193, 78, 0.36), rgba(120, 53, 15, 0.18));
+  color: rgb(254, 243, 199);
 }
 
 .trick-island {
@@ -137,9 +214,15 @@ textarea {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 42% / 20%;
   background:
-    radial-gradient(ellipse at 50% 48%, rgba(255, 255, 255, 0.1), transparent 12rem),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 14px),
-    radial-gradient(ellipse at center, #14604d 0%, #08362c 72%);
+    radial-gradient(ellipse at 50% 48%, rgba(255, 255, 255, 0.09), transparent 12rem),
+    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.07) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 72% 62%, rgba(0, 0, 0, 0.12) 0 1px, transparent 2px),
+    radial-gradient(ellipse at center, #145a49 0%, #082d25 72%);
+  background-size:
+    auto,
+    41px 43px,
+    53px 47px,
+    auto;
   box-shadow:
     inset 0 0 0 10px rgba(0, 0, 0, 0.18),
     inset 0 0 0 12px rgba(255, 255, 255, 0.04),
@@ -151,20 +234,28 @@ textarea {
   inset: 14px;
   content: "";
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 42% / 20%;
+  box-shadow: inset 0 0 36px rgba(255, 255, 255, 0.025);
 }
 
 .waiting-room-table {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 38% / 14%;
   background:
-    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.11), transparent 17rem),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 18px),
-    radial-gradient(ellipse at center, #145844 0%, #082d25 72%);
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.1), transparent 17rem),
+    radial-gradient(ellipse at 28% 68%, rgba(61, 214, 208, 0.07), transparent 18rem),
+    radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.06) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 72% 66%, rgba(0, 0, 0, 0.12) 0 1px, transparent 2px),
+    radial-gradient(ellipse at center, #145845 0%, #072d25 72%);
+  background-size:
+    auto,
+    auto,
+    43px 47px,
+    59px 53px,
+    auto;
   box-shadow:
-    inset 0 0 0 18px rgba(0, 0, 0, 0.2),
-    inset 0 0 0 21px rgba(255, 255, 255, 0.04),
+    inset 0 0 0 14px rgba(255, 255, 255, 0.026),
+    inset 0 0 0 30px rgba(0, 0, 0, 0.22),
     0 34px 90px rgba(0, 0, 0, 0.45);
 }
 
@@ -173,8 +264,8 @@ textarea {
   inset: 3.5rem;
   content: "";
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 38% / 14%;
+  box-shadow: inset 0 0 62px rgba(255, 255, 255, 0.03);
 }
 
 .card-back {
@@ -189,4 +280,24 @@ textarea {
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22), transparent 28%),
     repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 7px),
     linear-gradient(145deg, #f43f5e, #7f1d1d 62%, #2a0d14);
+}
+
+.card-back-neon-grid {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.24), transparent 28%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(145deg, #2563eb, #0f172a 58%, #042f2e);
+  background-size:
+    auto,
+    8px 8px,
+    8px 8px,
+    auto;
+}
+
+.card-back-ember-court {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(251, 191, 36, 0.34), transparent 25%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 9px),
+    linear-gradient(145deg, #f97316, #7f1d1d 54%, #1c1917);
 }

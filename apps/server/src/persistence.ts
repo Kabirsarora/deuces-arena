@@ -9,9 +9,11 @@ import {
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
+  FeedbackKind,
   MatchMode,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicMatchHistoryItem,
@@ -44,6 +46,22 @@ export type EquipCosmeticResult =
       readonly reason: "database-unavailable" | "profile-not-found" | "cosmetic-not-owned";
     };
 
+export type PurchaseCosmeticResult =
+  | {
+      readonly ok: true;
+      readonly profile: PublicGuestProfile;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "database-unavailable"
+        | "profile-not-found"
+        | "cosmetic-not-found"
+        | "cosmetic-not-purchasable"
+        | "cosmetic-already-owned"
+        | "insufficient-coins";
+    };
+
 export type UpdateProfileResult =
   | {
       readonly ok: true;
@@ -54,9 +72,25 @@ export type UpdateProfileResult =
       readonly reason: "database-unavailable";
     };
 
+export type SaveReplayLabelResult =
+  | {
+      readonly ok: true;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "database-unavailable" | "profile-not-found" | "match-not-found";
+    };
+
 type CosmeticProgressionStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
+};
+
+const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
+  first: 120,
+  second: 80,
+  third: 50,
+  other: 25
 };
 
 const COSMETIC_UNLOCK_RULES: readonly {
@@ -167,6 +201,7 @@ export async function getPersistedGuestProfile(
         rating: true,
         gamesPlayed: true,
         wins: true,
+        arenaCoins: true,
         placementTotal: true,
         cosmeticUnlocks: {
           orderBy: {
@@ -184,6 +219,7 @@ export async function getPersistedGuestProfile(
                 description: true,
                 rarity: true,
                 isSupporter: true,
+                coinPrice: true,
                 previewUrl: true
               }
             }
@@ -205,6 +241,7 @@ export async function getPersistedGuestProfile(
                 description: true,
                 rarity: true,
                 isSupporter: true,
+                coinPrice: true,
                 previewUrl: true
               }
             }
@@ -225,6 +262,8 @@ export async function getPersistedGuestProfile(
       gamesPlayed: user.gamesPlayed,
       wins: user.wins,
       averagePlacement: user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed,
+      arenaCoins: user.arenaCoins,
+      isAdmin: false,
       unlocks: user.cosmeticUnlocks.map((unlock) => ({
         cosmetic: unlock.cosmetic,
         source: unlock.source,
@@ -331,6 +370,7 @@ export async function getPersistedLeaderboard(
         rating: true,
         gamesPlayed: true,
         wins: true,
+        arenaCoins: true,
         placementTotal: true
       }
     });
@@ -345,6 +385,7 @@ export async function getPersistedLeaderboard(
               rating: user.rating,
               gamesPlayed: user.gamesPlayed,
               wins: user.wins,
+              arenaCoins: user.arenaCoins,
               averagePlacement:
                 user.gamesPlayed === 0 ? null : user.placementTotal / user.gamesPlayed
             }
@@ -387,6 +428,7 @@ export async function getPersistedCosmetics(): Promise<readonly PublicCosmetic[]
         description: true,
         rarity: true,
         isSupporter: true,
+        coinPrice: true,
         previewUrl: true
       }
     });
@@ -492,6 +534,123 @@ export async function equipPersistedCosmetic(
   }
 }
 
+export async function purchasePersistedCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<PurchaseCosmeticResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    const result = await db.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: {
+          guestId
+        },
+        select: {
+          id: true,
+          arenaCoins: true
+        }
+      });
+
+      if (user === null) {
+        return { ok: false as const, reason: "profile-not-found" as const };
+      }
+
+      const cosmetic = await tx.cosmetic.findFirst({
+        where: {
+          id: cosmeticId,
+          isActive: true
+        },
+        select: {
+          id: true,
+          coinPrice: true,
+          isSupporter: true
+        }
+      });
+
+      if (cosmetic === null) {
+        return { ok: false as const, reason: "cosmetic-not-found" as const };
+      }
+
+      if (cosmetic.isSupporter || cosmetic.coinPrice === null) {
+        return { ok: false as const, reason: "cosmetic-not-purchasable" as const };
+      }
+
+      const existingUnlock = await tx.userCosmeticUnlock.findUnique({
+        where: {
+          userId_cosmeticId: {
+            userId: user.id,
+            cosmeticId
+          }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (existingUnlock !== null) {
+        return { ok: false as const, reason: "cosmetic-already-owned" as const };
+      }
+
+      if (user.arenaCoins < cosmetic.coinPrice) {
+        return { ok: false as const, reason: "insufficient-coins" as const };
+      }
+
+      await tx.user.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          arenaCoins: {
+            decrement: cosmetic.coinPrice
+          }
+        }
+      });
+
+      await tx.userCosmeticUnlock.create({
+        data: {
+          userId: user.id,
+          cosmeticId,
+          source: "EARNED"
+        }
+      });
+
+      return { ok: true as const };
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    const profile = await getPersistedGuestProfile(guestId);
+
+    if (profile === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    return {
+      ok: true,
+      profile
+    };
+  } catch (error) {
+    console.error("Unable to purchase cosmetic.", error);
+    return {
+      ok: false,
+      reason: "profile-not-found"
+    };
+  }
+}
+
 export async function getPersistedMatchHistory(
   guestId: string,
   limit: number
@@ -540,6 +699,19 @@ export async function getPersistedMatchHistory(
                 kind: true,
                 placement: true
               }
+            },
+            replayLabels: {
+              where: {
+                user: {
+                  guestId
+                }
+              },
+              orderBy: {
+                createdAt: "desc"
+              },
+              select: {
+                label: true
+              }
             }
           }
         }
@@ -561,6 +733,7 @@ export async function getPersistedMatchHistory(
       cardsRemaining: matchPlayer.cardsRemaining,
       bombsPlayed: matchPlayer.bombsPlayed,
       movesPlayed: matchPlayer.averageMoveCount,
+      labels: matchPlayer.match.replayLabels.map((replayLabel) => replayLabel.label),
       opponents: matchPlayer.match.players.map((player) => ({
         name: player.playerLabel,
         kind: fromDbPlayerKind(player.kind),
@@ -607,6 +780,158 @@ export async function persistCoachEvaluation(
     });
   } catch (error) {
     console.error("Unable to persist coach evaluation.", error);
+  }
+}
+
+export async function savePersistedReplayLabel(
+  guestId: string,
+  matchId: string,
+  label: string
+): Promise<SaveReplayLabelResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      ok: false,
+      reason: "database-unavailable"
+    };
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: {
+        guestId
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (user === null) {
+      return {
+        ok: false,
+        reason: "profile-not-found"
+      };
+    }
+
+    const matchPlayer = await db.prisma.matchPlayer.findFirst({
+      where: {
+        matchId,
+        userId: user.id,
+        match: {
+          status: "COMPLETED"
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (matchPlayer === null) {
+      return {
+        ok: false,
+        reason: "match-not-found"
+      };
+    }
+
+    await db.prisma.replayLabel.upsert({
+      where: {
+        userId_matchId_label: {
+          userId: user.id,
+          matchId,
+          label
+        }
+      },
+      create: {
+        userId: user.id,
+        matchId,
+        label
+      },
+      update: {}
+    });
+
+    return {
+      ok: true
+    };
+  } catch (error) {
+    console.error("Unable to save replay label.", error);
+    return {
+      ok: false,
+      reason: "match-not-found"
+    };
+  }
+}
+
+export async function persistFeedbackReport(input: {
+  readonly id: string;
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly guestId: string | null;
+  readonly roomCode: string | null;
+  readonly contactEmail: string | null;
+  readonly userAgent: string | null;
+  readonly createdAt: Date;
+}): Promise<PublicFeedbackReceipt> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+
+  try {
+    const user =
+      input.guestId === null
+        ? null
+        : await db.prisma.user.findUnique({
+            where: {
+              guestId: input.guestId
+            },
+            select: {
+              id: true
+            }
+          });
+
+    await db.prisma.$executeRaw`
+      INSERT INTO "FeedbackReport" (
+        "id",
+        "userId",
+        "guestId",
+        "roomCode",
+        "kind",
+        "body",
+        "contactEmail",
+        "userAgent",
+        "createdAt"
+      )
+      VALUES (
+        ${input.id},
+        ${user?.id ?? null},
+        ${input.guestId},
+        ${input.roomCode},
+        ${input.kind},
+        ${input.body},
+        ${input.contactEmail},
+        ${input.userAgent},
+        ${input.createdAt}
+      )
+    `;
+
+    return {
+      id: input.id,
+      stored: true,
+      createdAt: input.createdAt.toISOString()
+    };
+  } catch (error) {
+    console.error("Unable to persist feedback report.", error);
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
   }
 }
 
@@ -755,6 +1080,9 @@ export async function completePersistedMatch(
               },
               placementTotal: {
                 increment: placement
+              },
+              arenaCoins: {
+                increment: getArenaCoinReward(placement)
               }
             }
           })
@@ -765,6 +1093,22 @@ export async function completePersistedMatch(
   } catch (error) {
     console.error("Unable to persist match completion.", error);
   }
+}
+
+function getArenaCoinReward(placement: number): number {
+  if (placement === 1) {
+    return ARENA_COIN_REWARDS.first;
+  }
+
+  if (placement === 2) {
+    return ARENA_COIN_REWARDS.second;
+  }
+
+  if (placement === 3) {
+    return ARENA_COIN_REWARDS.third;
+  }
+
+  return ARENA_COIN_REWARDS.other;
 }
 
 async function awardEarnedCosmetics(

@@ -58,6 +58,7 @@ model User {
   wins            Int           @default(0)
   losses          Int           @default(0)
   placementTotal  Int           @default(0)
+  arenaCoins      Int           @default(0)
   supporterStatus String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -65,6 +66,8 @@ model User {
   cosmeticUnlocks UserCosmeticUnlock[]
   equippedCosmetics UserEquippedCosmetic[]
   oauthAccounts   OAuthAccount[]
+  feedbackReports FeedbackReport[]
+  replayLabels    ReplayLabel[]
 
   @@index([rating])
 }
@@ -99,6 +102,7 @@ model Match {
   players     MatchPlayer[]
   moves       MoveEvent[]
   coachEvaluations CoachEvaluation[]
+  replayLabels ReplayLabel[]
 
   @@index([mode, status])
   @@index([startedAt])
@@ -176,6 +180,20 @@ model CoachEvaluation {
   @@index([roomCode, createdAt])
 }
 
+model ReplayLabel {
+  id        String   @id @default(cuid())
+  userId    String
+  matchId   String
+  label     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId, label])
+  @@index([matchId])
+  @@index([userId, createdAt])
+}
+
 model Cosmetic {
   id          String         @id @default(cuid())
   slug        String         @unique
@@ -184,6 +202,7 @@ model Cosmetic {
   description String?
   rarity      String         @default("common")
   isSupporter Boolean        @default(false)
+  coinPrice   Int?
   isActive    Boolean        @default(true)
   previewUrl  String?
   metadata    Json?
@@ -222,4 +241,22 @@ model UserEquippedCosmetic {
 
   @@unique([userId, kind])
   @@index([cosmeticId])
+}
+
+model FeedbackReport {
+  id           String   @id @default(cuid())
+  userId       String?
+  guestId      String?
+  roomCode     String?
+  kind         String
+  body         String
+  contactEmail String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([guestId])
+  @@index([roomCode])
+  @@index([kind])
 }

@@ -7,11 +7,13 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 ## Current Features
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, and simulation-based move evaluation utilities.
-- Mobile-first Next.js table for local human vs bot play, with selected-card motion, trick display, turn state, and game-over summaries.
-- Socket.IO rooms with server-authoritative move validation, reconnect support, ready states, leave-room flow, invite links, bot fill, table chat, live lobby discovery, open-room counts, connected-user counts, and replay export.
-- Guest profiles with match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
+- Mobile-first Next.js table for local human vs bot play, with selected-card motion, trick display, turn state, game-over summaries, replay review targets, and hosted-demo metadata.
+- Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, table chat, basic realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
+- Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
+- Signed-in and public profile pages with account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
 - Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, stores the analysis in replay exports, and can persist those records for future AI coach training/evaluation.
 - Cosmetics foundation with catalog APIs, earned unlock tracking, profile loadouts, equip validation, starter progression rewards, and non-pay-to-win supporter-ready data models.
+- Arena Coins soft-currency foundation for earned, non-real-money progression rewards.
 - Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
 - Early ML package for random self-play sample generation and JSONL export of persisted coach evaluations without pretending baseline bots are trained AI.
 
@@ -30,11 +32,13 @@ The engine is deliberately independent from React and the server. A future Expo 
 
 ## Game Rules
 
-Deuces Arena currently implements a 4-player Deuces / Big Two shedding game:
+Deuces Arena currently implements classic 4-player Deuces / Big Two plus an experimental casual Arena 6 table variant:
 
 - Each player receives 13 cards.
 - Card rank order is `3 4 5 6 7 8 9 10 J Q K A 2`.
-- Suit order is diamonds, clubs, hearts, spades.
+- Classic suit order is diamonds, clubs, hearts, spades.
+- Arena 6 adds placeholder Stars and Crowns suits above spades, so the full order is diamonds, clubs, hearts, spades, stars, crowns.
+- Casual rooms can choose 2-6 seats and custom cards per player when the selected deck has enough cards.
 - The player holding 3 of diamonds starts, and the first play must include it.
 - The lead player chooses the trick type: single, pair, trips, quad, full house, straight, longer straight, or bomb.
 - Players must answer with the same hand type and straight length, unless they play a bomb.
@@ -42,13 +46,15 @@ Deuces Arena currently implements a 4-player Deuces / Big Two shedding game:
 - When everyone else passes, the last valid player wins the trick and leads the next one.
 - First player to empty their hand wins.
 
-Current bomb variant:
+Bomb variants:
 
 - A bomb is four of a kind plus one kicker.
 - A bomb beats any non-bomb hand.
-- Once a bomb is active, only a stronger bomb can beat it.
 - Bomb strength is determined by the rank of the four of a kind; the kicker is ignored.
-- This is intentionally documented as a variant choice so alternate house rules can be added later.
+- Default room rule: once a bomb is active, only a stronger bomb can beat it.
+- Optional room rule: a bomb immediately wins the trick, so no stronger bomb response is allowed.
+- Arena 6 keeps bombs as four of a kind plus one kicker for now; five- or six-of-a-kind "super bomb" rules are intentionally deferred.
+- These are intentionally documented as variant choices so more house rules can be added later.
 
 ## Local Setup
 
@@ -67,7 +73,7 @@ URI as `http://localhost:3000/api/auth/callback/google`.
 
 Useful backend endpoints:
 
-- `GET /health`: service health and active room count.
+- `GET /health`: service health, safe config metadata, uptime, and active room count.
 - `GET /lobby`: public room/activity snapshot.
 - `GET /leaderboard`: persisted or in-memory guest leaderboard.
 - `GET /cosmetics`: active cosmetic catalog.
@@ -95,6 +101,8 @@ Current cosmetic progression is intentionally simple:
 - Complete 1 persisted match: unlock `classic-red-card-back`.
 - Win 1 persisted match: unlock `midnight-felt-table`.
 - Supporter cosmetics are modeled separately and do not affect gameplay.
+- Arena Coins are earned from completed matches and are not purchasable or bettable yet.
+- Cosmetic coin purchases are server-validated and only unlock non-supporter presentation items such as card backs, table themes, avatars, and profile borders.
 
 ## ML Data Export
 
@@ -116,11 +124,14 @@ npm run test
 npm run build
 ```
 
-Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
+Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
+
+The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`, and confirm the active value through `GET /health`.
 
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for web, server, database, and environment variable deployment notes.
+Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted link or recording a walkthrough.
 
 ## Roadmap
 
@@ -128,6 +139,7 @@ See [docs/deployment.md](docs/deployment.md) for web, server, database, and envi
 - Add production Google sign-in and account/profile persistence with deployed OAuth credentials.
 - Deploy the frontend, backend, PostgreSQL database, and optional Redis layer.
 - Expand ranked mode with queue health, rating history, leaderboards, and anti-abuse checks.
+- Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
 - Improve baseline bots, then add simulation-backed bots and self-play data generation.
 - Build AI coach explanations from legal moves, replay state, rollout outcomes, and future model scores.
 - Add replay timeline UI, searchable match history, and richer post-game analysis.

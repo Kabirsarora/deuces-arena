@@ -1,8 +1,10 @@
-import type { Card, CurrentTrick, GameEvent, Move } from "@deuces-arena/game-engine";
+import type { Card, CurrentTrick, DeckType, GameEvent, Move } from "@deuces-arena/game-engine";
 
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
+export type PublicBotDifficulty = "easy" | "normal" | "hard";
+export type PublicBotPace = "quick" | "normal" | "relaxed";
 export type CosmeticKind =
   | "CARD_BACK"
   | "TABLE_THEME"
@@ -17,6 +19,7 @@ export type PublicPlayerStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
   readonly averagePlacement: number | null;
+  readonly arenaCoins: number;
 };
 
 export type ProfileAvatarKey = "diamond" | "club" | "heart" | "spade";
@@ -25,6 +28,7 @@ export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
   readonly displayName: string | null;
   readonly avatarKey: ProfileAvatarKey;
+  readonly isAdmin: boolean;
   readonly unlocks: readonly PublicCosmeticUnlock[];
   readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };
@@ -42,6 +46,7 @@ export type PublicCosmetic = {
   readonly description: string | null;
   readonly rarity: string;
   readonly isSupporter: boolean;
+  readonly coinPrice: number | null;
   readonly previewUrl: string | null;
 };
 
@@ -75,12 +80,14 @@ export type PublicMatchHistoryItem = {
   readonly cardsRemaining: number | null;
   readonly bombsPlayed: number;
   readonly movesPlayed: number | null;
+  readonly labels: readonly string[];
   readonly opponents: readonly PublicMatchHistoryPlayer[];
 };
 
 export type PublicOpenRoom = {
   readonly roomCode: string;
   readonly hostName: string;
+  readonly rules: PublicRoomRules;
   readonly seatedPlayers: number;
   readonly readyPlayers: number;
   readonly maxPlayers: number;
@@ -109,6 +116,7 @@ export type PublicRankedQueueState = {
   readonly requiredPlayers: number;
   readonly etaSeconds: number | null;
   readonly joined: boolean;
+  readonly queuePosition: number | null;
 };
 
 export type PublicRoomPlayer = {
@@ -149,10 +157,21 @@ export type PublicCoachEvaluationRecord = {
   readonly evaluations: readonly PublicMoveEvaluation[];
 };
 
+export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI";
+
+export type PublicFeedbackReceipt = {
+  readonly id: string;
+  readonly stored: boolean;
+  readonly createdAt: string;
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;
   readonly status: RoomStatus;
+  readonly rules: PublicRoomRules;
+  readonly botDifficulty: PublicBotDifficulty;
+  readonly botPace: PublicBotPace;
   readonly players: readonly PublicRoomPlayer[];
   readonly activePlayerId: string | null;
   readonly currentTrick: CurrentTrick | null;
@@ -169,6 +188,13 @@ export type PublicTurnTimerState = {
   readonly enabled: boolean;
   readonly secondsPerTurn: number;
   readonly deadlineAt: string | null;
+};
+
+export type PublicRoomRules = {
+  readonly bombEndsTrick: boolean;
+  readonly deckType: DeckType;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
 };
 
 export type RoomReplayExport = {
@@ -208,6 +234,14 @@ export type ChatPayload = {
   readonly body: string;
 };
 
+export type FeedbackPayload = {
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly guestId?: string;
+  readonly roomCode?: string;
+  readonly contactEmail?: string;
+};
+
 export type ServerAck<T = undefined> =
   | {
       readonly ok: true;
@@ -239,6 +273,9 @@ export type ClientToServerEvents = {
         readonly enabled: boolean;
         readonly secondsPerTurn: number;
       };
+      readonly rules?: PublicRoomRules;
+      readonly botDifficulty?: PublicBotDifficulty;
+      readonly botPace?: PublicBotPace;
     },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
@@ -275,8 +312,16 @@ export type ClientToServerEvents = {
     payload: { readonly guestId: string; readonly cosmeticId: string },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
   ) => void;
+  "cosmetics:purchase": (
+    payload: { readonly guestId: string; readonly cosmeticId: string },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
   "profile:history": (
     payload: { readonly guestId: string; readonly limit?: number },
+    callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
+  ) => void;
+  "profile:label-replay": (
+    payload: { readonly guestId: string; readonly matchId: string; readonly label: string },
     callback: (ack: ServerAck<readonly PublicMatchHistoryItem[]>) => void
   ) => void;
   "lobby:get": (callback: (ack: ServerAck<PublicLobbyState>) => void) => void;
@@ -294,6 +339,10 @@ export type ClientToServerEvents = {
   "coach:evaluate": (
     payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number },
     callback: (ack: ServerAck<readonly PublicMoveEvaluation[]>) => void
+  ) => void;
+  "feedback:submit": (
+    payload: FeedbackPayload,
+    callback: (ack: ServerAck<PublicFeedbackReceipt>) => void
   ) => void;
 };
 

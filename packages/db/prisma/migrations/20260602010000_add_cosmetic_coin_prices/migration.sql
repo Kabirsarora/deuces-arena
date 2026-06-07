@@ -1,0 +1,1 @@
+ALTER TABLE "Cosmetic" ADD COLUMN "coinPrice" INTEGER;

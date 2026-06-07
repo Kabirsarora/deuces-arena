@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 import {
@@ -8,14 +9,19 @@ import {
   createInitialGame,
   evaluateLegalMovesByRandomRollouts,
   summarizeGame,
+  type BotStrategy,
   type Card,
+  type DeckType,
   type GameState,
   type PlayerState
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  FeedbackKind,
   InterServerEvents,
   MatchMode,
+  PublicBotDifficulty,
+  PublicBotPace,
   PublicChatMessage,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
@@ -26,6 +32,7 @@ import type {
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
+  PublicRoomRules,
   PublicRoomPlayer,
   PublicRoomState,
   ProfileAvatarKey,
@@ -48,7 +55,10 @@ import {
   getPersistedLeaderboard,
   getPersistedMatchHistory,
   persistCoachEvaluation,
+  persistFeedbackReport,
   persistMoveEvent,
+  purchasePersistedCosmetic,
+  savePersistedReplayLabel,
   updatePersistedGuestProfile,
   type PersistedMatch
 } from "./persistence.js";
@@ -70,6 +80,7 @@ type GuestProfile = {
   gamesPlayed: number;
   wins: number;
   placementTotal: number;
+  arenaCoins: number;
 };
 
 type Room = {
@@ -83,6 +94,9 @@ type Room = {
   persistedMatch: PersistedMatch | null;
   statsApplied: boolean;
   timer: RoomTimerSettings;
+  rules: RoomRuleSettings;
+  botDifficulty: PublicBotDifficulty;
+  botPace: PublicBotPace;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
 };
@@ -90,6 +104,16 @@ type Room = {
 type RoomTimerSettings = {
   readonly enabled: boolean;
   readonly secondsPerTurn: number;
+};
+
+type RoomRuleSettings = PublicRoomRules;
+
+type RateLimitBucket = "chat" | "coach" | "feedback" | "replay-label";
+
+type RateLimitRule = {
+  readonly maxEvents: number;
+  readonly windowMs: number;
+  readonly message: string;
 };
 
 type RankedQueuedPlayer = {
@@ -101,11 +125,60 @@ type RankedQueuedPlayer = {
 
 const PORT = Number(process.env.PORT ?? 4000);
 const CLIENT_ORIGINS = parseClientOrigins(process.env.CLIENT_ORIGIN);
-const MAX_PLAYERS_PER_ROOM = 4;
+const SERVICE_VERSION = process.env.npm_package_version ?? "0.1.0";
+const ADMIN_GUEST_IDS = [
+  ...parseCommaList(process.env.ADMIN_GUEST_IDS),
+  ...parseCommaList(process.env.ADMIN_EMAILS).map(createAuthProfileId)
+];
+const DATABASE_CONFIGURED = isConfiguredEnvironmentValue(process.env.DATABASE_URL);
+const REDIS_CONFIGURED = isConfiguredEnvironmentValue(process.env.REDIS_URL);
+const CLASSIC_PLAYER_COUNT = 4;
+const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
+const DEFAULT_CARDS_PER_PLAYER = 13;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
-const BOT_MOVE_DELAY_MS = 2_800;
+const DISCONNECTED_AUTO_MOVE_DELAY_MS = parseIntegerSetting(
+  process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS,
+  15_000,
+  10,
+  120_000
+);
+const RATE_LIMITS: Readonly<Record<RateLimitBucket, RateLimitRule>> = {
+  chat: {
+    maxEvents: 8,
+    windowMs: 10_000,
+    message: "Slow down before sending more chat messages."
+  },
+  coach: {
+    maxEvents: 6,
+    windowMs: 60_000,
+    message: "Move Lab is cooling down. Try again in a moment."
+  },
+  feedback: {
+    maxEvents: 3,
+    windowMs: 60_000,
+    message: "Please wait before sending more feedback."
+  },
+  "replay-label": {
+    maxEvents: 10,
+    windowMs: 60_000,
+    message: "Please wait before saving more replay labels."
+  }
+};
+const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
+  first: 120,
+  second: 80,
+  third: 50,
+  other: 25
+};
+const BOT_MOVE_DELAY_RANGES: Readonly<
+  Record<PublicBotPace, { readonly minMs: number; readonly maxMs: number }>
+> = {
+  quick: { minMs: 2_200, maxMs: 3_400 },
+  normal: { minMs: 3_800, maxMs: 5_400 },
+  relaxed: { minMs: 5_800, maxMs: 8_000 }
+};
 const RANKED_REQUIRED_PLAYERS = 4;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
@@ -116,6 +189,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A clean starter card back for every table.",
     rarity: "common",
     isSupporter: false,
+    coinPrice: 0,
     previewUrl: null
   },
   {
@@ -126,6 +200,84 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "The default dark table theme.",
     rarity: "common",
     isSupporter: false,
+    coinPrice: 500,
+    previewUrl: null
+  },
+  {
+    id: "starter-lagoon-table",
+    slug: "lagoon-table",
+    kind: "TABLE_THEME",
+    name: "Lagoon Table",
+    description: "A bright teal table theme with a softer casino glow.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 450,
+    previewUrl: null
+  },
+  {
+    id: "starter-obsidian-table",
+    slug: "obsidian-table",
+    kind: "TABLE_THEME",
+    name: "Obsidian Table",
+    description: "A low-light table theme with gold edge lighting.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 800,
+    previewUrl: null
+  },
+  {
+    id: "starter-neon-grid-card-back",
+    slug: "neon-grid-card-back",
+    kind: "CARD_BACK",
+    name: "Neon Grid",
+    description: "A blue circuit-style card back for sharper tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 350,
+    previewUrl: null
+  },
+  {
+    id: "starter-ember-court-card-back",
+    slug: "ember-court-card-back",
+    kind: "CARD_BACK",
+    name: "Ember Court",
+    description: "A warm red-gold card back for endgame drama.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 650,
+    previewUrl: null
+  },
+  {
+    id: "starter-aqua-pulse-avatar",
+    slug: "aqua-pulse-avatar",
+    kind: "AVATAR",
+    name: "Aqua Pulse",
+    description: "A clean glowing avatar mark for table seats.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 300,
+    previewUrl: null
+  },
+  {
+    id: "starter-crown-chip-avatar",
+    slug: "crown-chip-avatar",
+    kind: "AVATAR",
+    name: "Crown Chip",
+    description: "A gold chip avatar mark for players who like a little pressure.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 700,
+    previewUrl: null
+  },
+  {
+    id: "starter-aqua-profile-border",
+    slug: "aqua-profile-border",
+    kind: "PROFILE_BORDER",
+    name: "Aqua Rail",
+    description: "A cool cyan seat border for online tables.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 550,
     previewUrl: null
   },
   {
@@ -136,12 +288,18 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A future supporter profile border with no gameplay advantage.",
     rarity: "supporter",
     isSupporter: true,
+    coinPrice: null,
     previewUrl: null
   }
 ];
 const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
+const guestReplayLabels = new Map<string, readonly string[]>();
+const socketRateLimitEvents = new Map<
+  string,
+  Partial<Record<RateLimitBucket, readonly number[]>>
+>();
 let rankedQueue: RankedQueuedPlayer[] = [];
 
 const app = express();
@@ -152,8 +310,16 @@ app.get("/health", (_request, response) => {
   response.json({
     ok: true,
     service: "@deuces-arena/server",
+    version: SERVICE_VERSION,
+    environment: process.env.NODE_ENV ?? "development",
+    uptimeSeconds: Math.floor(process.uptime()),
     rooms: rooms.size,
     allowedOrigins: CLIENT_ORIGINS,
+    config: {
+      database: DATABASE_CONFIGURED ? "configured" : "memory-fallback",
+      redis: REDIS_CONFIGURED ? "configured" : "disabled",
+      disconnectedAutoMoveDelayMs: DISCONNECTED_AUTO_MOVE_DELAY_MS
+    },
     activity: publicLobbyState().activity
   });
 });
@@ -162,8 +328,38 @@ app.get("/lobby", (_request, response) => {
   response.json(publicLobbyState());
 });
 
+app.get("/leaderboard", async (request, response) => {
+  const limit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : undefined;
+  response.json(await publicLeaderboard(Number.isNaN(limit) ? undefined : limit));
+});
+
 app.get("/cosmetics", async (_request, response) => {
   response.json(await publicCosmetics());
+});
+
+app.get("/profiles/:guestId", async (request, response) => {
+  const guestId = normalizeGuestId(request.params.guestId);
+
+  if (guestId === null) {
+    response.status(400).json({ error: "Profile not found." });
+    return;
+  }
+
+  response.json(await publicGuestProfile(guestId));
+});
+
+app.get("/profiles/:guestId/history", async (request, response) => {
+  const guestId = normalizeGuestId(request.params.guestId);
+  const limit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : undefined;
+
+  if (guestId === null) {
+    response.status(400).json({ error: "Profile not found." });
+    return;
+  }
+
+  response.json(await publicMatchHistory(guestId, Number.isNaN(limit) ? undefined : limit));
 });
 
 const httpServer = createServer(app);
@@ -177,6 +373,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 );
 
 io.on("connection", (socket) => {
+  emitLobbyState();
+
   function leaveCurrentRoomForSocket(): void {
     if (socket.data.roomCode === undefined || socket.data.playerId === undefined) {
       return;
@@ -228,7 +426,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (room.players.filter((player) => player.kind === "human").length >= MAX_PLAYERS_PER_ROOM) {
+    if (
+      room.players.filter((player) => player.kind === "human").length >= MAX_CASUAL_PLAYERS_PER_ROOM
+    ) {
       callback(fail("Room is full."));
       return;
     }
@@ -283,6 +483,7 @@ io.on("connection", (socket) => {
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
+    scheduleAutomatedTurn(room);
   });
 
   socket.on("room:start", async (payload, callback) => {
@@ -308,18 +509,30 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const botCount = normalizeBotCount(payload.botCount, room.players.length);
+    const rules = normalizeRuleSettings(payload.rules, room.players.length);
+    const botCount = normalizeBotCount(payload.botCount, room.players.length, rules.playerCount);
 
-    if (room.players.length + botCount < MAX_PLAYERS_PER_ROOM) {
-      callback(fail("A game needs 4 seated players. Add more humans or bots."));
+    if (createDeck(rules.deckType).length < rules.playerCount * rules.cardsPerPlayer) {
+      callback(fail("Selected deck does not have enough cards for this table setup."));
       return;
     }
 
-    fillRoomWithBots(room, botCount);
+    if (room.players.length + botCount < rules.playerCount) {
+      callback(fail(`A game needs ${rules.playerCount} seated players. Add more humans or bots.`));
+      return;
+    }
+
+    fillRoomWithBots(room, botCount, rules.playerCount);
     room.timer = normalizeTimerSettings(payload.timer);
+    room.rules = rules;
+    room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
+    room.botPace = normalizeBotPace(payload.botPace);
     room.game = createInitialGame(
       room.players.map((player) => player.id),
-      shuffleDeck()
+      shuffleDeck(room.rules.deckType, room.rules.playerCount, room.rules.cardsPerPlayer),
+      {
+        cardsPerPlayer: room.rules.cardsPerPlayer
+      }
     );
     room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
     resetTurnTimer(room);
@@ -461,6 +674,19 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (isAdminGuestId(guestId)) {
+      const adminProfile = await equipAdminCosmetic(guestId, cosmeticId);
+
+      if (adminProfile === null) {
+        callback(fail("Cosmetic not found."));
+        return;
+      }
+
+      callback(ok(adminProfile));
+      emitRoomStatesForGuest(guestId);
+      return;
+    }
+
     const result = await equipPersistedCosmetic(guestId, cosmeticId);
 
     if (result.ok) {
@@ -473,6 +699,32 @@ io.on("connection", (socket) => {
     callback(fail(getEquipCosmeticError(result.reason)));
   });
 
+  socket.on("cosmetics:purchase", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const cosmeticId = payload.cosmeticId.trim();
+
+    if (guestId === null || cosmeticId === "") {
+      callback(fail("Cosmetic not found."));
+      return;
+    }
+
+    if (isAdminGuestId(guestId)) {
+      callback(ok(await publicGuestProfile(guestId)));
+      return;
+    }
+
+    const result = await purchasePersistedCosmetic(guestId, cosmeticId);
+
+    if (result.ok) {
+      guestEquippedCosmetics.set(guestId, result.profile.equippedCosmetics);
+      callback(ok(result.profile));
+      emitRoomStatesForGuest(guestId);
+      return;
+    }
+
+    callback(fail(getPurchaseCosmeticError(result.reason)));
+  });
+
   socket.on("profile:history", async (payload, callback) => {
     const guestId = normalizeGuestId(payload.guestId);
 
@@ -482,6 +734,42 @@ io.on("connection", (socket) => {
     }
 
     callback(ok(await publicMatchHistory(guestId, payload.limit)));
+  });
+
+  socket.on("profile:label-replay", async (payload, callback) => {
+    const guestId = normalizeGuestId(payload.guestId);
+    const matchId = payload.matchId.trim();
+    const label = normalizeReplayLabel(payload.label);
+
+    if (guestId === null || matchId === "") {
+      callback(fail("Match not found."));
+      return;
+    }
+
+    if (label === null) {
+      callback(fail("Replay label must be 2-24 characters."));
+      return;
+    }
+
+    const rateLimitError = checkSocketRateLimit(socket.id, "replay-label");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    const persistedLabel = await savePersistedReplayLabel(guestId, matchId, label);
+
+    if (persistedLabel.ok || persistedLabel.reason === "database-unavailable") {
+      if (!persistedLabel.ok) {
+        addInMemoryReplayLabel(guestId, matchId, label);
+      }
+
+      callback(ok(await publicMatchHistory(guestId, 10)));
+      return;
+    }
+
+    callback(fail(getSaveReplayLabelError(persistedLabel.reason)));
   });
 
   socket.on("lobby:get", (callback) => {
@@ -537,7 +825,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const result = applyMove(room.game, player.id, payload.move);
+    const result = applyMove(room.game, player.id, payload.move, room.rules);
 
     if (!result.ok) {
       callback(fail(result.reason));
@@ -576,6 +864,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const rateLimitError = checkSocketRateLimit(socket.id, "chat");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
     const message: PublicChatMessage = {
       id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       playerId: player.id,
@@ -609,6 +904,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const rateLimitError = checkSocketRateLimit(socket.id, "coach");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
     const evaluations = publicMoveEvaluations(
       room.game,
       player.id,
@@ -634,9 +936,44 @@ io.on("connection", (socket) => {
     callback(ok(evaluations));
   });
 
+  socket.on("feedback:submit", async (payload, callback) => {
+    const body = normalizeFeedbackBody(payload.body);
+
+    if (body === null) {
+      callback(fail("Feedback must be 6-800 characters."));
+      return;
+    }
+
+    const rateLimitError = checkSocketRateLimit(socket.id, "feedback");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    const roomCode =
+      payload.roomCode === undefined || payload.roomCode.trim() === ""
+        ? null
+        : normalizeRoomCode(payload.roomCode).slice(0, 16);
+    const receipt = await persistFeedbackReport({
+      id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      kind: normalizeFeedbackKind(payload.kind),
+      body,
+      guestId: normalizeGuestId(payload.guestId),
+      roomCode,
+      contactEmail: normalizeContactEmail(payload.contactEmail),
+      userAgent: normalizeUserAgent(socket.handshake.headers["user-agent"]),
+      createdAt: new Date()
+    });
+
+    callback(ok(receipt));
+  });
+
   socket.on("disconnect", () => {
+    clearSocketRateLimits(socket.id);
     removeRankedQueueEntry(socket.id);
     emitRankedQueueState();
+    emitLobbyState();
 
     const roomCode = socket.data.roomCode;
     const playerId = socket.data.playerId;
@@ -702,6 +1039,14 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
       enabled: false,
       secondsPerTurn: DEFAULT_TIMER_SECONDS
     },
+    rules: {
+      bombEndsTrick: false,
+      deckType: "classic",
+      playerCount: CLASSIC_PLAYER_COUNT,
+      cardsPerPlayer: DEFAULT_CARDS_PER_PLAYER
+    },
+    botDifficulty: "normal",
+    botPace: "relaxed",
     turnDeadlineAt: null,
     timerTimeout: null
   };
@@ -745,6 +1090,7 @@ function leaveRoom(room: Room, playerId: string): void {
   );
   emitRoomState(room);
   emitLobbyState();
+  scheduleAutomatedTurn(room);
 }
 
 function createHumanPlayer(
@@ -781,10 +1127,10 @@ function canStartRoom(room: Room): boolean {
   return connectedHumans.every((player) => player.ready);
 }
 
-function fillRoomWithBots(room: Room, botCount: number): void {
+function fillRoomWithBots(room: Room, botCount: number, targetPlayerCount: number): void {
   let botsAdded = 0;
 
-  while (room.players.length < MAX_PLAYERS_PER_ROOM && botsAdded < botCount) {
+  while (room.players.length < targetPlayerCount && botsAdded < botCount) {
     const seatIndex = room.players.length;
     room.players = [
       ...room.players,
@@ -801,8 +1147,12 @@ function fillRoomWithBots(room: Room, botCount: number): void {
   }
 }
 
-function normalizeBotCount(botCount: number | undefined, seatedPlayers: number): number {
-  return clampInteger(botCount ?? MAX_PLAYERS_PER_ROOM, 0, MAX_PLAYERS_PER_ROOM - seatedPlayers);
+function normalizeBotCount(
+  botCount: number | undefined,
+  seatedPlayers: number,
+  targetPlayerCount: number
+): number {
+  return clampInteger(botCount ?? targetPlayerCount, 0, targetPlayerCount - seatedPlayers);
 }
 
 function normalizeTimerSettings(
@@ -812,6 +1162,39 @@ function normalizeTimerSettings(
     enabled: timer?.enabled ?? false,
     secondsPerTurn: clampInteger(timer?.secondsPerTurn ?? DEFAULT_TIMER_SECONDS, 1, 120)
   };
+}
+
+function normalizeRuleSettings(
+  rules: PublicRoomRules | undefined,
+  seatedPlayers = 1
+): RoomRuleSettings {
+  const deckType = normalizeDeckType(rules?.deckType);
+  const cardsPerPlayer = clampInteger(rules?.cardsPerPlayer ?? DEFAULT_CARDS_PER_PLAYER, 1, 20);
+  const maximumPlayersByDeck = Math.floor(createDeck(deckType).length / cardsPerPlayer);
+  const playerCount = clampInteger(
+    rules?.playerCount ?? CLASSIC_PLAYER_COUNT,
+    Math.max(2, seatedPlayers),
+    Math.min(MAX_CASUAL_PLAYERS_PER_ROOM, maximumPlayersByDeck)
+  );
+
+  return {
+    bombEndsTrick: rules?.bombEndsTrick ?? false,
+    deckType,
+    playerCount,
+    cardsPerPlayer
+  };
+}
+
+function normalizeDeckType(deckType: DeckType | undefined): DeckType {
+  return deckType === "arena-six" ? "arena-six" : "classic";
+}
+
+function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): PublicBotDifficulty {
+  return difficulty === "easy" || difficulty === "hard" ? difficulty : "normal";
+}
+
+function normalizeBotPace(pace: PublicBotPace | undefined): PublicBotPace {
+  return pace === "quick" || pace === "normal" ? pace : "relaxed";
 }
 
 function resetTurnTimer(room: Room): void {
@@ -845,8 +1228,9 @@ function publicTurnTimer(room: Room) {
 }
 
 function scheduleAutomatedTurn(room: Room): void {
+  clearTurnTimer(room);
+
   if (room.game === null || room.game.status === "complete") {
-    clearTurnTimer(room);
     return;
   }
 
@@ -857,11 +1241,20 @@ function scheduleAutomatedTurn(room: Room): void {
   }
 
   if (activePlayer.kind === "bot") {
-    const botTimeout = setTimeout(
-      () => applyAutomatedMove(room, activePlayer.id, "simple-heuristic"),
-      BOT_MOVE_DELAY_MS
+    room.timerTimeout = setTimeout(
+      () => applyAutomatedMove(room, activePlayer.id, botStrategyForDifficulty(room.botDifficulty)),
+      botMoveDelayMs(room.botPace)
     );
-    botTimeout.unref();
+    room.timerTimeout.unref();
+    return;
+  }
+
+  if (activePlayer.socketId === null) {
+    room.timerTimeout = setTimeout(
+      () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
+      DISCONNECTED_AUTO_MOVE_DELAY_MS
+    );
+    room.timerTimeout.unref();
     return;
   }
 
@@ -869,7 +1262,6 @@ function scheduleAutomatedTurn(room: Room): void {
     return;
   }
 
-  clearTurnTimer(room);
   room.timerTimeout = setTimeout(
     () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
     Math.max(0, room.turnDeadlineAt.getTime() - Date.now())
@@ -877,11 +1269,13 @@ function scheduleAutomatedTurn(room: Room): void {
   room.timerTimeout.unref();
 }
 
-function applyAutomatedMove(
-  room: Room,
-  playerId: string,
-  strategy: "lowest-legal" | "simple-heuristic"
-): void {
+function botMoveDelayMs(pace: PublicBotPace): number {
+  const range = BOT_MOVE_DELAY_RANGES[pace];
+
+  return range.minMs + Math.floor(Math.random() * (range.maxMs - range.minMs + 1));
+}
+
+function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy): void {
   if (room.game === null || room.game.activePlayerId !== playerId) {
     return;
   }
@@ -895,7 +1289,7 @@ function applyAutomatedMove(
     },
     strategy
   });
-  const result = applyMove(room.game, playerId, decision.move);
+  const result = applyMove(room.game, playerId, decision.move, room.rules);
 
   if (result.ok) {
     room.game = result.state;
@@ -905,6 +1299,18 @@ function applyAutomatedMove(
     emitLobbyState();
     scheduleAutomatedTurn(room);
   }
+}
+
+function botStrategyForDifficulty(difficulty: PublicBotDifficulty): BotStrategy {
+  if (difficulty === "easy") {
+    return "random-legal";
+  }
+
+  if (difficulty === "hard") {
+    return "simple-heuristic";
+  }
+
+  return "lowest-legal";
 }
 
 function persistLastMove(room: Room): void {
@@ -936,7 +1342,7 @@ function applyGuestStats(room: Room, game: GameState): void {
             playerId: player.id,
             ratingBefore:
               player.guestId === null ? 1000 : getOrCreateGuestProfile(player.guestId).rating,
-            placement: toPlacement(placements.indexOf(player.id) + 1)
+            placement: toRankedPlacement(placements.indexOf(player.id) + 1)
           }))
         )
       : [];
@@ -953,6 +1359,7 @@ function applyGuestStats(room: Room, game: GameState): void {
     profile.gamesPlayed += 1;
     profile.wins += placement === 1 ? 1 : 0;
     profile.placementTotal += placement;
+    profile.arenaCoins += getArenaCoinReward(placement);
 
     if (ratingChange !== undefined) {
       profile.rating = ratingChange.ratingAfter;
@@ -971,12 +1378,16 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     roomCode: room.code,
     mode: room.mode,
     status: room.game?.status ?? "waiting",
+    rules: room.rules,
+    botDifficulty: room.botDifficulty,
+    botPace: room.botPace,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
     activePlayerId: room.game?.activePlayerId ?? null,
     currentTrick: room.game?.currentTrick ?? null,
     turnNumber: room.game?.turnNumber ?? 0,
     placements: room.game?.placements ?? [],
-    recentEvents: room.game?.events.slice(-12) ?? [],
+    recentEvents:
+      room.game?.status === "complete" ? room.game.events : (room.game?.events.slice(-12) ?? []),
     recentChat: room.chatMessages.slice(-20),
     turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
@@ -1015,6 +1426,7 @@ function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
             rating: profile.rating,
             gamesPlayed: profile.gamesPlayed,
             wins: profile.wins,
+            arenaCoins: profile.arenaCoins,
             averagePlacement:
               profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
           },
@@ -1055,7 +1467,7 @@ function publicLobbyState(): PublicLobbyState {
     .filter(
       (room) =>
         room.game === null &&
-        room.players.length < MAX_PLAYERS_PER_ROOM &&
+        room.players.length < MAX_CASUAL_PLAYERS_PER_ROOM &&
         room.players.some((player) => player.socketId !== null)
     )
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
@@ -1068,10 +1480,11 @@ function publicLobbyState(): PublicLobbyState {
       return {
         roomCode: room.code,
         hostName: room.players[0]?.name ?? "Open table",
+        rules: room.rules,
         seatedPlayers,
         readyPlayers,
-        maxPlayers: MAX_PLAYERS_PER_ROOM,
-        botSeatsAvailable: MAX_PLAYERS_PER_ROOM - seatedPlayers,
+        maxPlayers: room.rules.playerCount,
+        botSeatsAvailable: Math.max(0, room.rules.playerCount - seatedPlayers),
         createdAt: room.createdAt.toISOString()
       };
     });
@@ -1079,13 +1492,14 @@ function publicLobbyState(): PublicLobbyState {
     (room) => room.game !== null && room.game.status === "in-progress"
   );
   const completedRooms = roomList.filter((room) => room.game?.status === "complete");
+  const connectedUsers = io.engine.clientsCount;
 
   return {
     activity: {
       openRooms: openRooms.length,
       activeRooms: activeRooms.length,
       completedRooms: completedRooms.length,
-      connectedUsers: io.engine.clientsCount,
+      connectedUsers,
       seatedHumans: roomList.reduce(
         (total, room) => total + room.players.filter((player) => player.kind === "human").length,
         0
@@ -1095,7 +1509,10 @@ function publicLobbyState(): PublicLobbyState {
         0
       ),
       playersInOpenRooms: openRooms.reduce((total, room) => total + room.seatedPlayers, 0),
-      playersInActiveGames: activeRooms.reduce((total, room) => total + room.players.length, 0)
+      playersInActiveGames: activeRooms.reduce(
+        (total, room) => total + room.players.filter((player) => player.kind === "human").length,
+        0
+      )
     },
     openRooms
   };
@@ -1104,12 +1521,14 @@ function publicLobbyState(): PublicLobbyState {
 function publicRankedQueueState(socketId: string): PublicRankedQueueState {
   const queuedPlayers = rankedQueue.length;
   const playersNeeded = Math.max(0, RANKED_REQUIRED_PLAYERS - queuedPlayers);
+  const queueIndex = rankedQueue.findIndex((entry) => entry.socketId === socketId);
 
   return {
     queuedPlayers,
     requiredPlayers: RANKED_REQUIRED_PLAYERS,
     etaSeconds: playersNeeded === 0 ? 0 : playersNeeded * 20,
-    joined: rankedQueue.some((entry) => entry.socketId === socketId)
+    joined: queueIndex >= 0,
+    queuePosition: queueIndex >= 0 ? queueIndex + 1 : null
   };
 }
 
@@ -1216,14 +1635,116 @@ function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
   return "diamond";
 }
 
+function normalizeFeedbackKind(kind: FeedbackKind): FeedbackKind {
+  if (kind === "IDEA" || kind === "BALANCE" || kind === "UI") {
+    return kind;
+  }
+
+  return "BUG";
+}
+
+function normalizeFeedbackBody(body: string): string | null {
+  const normalized = body.replace(/\s+/g, " ").trim();
+
+  if (normalized.length < 6 || normalized.length > 800) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeContactEmail(email: string | undefined): string | null {
+  const normalized = email?.trim().toLowerCase();
+
+  if (normalized === undefined || normalized === "") {
+    return null;
+  }
+
+  return normalized.length <= 254 && normalized.includes("@") ? normalized : null;
+}
+
+function normalizeReplayLabel(label: string | undefined): string | null {
+  const normalized = label?.replace(/\s+/g, " ").trim();
+
+  if (normalized === undefined || normalized.length < 2 || normalized.length > 24) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeUserAgent(userAgent: string | undefined): string | null {
+  const normalized = userAgent?.trim();
+  return normalized === undefined || normalized === "" ? null : normalized.slice(0, 320);
+}
+
+function checkSocketRateLimit(socketId: string, bucket: RateLimitBucket): string | null {
+  const rule = RATE_LIMITS[bucket];
+  const now = Date.now();
+  const socketBuckets = socketRateLimitEvents.get(socketId) ?? {};
+  const recentEvents = (socketBuckets[bucket] ?? []).filter(
+    (timestamp) => now - timestamp < rule.windowMs
+  );
+
+  if (recentEvents.length >= rule.maxEvents) {
+    socketRateLimitEvents.set(socketId, {
+      ...socketBuckets,
+      [bucket]: recentEvents
+    });
+    return rule.message;
+  }
+
+  socketRateLimitEvents.set(socketId, {
+    ...socketBuckets,
+    [bucket]: [...recentEvents, now]
+  });
+  return null;
+}
+
+function clearSocketRateLimits(socketId: string): void {
+  socketRateLimitEvents.delete(socketId);
+}
+
 function parseClientOrigins(value: string | undefined): string[] {
-  const origins =
-    value
-      ?.split(",")
-      .map((origin) => origin.trim())
-      .filter((origin) => origin !== "") ?? [];
+  const origins = parseCommaList(value);
 
   return origins.length === 0 ? ["http://localhost:3000"] : origins;
+}
+
+function parseCommaList(value: string | undefined): string[] {
+  return (
+    value
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "") ?? []
+  );
+}
+
+function parseIntegerSetting(
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = value === undefined ? Number.NaN : Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return clampInteger(parsed, min, max);
+}
+
+function isConfiguredEnvironmentValue(value: string | undefined): boolean {
+  return value !== undefined && value.trim() !== "";
+}
+
+function isAdminGuestId(guestId: string): boolean {
+  return ADMIN_GUEST_IDS.includes(guestId);
+}
+
+function createAuthProfileId(identifier: string): string {
+  return `auth-${createHash("sha256").update(identifier.toLowerCase()).digest("hex").slice(0, 32)}`;
 }
 
 function getOrCreateGuestProfile(guestId: string): GuestProfile {
@@ -1240,10 +1761,30 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
     rating: 1000,
     gamesPlayed: 0,
     wins: 0,
-    placementTotal: 0
+    placementTotal: 0,
+    arenaCoins: 0
   };
   guestProfiles.set(guestId, profile);
   return profile;
+}
+
+function addInMemoryReplayLabel(guestId: string, matchId: string, label: string): void {
+  const key = getReplayLabelKey(guestId, matchId);
+  const labels = guestReplayLabels.get(key) ?? [];
+
+  if (labels.includes(label)) {
+    return;
+  }
+
+  guestReplayLabels.set(key, [label, ...labels].slice(0, 5));
+}
+
+function getInMemoryReplayLabels(guestId: string, matchId: string): readonly string[] {
+  return guestReplayLabels.get(getReplayLabelKey(guestId, matchId)) ?? [];
+}
+
+function getReplayLabelKey(guestId: string, matchId: string): string {
+  return `${guestId}:${matchId}`;
 }
 
 async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> {
@@ -1256,29 +1797,34 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
     profile.rating = persistedProfile.rating;
     profile.gamesPlayed = persistedProfile.gamesPlayed;
     profile.wins = persistedProfile.wins;
+    profile.arenaCoins = persistedProfile.arenaCoins;
     profile.placementTotal =
       persistedProfile.averagePlacement === null
         ? 0
         : persistedProfile.averagePlacement * persistedProfile.gamesPlayed;
     guestEquippedCosmetics.set(guestId, persistedProfile.equippedCosmetics);
 
-    return persistedProfile;
+    return isAdminGuestId(guestId) ? withAdminCosmeticAccess(persistedProfile) : persistedProfile;
   }
 
   const profile = getOrCreateGuestProfile(guestId);
 
-  return {
+  const fallbackProfile: PublicGuestProfile = {
     guestId,
     displayName: profile.displayName,
     avatarKey: profile.avatarKey,
     rating: profile.rating,
     gamesPlayed: profile.gamesPlayed,
     wins: profile.wins,
+    arenaCoins: profile.arenaCoins,
     averagePlacement:
       profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed,
+    isAdmin: false,
     unlocks: [],
     equippedCosmetics: []
   };
+
+  return isAdminGuestId(guestId) ? withAdminCosmeticAccess(fallbackProfile) : fallbackProfile;
 }
 
 async function publicLeaderboard(
@@ -1301,6 +1847,7 @@ async function publicLeaderboard(
       rating: profile.rating,
       gamesPlayed: profile.gamesPlayed,
       wins: profile.wins,
+      arenaCoins: profile.arenaCoins,
       averagePlacement:
         profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
     }));
@@ -1308,6 +1855,47 @@ async function publicLeaderboard(
 
 async function publicCosmetics(): Promise<readonly PublicCosmetic[]> {
   return (await getPersistedCosmetics()) ?? STARTER_COSMETICS;
+}
+
+async function equipAdminCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<PublicGuestProfile | null> {
+  const cosmetic = (await publicCosmetics()).find((candidate) => candidate.id === cosmeticId);
+
+  if (cosmetic === undefined) {
+    return null;
+  }
+
+  const equippedCosmetics: PublicEquippedCosmetic[] = [
+    ...(guestEquippedCosmetics.get(guestId) ?? []).filter(
+      (equipped) => equipped.kind !== cosmetic.kind
+    ),
+    {
+      kind: cosmetic.kind,
+      cosmetic,
+      equippedAt: new Date().toISOString()
+    }
+  ];
+
+  guestEquippedCosmetics.set(guestId, equippedCosmetics);
+
+  return withAdminCosmeticAccess(await publicGuestProfile(guestId));
+}
+
+async function withAdminCosmeticAccess(profile: PublicGuestProfile): Promise<PublicGuestProfile> {
+  const unlockedAt = new Date().toISOString();
+
+  return {
+    ...profile,
+    isAdmin: true,
+    unlocks: (await publicCosmetics()).map((cosmetic) => ({
+      cosmetic,
+      source: "ADMIN_GRANT",
+      earnedAt: unlockedAt
+    })),
+    equippedCosmetics: guestEquippedCosmetics.get(profile.guestId) ?? profile.equippedCosmetics
+  };
 }
 
 function getEquipCosmeticError(
@@ -1322,6 +1910,46 @@ function getEquipCosmeticError(
   }
 
   return "You have not unlocked this cosmetic.";
+}
+
+function getPurchaseCosmeticError(
+  reason:
+    | "database-unavailable"
+    | "profile-not-found"
+    | "cosmetic-not-found"
+    | "cosmetic-not-purchasable"
+    | "cosmetic-already-owned"
+    | "insufficient-coins"
+): string {
+  if (reason === "database-unavailable") {
+    return "Cosmetic purchases require a connected database.";
+  }
+
+  if (reason === "profile-not-found") {
+    return "Guest profile not found.";
+  }
+
+  if (reason === "cosmetic-not-purchasable") {
+    return "This cosmetic is not available for Arena Coins.";
+  }
+
+  if (reason === "cosmetic-already-owned") {
+    return "You already own this cosmetic.";
+  }
+
+  if (reason === "insufficient-coins") {
+    return "Not enough Arena Coins.";
+  }
+
+  return "Cosmetic not found.";
+}
+
+function getSaveReplayLabelError(reason: "profile-not-found" | "match-not-found"): string {
+  if (reason === "profile-not-found") {
+    return "Guest profile not found.";
+  }
+
+  return "Match not found.";
 }
 
 async function publicMatchHistory(
@@ -1396,6 +2024,7 @@ function toInMemoryMatchHistoryItem(room: Room, guestId: string): PublicMatchHis
     cardsRemaining: summary?.cardsRemaining ?? null,
     bombsPlayed: summary?.bombsPlayed ?? 0,
     movesPlayed: summary?.movesPlayed ?? null,
+    labels: getInMemoryReplayLabels(guestId, room.persistedMatch?.matchId ?? room.code),
     opponents: room.players.map((roomPlayer) => ({
       name: roomPlayer.name,
       kind: roomPlayer.kind,
@@ -1414,7 +2043,27 @@ function inferPlacements(game: GameState): readonly string[] {
   ];
 }
 
-function toPlacement(value: number): 1 | 2 | 3 | 4 {
+function toPlacement(value: number): number {
+  return Math.max(1, value);
+}
+
+function getArenaCoinReward(placement: number): number {
+  if (placement === 1) {
+    return ARENA_COIN_REWARDS.first;
+  }
+
+  if (placement === 2) {
+    return ARENA_COIN_REWARDS.second;
+  }
+
+  if (placement === 3) {
+    return ARENA_COIN_REWARDS.third;
+  }
+
+  return ARENA_COIN_REWARDS.other;
+}
+
+function toRankedPlacement(value: number): 1 | 2 | 3 | 4 {
   if (value === 1 || value === 2 || value === 3 || value === 4) {
     return value;
   }
@@ -1422,8 +2071,12 @@ function toPlacement(value: number): 1 | 2 | 3 | 4 {
   return 4;
 }
 
-function shuffleDeck(): Card[] {
-  const deck = createDeck();
+function shuffleDeck(
+  deckType: DeckType = "classic",
+  playerCount = CLASSIC_PLAYER_COUNT,
+  cardsPerPlayer = DEFAULT_CARDS_PER_PLAYER
+): Card[] {
+  const deck = createDeck(deckType);
 
   for (let index = deck.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -1433,6 +2086,19 @@ function shuffleDeck(): Card[] {
     if (current !== undefined && swap !== undefined) {
       deck[index] = swap;
       deck[swapIndex] = current;
+    }
+  }
+
+  const dealtCardCount = playerCount * cardsPerPlayer;
+  const lowestCardIndex = deck.findIndex((card) => card.rank === "3" && card.suit === "diamonds");
+
+  if (lowestCardIndex >= dealtCardCount && lowestCardIndex !== -1) {
+    const firstCard = deck[0];
+    const lowestCard = deck[lowestCardIndex];
+
+    if (firstCard !== undefined && lowestCard !== undefined) {
+      deck[0] = lowestCard;
+      deck[lowestCardIndex] = firstCard;
     }
   }
 

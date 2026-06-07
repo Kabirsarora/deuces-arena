@@ -16,5 +16,8 @@
     "lint": "eslint .",
     "test": "vitest run src --passWithNoTests",
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
   }
 }
