@@ -301,7 +301,6 @@ const socketRateLimitEvents = new Map<
   Partial<Record<RateLimitBucket, readonly number[]>>
 >();
 let rankedQueue: RankedQueuedPlayer[] = [];
-let peakConnectedUsers = 0;
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGINS }));
@@ -374,7 +373,6 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
 );
 
 io.on("connection", (socket) => {
-  peakConnectedUsers = Math.max(peakConnectedUsers, io.engine.clientsCount);
   emitLobbyState();
 
   function leaveCurrentRoomForSocket(): void {
@@ -1502,8 +1500,6 @@ function publicLobbyState(): PublicLobbyState {
       activeRooms: activeRooms.length,
       completedRooms: completedRooms.length,
       connectedUsers,
-      peakConnectedUsers: Math.max(peakConnectedUsers, connectedUsers),
-      totalUsers: guestProfiles.size,
       seatedHumans: roomList.reduce(
         (total, room) => total + room.players.filter((player) => player.kind === "human").length,
         0

@@ -100,8 +100,6 @@ export type PublicLobbyActivity = {
   readonly activeRooms: number;
   readonly completedRooms: number;
   readonly connectedUsers: number;
-  readonly peakConnectedUsers: number;
-  readonly totalUsers: number;
   readonly seatedHumans: number;
   readonly seatedBots: number;
   readonly playersInOpenRooms: number;
