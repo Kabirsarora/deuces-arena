@@ -7,7 +7,7 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 ## Current Features
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, and simulation-based move evaluation utilities.
-- Mobile-first Next.js table for local human vs bot play, with selected-card motion, trick display, turn state, game-over summaries, and replay review targets.
+- Mobile-first Next.js table for local human vs bot play, with selected-card motion, trick display, turn state, game-over summaries, replay review targets, and hosted-demo metadata.
 - Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, table chat, basic realtime rate limits, live lobby discovery, open-room counts, connected-user counts, server health indicators, and replay export.
 - Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Signed-in and public profile pages with account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.

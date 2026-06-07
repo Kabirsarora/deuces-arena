@@ -32,6 +32,7 @@ npm run build --workspace @deuces-arena/web
 ## Hosted Demo Checks
 
 - Open the deployed web URL and confirm the lobby loads without console-breaking errors.
+- Confirm the browser tab title, install metadata, and social preview text identify the app as Deuces Arena.
 - Confirm the lobby health pills show `Socket live`.
 - Confirm `Postgres on` appears if the hosted backend has `DATABASE_URL`; `Memory mode` is acceptable for a temporary no-database demo.
 - Confirm `Single server` appears until Redis-backed scaling is intentionally added.
