@@ -10,6 +10,8 @@ Cosmetic tables are data-only foundations for non-pay-to-win unlocks such as car
 
 Prisma ORM 7 reads the connection URL from `prisma.config.ts`. Keep `DATABASE_URL` out of `schema.prisma` so CLI commands such as `prisma generate`, `prisma migrate dev`, and `prisma studio` use the same config path.
 
+For local migration and seed commands, copy `.env.example` to `.env` in this package and use the database provider's direct, unpooled connection string. The ignored `.env` file is loaded automatically and must never be committed.
+
 ```bash
 npm run db:generate --workspace @deuces-arena/db
 npm run db:migrate --workspace @deuces-arena/db

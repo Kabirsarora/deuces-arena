@@ -108,7 +108,13 @@ npm run start --workspace @deuces-arena/server
 
 ## Database Migration
 
-Run this after setting `DATABASE_URL`:
+Copy the database environment template and place the provider's direct, unpooled connection string in the ignored file. Keep the pooled connection string in Render's runtime `DATABASE_URL`.
+
+```bash
+cp packages/db/.env.example packages/db/.env
+```
+
+Run this after setting `DATABASE_URL` in `packages/db/.env`:
 
 ```bash
 npm run db:generate --workspace @deuces-arena/db
