@@ -35,6 +35,7 @@ NEXT_PUBLIC_SERVER_URL="https://your-server.example.com"
 AUTH_SECRET="generated-secret"
 AUTH_GOOGLE_ID="google-oauth-client-id"
 AUTH_GOOGLE_SECRET="google-oauth-client-secret"
+REALTIME_AUTH_SECRET="shared-realtime-secret"
 ```
 
 For Google OAuth, add the deployed callback URL in Google Cloud:
@@ -47,9 +48,22 @@ PORT="4000"
 CLIENT_ORIGIN="https://your-web-app.example.com"
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/deuces_arena"
 DISCONNECTED_AUTO_MOVE_DELAY_MS="15000"
+REALTIME_AUTH_SECRET="shared-realtime-secret"
 ADMIN_EMAILS="creator@example.com"
 ADMIN_GUEST_IDS=""
 ```
+
+Generate `REALTIME_AUTH_SECRET` once and paste the exact same value into Vercel and the realtime
+server host:
+
+```bash
+openssl rand -base64 48
+```
+
+Keep it server-only: never prefix it with `NEXT_PUBLIC_`. It signs short-lived account identity
+tokens so Render can verify the Google account established by Auth.js on Vercel. With the bridge
+configured, guests can still play casual games, while signed-in profile mutations, seat reconnects,
+and ranked entry cannot be performed by claiming another account ID.
 
 `CLIENT_ORIGIN` also accepts a comma-separated allowlist for deploy previews:
 
@@ -64,7 +78,7 @@ COACH_EVALUATION_EXPORT_PATH="artifacts/coach-evaluations.jsonl"
 COACH_EVALUATION_EXPORT_LIMIT="1000"
 ```
 
-The app can run without `DATABASE_URL`, but match history, move persistence, durable guest stats, coach-evaluation persistence, and earned cosmetic unlocks require PostgreSQL.
+The app can run without `DATABASE_URL`, but match history, move persistence, durable guest stats, coach-evaluation persistence, and earned cosmetic unlocks require PostgreSQL. Production should not run without `REALTIME_AUTH_SECRET` once signed-in accounts or ranked mode are public.
 
 `GET /health` returns safe deployment metadata such as allowed origins, uptime, room counts, whether PostgreSQL/Redis are configured, and the disconnected-player grace delay. It does not expose secret connection strings.
 
@@ -135,3 +149,16 @@ Run migrations from a trusted machine or CI job with database access. Do not run
 - Enable HTTPS for both web and server origins; browsers require secure contexts for production WebSocket usage in most deployments.
 - Keep `DATABASE_URL`, future auth secrets, and future Stripe keys out of client-exposed `NEXT_PUBLIC_*` variables.
 - If the server provider sleeps free instances, the first connection after idle may be slow. That is acceptable for a demo but should be disclosed in the README once deployed.
+
+## AI Cost Controls
+
+Core gameplay, baseline bots, Move Lab rollouts, and self-play run without a paid model API. Before
+any external AI provider is enabled, require all of the following:
+
+- AI analysis is opt-in and only runs after a match or explicit review request.
+- Per-user and global request limits are enforced on the server.
+- Results are cached by game state so identical positions are not billed twice.
+- A server-side kill switch can disable external model calls immediately.
+- Provider budgets and billing alerts are set to the smallest practical amount.
+
+Do not put an AI provider key in a `NEXT_PUBLIC_*` variable or call a paid model once per turn.

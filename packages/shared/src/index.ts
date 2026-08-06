@@ -1,5 +1,11 @@
 import type { Card, CurrentTrick, DeckType, GameEvent, Move } from "@deuces-arena/game-engine";
 
+export {
+  createRealtimeAuthToken,
+  verifyRealtimeAuthToken,
+  type RealtimeAuthIdentity
+} from "./realtime-auth.js";
+
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
@@ -222,6 +228,7 @@ export type JoinRoomPayload = {
 export type ReconnectRoomPayload = {
   readonly roomCode: string;
   readonly playerId: string;
+  readonly guestId?: string;
 };
 
 export type MovePayload = {
@@ -356,6 +363,7 @@ export type ServerToClientEvents = {
 
 export type InterServerEvents = Record<string, never>;
 export type SocketData = {
+  authProfileId?: string;
   playerId?: string;
   roomCode?: string;
 };

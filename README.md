@@ -69,7 +69,9 @@ The web app defaults to `http://localhost:3000`; the realtime server defaults to
 Google sign-in is optional for local development. Without auth credentials, the app still works with
 guest profiles stored by browser. To test Google sign-in, create a `.env.local` for `apps/web` with
 `AUTH_SECRET`, `AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET`, then configure the Google OAuth redirect
-URI as `http://localhost:3000/api/auth/callback/google`.
+URI as `http://localhost:3000/api/auth/callback/google`. Set the same server-only
+`REALTIME_AUTH_SECRET` on the web app and realtime server to bind Socket.IO actions to the signed-in
+account; guests can continue using casual rooms without it.
 
 Useful backend endpoints:
 

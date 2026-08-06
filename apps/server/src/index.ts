@@ -41,6 +41,7 @@ import type {
   ServerToClientEvents,
   SocketData
 } from "@deuces-arena/shared";
+import { verifyRealtimeAuthToken } from "@deuces-arena/shared";
 import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
@@ -133,6 +134,7 @@ const ADMIN_GUEST_IDS = [
 ];
 const DATABASE_CONFIGURED = isConfiguredEnvironmentValue(process.env.DATABASE_URL);
 const REDIS_CONFIGURED = isConfiguredEnvironmentValue(process.env.REDIS_URL);
+const REALTIME_AUTH_SECRET = normalizeRealtimeAuthSecret(process.env.REALTIME_AUTH_SECRET);
 const CLASSIC_PLAYER_COUNT = 4;
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
@@ -319,6 +321,7 @@ app.get("/health", (_request, response) => {
     config: {
       database: DATABASE_CONFIGURED ? "configured" : "memory-fallback",
       redis: REDIS_CONFIGURED ? "configured" : "disabled",
+      realtimeAuth: REALTIME_AUTH_SECRET === null ? "disabled" : "configured",
       disconnectedAutoMoveDelayMs: DISCONNECTED_AUTO_MOVE_DELAY_MS
     },
     activity: publicLobbyState().activity
@@ -373,8 +376,36 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEve
   }
 );
 
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+
+  if (REALTIME_AUTH_SECRET === null || typeof token !== "string" || token.trim() === "") {
+    next();
+    return;
+  }
+
+  const identity = verifyRealtimeAuthToken(token, REALTIME_AUTH_SECRET);
+
+  if (identity === null) {
+    next(new Error("Invalid or expired account session."));
+    return;
+  }
+
+  socket.data.authProfileId = identity.profileId;
+  next();
+});
+
 io.on("connection", (socket) => {
   emitLobbyState();
+
+  function profileIdForSocket(requestedProfileId: string | undefined): string | null {
+    return resolveSocketProfileId(socket.data.authProfileId, requestedProfileId);
+  }
+
+  function clearSocketRoomData(): void {
+    const authProfileId = socket.data.authProfileId;
+    socket.data = authProfileId === undefined ? {} : { authProfileId };
+  }
 
   function leaveCurrentRoomForSocket(): void {
     if (socket.data.roomCode === undefined || socket.data.playerId === undefined) {
@@ -388,13 +419,17 @@ io.on("connection", (socket) => {
       socket.leave(currentRoom.code);
     }
 
-    socket.data = {};
+    clearSocketRoomData();
   }
 
   socket.on("room:create", (payload, callback) => {
     removeRankedQueueEntry(socket.id);
     leaveCurrentRoomForSocket();
-    const room = createRoom(payload.playerName, socket.id, payload.guestId);
+    const room = createRoom(
+      payload.playerName,
+      socket.id,
+      profileIdForSocket(payload.guestId) ?? undefined
+    );
     const player = room.players[0];
 
     if (player === undefined) {
@@ -403,6 +438,7 @@ io.on("connection", (socket) => {
     }
 
     socket.data = {
+      ...socket.data,
       playerId: player.id,
       roomCode: room.code
     };
@@ -440,8 +476,14 @@ io.on("connection", (socket) => {
     }
 
     leaveCurrentRoomForSocket();
-    const player = addHumanPlayer(room, payload.playerName, socket.id, payload.guestId);
+    const player = addHumanPlayer(
+      room,
+      payload.playerName,
+      socket.id,
+      profileIdForSocket(payload.guestId) ?? undefined
+    );
     socket.data = {
+      ...socket.data,
       playerId: player.id,
       roomCode: room.code
     };
@@ -461,8 +503,14 @@ io.on("connection", (socket) => {
     }
 
     const player = room.players.find((candidate) => candidate.id === payload.playerId);
+    const profileId = profileIdForSocket(payload.guestId);
 
-    if (player === undefined || player.kind !== "human") {
+    if (
+      player === undefined ||
+      player.kind !== "human" ||
+      profileId === null ||
+      player.guestId !== profileId
+    ) {
       callback(fail("Seat not found."));
       return;
     }
@@ -476,6 +524,7 @@ io.on("connection", (socket) => {
         : candidate
     );
     socket.data = {
+      ...socket.data,
       playerId: player.id,
       roomCode: room.code
     };
@@ -595,7 +644,7 @@ io.on("connection", (socket) => {
 
     leaveRoom(room, player.id, true);
     socket.leave(room.code);
-    socket.data = {};
+    clearSocketRoomData();
     callback(ok(undefined));
   });
 
@@ -616,7 +665,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("profile:get", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
 
     if (guestId === null) {
       callback(fail("Guest profile not found."));
@@ -627,7 +676,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("profile:update", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
     const displayName = normalizeDisplayName(payload.displayName);
     const avatarKey = normalizeAvatarKey(payload.avatarKey);
 
@@ -667,7 +716,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("cosmetics:equip", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
     const cosmeticId = payload.cosmeticId.trim();
 
     if (guestId === null || cosmeticId === "") {
@@ -701,7 +750,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("cosmetics:purchase", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
     const cosmeticId = payload.cosmeticId.trim();
 
     if (guestId === null || cosmeticId === "") {
@@ -727,7 +776,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("profile:history", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
 
     if (guestId === null) {
       callback(fail("Guest profile not found."));
@@ -738,7 +787,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("profile:label-replay", async (payload, callback) => {
-    const guestId = normalizeGuestId(payload.guestId);
+    const guestId = profileIdForSocket(payload.guestId);
     const matchId = payload.matchId.trim();
     const label = normalizeReplayLabel(payload.label);
 
@@ -782,6 +831,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("ranked:join", async (payload, callback) => {
+    if (REALTIME_AUTH_SECRET !== null && socket.data.authProfileId === undefined) {
+      callback(fail("Sign in with Google to join ranked."));
+      return;
+    }
+
     if (socket.data.roomCode !== undefined) {
       callback(fail("Leave your current room before joining ranked."));
       return;
@@ -793,7 +847,7 @@ io.on("connection", (socket) => {
         {
           socketId: socket.id,
           playerName: payload.playerName.trim() || "Ranked Player",
-          guestId: normalizeGuestId(payload.guestId),
+          guestId: profileIdForSocket(payload.guestId),
           joinedAt: new Date()
         }
       ];
@@ -960,7 +1014,7 @@ io.on("connection", (socket) => {
       id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       kind: normalizeFeedbackKind(payload.kind),
       body,
-      guestId: normalizeGuestId(payload.guestId),
+      guestId: profileIdForSocket(payload.guestId),
       roomCode,
       contactEmail: normalizeContactEmail(payload.contactEmail),
       userAgent: normalizeUserAgent(socket.handshake.headers["user-agent"]),
@@ -1585,6 +1639,7 @@ async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): P
 
     if (matchedSocket !== undefined) {
       matchedSocket.data = {
+        ...matchedSocket.data,
         playerId: player.id,
         roomCode: room.code
       };
@@ -1750,6 +1805,37 @@ function parseIntegerSetting(
 
 function isConfiguredEnvironmentValue(value: string | undefined): boolean {
   return value !== undefined && value.trim() !== "";
+}
+
+function normalizeRealtimeAuthSecret(value: string | undefined): string | null {
+  const normalized = value?.trim();
+
+  if (normalized === undefined || normalized === "") {
+    return null;
+  }
+
+  if (normalized.length < 32) {
+    throw new Error("REALTIME_AUTH_SECRET must contain at least 32 characters.");
+  }
+
+  return normalized;
+}
+
+function resolveSocketProfileId(
+  authenticatedProfileId: string | undefined,
+  requestedProfileId: string | undefined
+): string | null {
+  if (authenticatedProfileId !== undefined) {
+    return authenticatedProfileId;
+  }
+
+  const normalized = normalizeGuestId(requestedProfileId);
+
+  if (REALTIME_AUTH_SECRET !== null && normalized?.startsWith("auth-") === true) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function isAdminGuestId(guestId: string): boolean {

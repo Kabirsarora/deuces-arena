@@ -22,6 +22,7 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
+import { createRealtimeAuthToken } from "@deuces-arena/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server as SocketServer } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -35,6 +36,7 @@ type ServerModule = {
 let serverModule: ServerModule;
 let serverUrl: string;
 const sockets: TestSocket[] = [];
+const TEST_REALTIME_AUTH_SECRET = "test-realtime-auth-secret-with-at-least-32-characters";
 
 beforeAll(async () => {
   process.env.PORT = "0";
@@ -43,6 +45,7 @@ beforeAll(async () => {
   process.env.ADMIN_GUEST_IDS = "guest-admin-cosmetics";
   process.env.ADMIN_EMAILS = "creator@example.com";
   process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS = "10";
+  process.env.REALTIME_AUTH_SECRET = TEST_REALTIME_AUTH_SECRET;
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -74,6 +77,7 @@ describe("realtime rooms", () => {
       readonly config: {
         readonly database: string;
         readonly redis: string;
+        readonly realtimeAuth: string;
         readonly disconnectedAutoMoveDelayMs: number;
       };
       readonly environment: string;
@@ -88,6 +92,7 @@ describe("realtime rooms", () => {
     expect(health.config).toEqual({
       database: "memory-fallback",
       redis: "disabled",
+      realtimeAuth: "configured",
       disconnectedAutoMoveDelayMs: 10
     });
   });
@@ -124,6 +129,34 @@ describe("realtime rooms", () => {
 
     expect(profile.data.displayName).toBe("Arena Ace");
     expect(profile.data.avatarKey).toBe("spade");
+  });
+
+  it("prevents guest sockets from claiming account profile IDs", async () => {
+    const socket = await connectTestSocket();
+    const update = await updateProfile(socket, {
+      guestId: "auth-ffffffffffffffffffffffffffffffff",
+      displayName: "Impersonator",
+      avatarKey: "spade"
+    });
+
+    expect(update.ok).toBe(false);
+  });
+
+  it("binds account profile mutations to the signed socket identity", async () => {
+    const profileId = "auth-11111111111111111111111111111111";
+    const socket = await connectTestSocket(profileId);
+    const update = await updateProfile(socket, {
+      guestId: "auth-ffffffffffffffffffffffffffffffff",
+      displayName: "Verified Player",
+      avatarKey: "heart"
+    });
+
+    expect(update.ok).toBe(true);
+
+    if (update.ok) {
+      expect(update.data.guestId).toBe(profileId);
+      expect(update.data.displayName).toBe("Verified Player");
+    }
   });
 
   it("serves the cosmetic catalog over REST and Socket.IO", async () => {
@@ -284,7 +317,8 @@ describe("realtime rooms", () => {
   });
 
   it("allows configured admin emails to equip any cosmetic", async () => {
-    const socket = await connectTestSocket();
+    const adminProfileId = "auth-758f27d1f066779a62a65665242b8780";
+    const socket = await connectTestSocket(adminProfileId);
     const catalog = await listCosmetics(socket);
 
     expect(catalog.ok).toBe(true);
@@ -301,7 +335,6 @@ describe("realtime rooms", () => {
       return;
     }
 
-    const adminProfileId = "auth-758f27d1f066779a62a65665242b8780";
     const profile = await getProfile(socket, adminProfileId);
 
     expect(profile.ok).toBe(true);
@@ -629,6 +662,53 @@ describe("realtime rooms", () => {
     expect(advancedState.activePlayerId).not.toBe(startedRoom.data.activePlayerId);
   });
 
+  it("only reconnects a seat to its original profile identity", async () => {
+    const owner = await connectTestSocket();
+    const createdRoom = await createRoom(owner, {
+      playerName: "Seat Owner",
+      guestId: "guest-seat-owner"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok || createdRoom.data.yourPlayerId === null) {
+      return;
+    }
+
+    const roomCode = createdRoom.data.roomCode;
+    const playerId = createdRoom.data.yourPlayerId;
+    const startedRoom = await startRoom(owner, {
+      roomCode,
+      botCount: 3
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    owner.disconnect();
+
+    const attacker = await connectTestSocket();
+    const stolenSeat = await reconnectRoom(attacker, {
+      roomCode,
+      playerId,
+      guestId: "guest-seat-attacker"
+    });
+
+    expect(stolenSeat.ok).toBe(false);
+
+    const returningOwner = await connectTestSocket();
+    const restoredSeat = await reconnectRoom(returningOwner, {
+      roomCode,
+      playerId,
+      guestId: "guest-seat-owner"
+    });
+
+    expect(restoredSeat.ok).toBe(true);
+  });
+
   it("uses the requested casual bot count when starting rooms", async () => {
     const host = await connectTestSocket();
     const createdRoom = await createRoom(host, {
@@ -797,12 +877,9 @@ describe("realtime rooms", () => {
   });
 
   it("matches ranked queues with four humans and no bots", async () => {
-    const players = await Promise.all([
-      connectTestSocket(),
-      connectTestSocket(),
-      connectTestSocket(),
-      connectTestSocket()
-    ]);
+    const players = await Promise.all(
+      [1, 2, 3, 4].map((index) => connectTestSocket(`auth-${index.toString(16).padStart(32, "0")}`))
+    );
     const matchedStates = players.map((socket) => waitForRoomState(socket));
 
     const joins = await Promise.all(
@@ -827,8 +904,8 @@ describe("realtime rooms", () => {
   });
 
   it("reports ranked queue position before a match starts", async () => {
-    const first = await connectTestSocket();
-    const second = await connectTestSocket();
+    const first = await connectTestSocket("auth-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    const second = await connectTestSocket("auth-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
     const firstJoin = await joinRanked(first, {
       playerName: "Queue One",
       guestId: "guest-ranked-position-1"
@@ -850,6 +927,20 @@ describe("realtime rooms", () => {
     expect(secondJoin.data.joined).toBe(true);
     expect(secondJoin.data.queuePosition).toBe(2);
     expect(secondJoin.data.queuedPlayers).toBe(2);
+  });
+
+  it("requires a verified account before joining ranked", async () => {
+    const guest = await connectTestSocket();
+    const join = await joinRanked(guest, {
+      playerName: "Guest Queue",
+      guestId: "guest-ranked-blocked"
+    });
+
+    expect(join.ok).toBe(false);
+
+    if (!join.ok) {
+      expect(join.error).toContain("Sign in with Google");
+    }
   });
 
   it("sanitizes chat and broadcasts accepted messages to seated players", async () => {
@@ -1064,10 +1155,15 @@ describe("realtime rooms", () => {
   });
 });
 
-async function connectTestSocket(): Promise<TestSocket> {
+async function connectTestSocket(authProfileId?: string): Promise<TestSocket> {
+  const token =
+    authProfileId === undefined
+      ? undefined
+      : createRealtimeAuthToken({ profileId: authProfileId }, TEST_REALTIME_AUTH_SECRET);
   const socket: TestSocket = createClient(serverUrl, {
     forceNew: true,
-    transports: ["websocket"]
+    transports: ["websocket"],
+    ...(token === undefined ? {} : { auth: { token } })
   });
   sockets.push(socket);
 
@@ -1095,6 +1191,17 @@ function joinRoom(
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {
     socket.emit("room:join", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function reconnectRoom(
+  socket: TestSocket,
+  payload: { readonly roomCode: string; readonly playerId: string; readonly guestId: string }
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("room:reconnect", payload, (ack) => {
       resolve(ack);
     });
   });

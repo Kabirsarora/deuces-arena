@@ -31,6 +31,7 @@
 - Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
 - Done: make public lobby activity human-centered with online users and open/active room counts.
 - Done: add Socket.IO event contracts and server-authoritative move validation.
+- Done: add a signed, short-lived identity bridge from Auth.js to Socket.IO so account actions and seat reconnects cannot claim another signed-in profile.
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
 - Done: add in-memory rate limits for noisy realtime actions.
 - Done: add disconnect grace auto-moves so active abandoned seats do not freeze a table.
@@ -43,6 +44,7 @@
 - Done: store match history, move history, placements, bombs played, rating, cards remaining, and replay timelines.
 - Done: expose profile, leaderboard, match history, and replay export in the online UI.
 - Done: add full account auth, profile pages, and a richer replay review screen.
+- Done: require verified signed-in identity for ranked entry when production realtime auth is configured.
 - Done: add searchable match history filters.
 - Done: add saved replay labels.
 
@@ -55,6 +57,7 @@
 - Next: split casual and ranked queues.
 - Next: add stronger Monte Carlo evaluators and replay-based mistake detection.
 - Later: add AI coach explanations only when grounded in legal moves, simulations, replay data, and model outputs.
+- Requirement: keep core play and simulations free of paid model calls; future external AI must be opt-in, cached, rate-limited, protected by a kill switch, and deployed with strict provider budgets.
 
 ## Phase 7: Cosmetics and Supporter Features
 

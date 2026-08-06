@@ -145,7 +145,13 @@ const CLASSIC_CLOCKWISE_SEAT_LAYOUT: readonly string[] = [
   "right-4 top-1/2 -translate-y-1/2 sm:right-6"
 ];
 
-export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
+export function OnlineRoomPanel({
+  authUser,
+  realtimeAuthToken
+}: {
+  readonly authUser: AuthUser | null;
+  readonly realtimeAuthToken: string | null;
+}) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const lastObservedChatKeyRef = useRef<string | null>(null);
@@ -311,7 +317,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     }
 
     const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(SERVER_URL, {
-      autoConnect: true
+      autoConnect: true,
+      ...(realtimeAuthToken === null ? {} : { auth: { token: realtimeAuthToken } })
     });
     socketRef.current = socket;
 
@@ -324,13 +331,15 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       refreshRankedQueue(socket, setRankedQueue);
       refreshMatchHistory(socket, getActiveProfileId(), setMatchHistory);
       refreshCosmetics(socket, setCosmetics);
-      const session = loadRoomSession();
+      const session = loadRoomSession(getActiveProfileId());
 
       if (session !== null) {
         socket.emit("room:reconnect", session, (ack) => {
           if (ack.ok) {
             setRoom(ack.data);
             setMessage("Reconnected to room.");
+          } else {
+            removeRoomSession();
           }
         });
       }
@@ -338,6 +347,14 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     socket.on("disconnect", () => {
       setConnected(false);
       setMessage("Disconnected from realtime server.");
+    });
+    socket.on("connect_error", (error) => {
+      setConnected(false);
+      setMessage(
+        error.message.includes("account session")
+          ? "Your account session expired. Refresh the page to reconnect."
+          : "Unable to reach the realtime server. It may still be waking up."
+      );
     });
     socket.on("room:state", (state) => {
       setRoom(state);
@@ -366,7 +383,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       socket.disconnect();
       socketRef.current = null;
     };
-  }, []);
+  }, [realtimeAuthToken]);
 
   useEffect(() => {
     if (room?.yourPlayerId === null || room === null) {
@@ -475,7 +492,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
         }
 
         setRoom(createAck.data);
-        saveRoomSession(createAck.data);
+        saveRoomSession(createAck.data, getActiveProfileId());
         syncRoomCodeToUrl(createAck.data.roomCode);
 
         socketRef.current?.emit(
@@ -868,7 +885,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       if (ack.ok) {
         setRoom(ack.data);
         setSelectedCardIds([]);
-        saveRoomSession(ack.data);
+        saveRoomSession(ack.data, getActiveProfileId());
         syncRoomCodeToUrl(ack.data.roomCode);
         setMessage(successMessage);
       } else {
@@ -2534,7 +2551,7 @@ function WaitingSeats({
   );
 }
 
-function saveRoomSession(room: PublicRoomState): void {
+function saveRoomSession(room: PublicRoomState, guestId: string): void {
   if (room.yourPlayerId === null) {
     return;
   }
@@ -2543,7 +2560,8 @@ function saveRoomSession(room: PublicRoomState): void {
     ROOM_SESSION_KEY,
     JSON.stringify({
       roomCode: room.roomCode,
-      playerId: room.yourPlayerId
+      playerId: room.yourPlayerId,
+      guestId
     })
   );
 }
@@ -2552,7 +2570,9 @@ function removeRoomSession(): void {
   window.localStorage.removeItem(ROOM_SESSION_KEY);
 }
 
-function loadRoomSession(): { readonly roomCode: string; readonly playerId: string } | null {
+function loadRoomSession(
+  activeProfileId: string
+): { readonly roomCode: string; readonly playerId: string; readonly guestId: string } | null {
   const rawSession = window.localStorage.getItem(ROOM_SESSION_KEY);
 
   if (rawSession === null) {
@@ -2563,12 +2583,18 @@ function loadRoomSession(): { readonly roomCode: string; readonly playerId: stri
     const parsedSession = JSON.parse(rawSession) as {
       roomCode?: unknown;
       playerId?: unknown;
+      guestId?: unknown;
     };
 
-    if (typeof parsedSession.roomCode === "string" && typeof parsedSession.playerId === "string") {
+    if (
+      typeof parsedSession.roomCode === "string" &&
+      typeof parsedSession.playerId === "string" &&
+      parsedSession.guestId === activeProfileId
+    ) {
       return {
         roomCode: parsedSession.roomCode,
-        playerId: parsedSession.playerId
+        playerId: parsedSession.playerId,
+        guestId: activeProfileId
       };
     }
   } catch {
