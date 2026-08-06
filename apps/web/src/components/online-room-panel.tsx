@@ -148,7 +148,6 @@ const CLASSIC_CLOCKWISE_SEAT_LAYOUT: readonly string[] = [
 export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | null }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
-  const lastDealAnimationKeyRef = useRef<string | null>(null);
   const lastObservedChatKeyRef = useRef<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const [connected, setConnected] = useState(false);
@@ -191,6 +190,13 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
     () => sortHandForDisplay(room?.yourHand ?? [], handSortMode, manualCardOrderIds),
     [handSortMode, manualCardOrderIds, room?.yourHand]
   );
+  const dealAnimationTriggerKey =
+    !shouldReduceMotion &&
+    room?.status === "in-progress" &&
+    room.turnNumber === 0 &&
+    room.yourHand.length > 0
+      ? `${room.roomCode}-${room.yourHand.map((card) => getCardId(card)).join(".")}`
+      : null;
   const legalMoves = useMemo(
     () =>
       room === null
@@ -278,27 +284,13 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }, [room?.yourHand]);
 
   useLayoutEffect(() => {
-    if (
-      shouldReduceMotion ||
-      room?.status !== "in-progress" ||
-      room.turnNumber !== 0 ||
-      room.yourHand.length === 0
-    ) {
+    if (dealAnimationTriggerKey === null) {
       setDealAnimationKey(null);
       setHandDealtVisible(true);
       return;
     }
 
-    const nextDealAnimationKey = `${room.roomCode}-${room.yourHand
-      .map((card) => getCardId(card))
-      .join(".")}`;
-
-    if (lastDealAnimationKeyRef.current === nextDealAnimationKey) {
-      return;
-    }
-
-    lastDealAnimationKeyRef.current = nextDealAnimationKey;
-    setDealAnimationKey(nextDealAnimationKey);
+    setDealAnimationKey(dealAnimationTriggerKey);
     setHandDealtVisible(false);
 
     const revealHandTimeout = window.setTimeout(() => setHandDealtVisible(true), 850);
@@ -308,7 +300,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
       window.clearTimeout(revealHandTimeout);
       window.clearTimeout(clearDealTimeout);
     };
-  }, [room, shouldReduceMotion]);
+  }, [dealAnimationTriggerKey]);
 
   useEffect(() => {
     const inviteCode = getRoomCodeFromUrl();
@@ -988,8 +980,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
   }
 
   return (
-    <main className="min-h-screen px-3 py-3 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
+    <main className="min-h-screen overflow-x-hidden px-3 py-3 text-white sm:px-5 lg:px-8">
+      <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
         <ActiveRoomBar
           room={room}
           connected={connected}
@@ -1019,7 +1011,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           onLeaveRoom={leaveRoom}
         />
 
-        <section className="relative min-h-[28rem] lg:min-h-0">
+        <section className="relative min-w-0 min-h-[28rem] lg:min-h-0">
           <OnlineTable
             room={room}
             timerNow={timerNow}
@@ -1035,8 +1027,8 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           />
         </section>
 
-        <section className="hand-dock border border-white/10 p-3 shadow-2xl backdrop-blur">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="hand-dock min-w-0 border border-white/10 p-3 shadow-2xl backdrop-blur">
+          <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-bold">Your Hand</p>
               <p className="text-xs text-zinc-400">
@@ -1047,7 +1039,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                   : turnStatus}
               </p>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
               <div className="flex rounded-full border border-white/10 bg-black/24 p-1">
                 {HAND_SORT_OPTIONS.map((option) => (
                   <button
@@ -1150,7 +1142,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
           </div>
 
           <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
-            <div className="flex items-end gap-1 sm:gap-2">
+            <div className="mx-auto flex min-w-max items-end px-3 sm:px-4">
               <AnimatePresence initial={false} mode="popLayout">
                 {(handDealtVisible ? displayedHand : []).map((card, index) => {
                   const selected = selectedCardIds.includes(getCardId(card));
@@ -1162,7 +1154,7 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       key={getCardId(card)}
                       layout
                       type="button"
-                      className="shrink-0 rounded-md disabled:cursor-default"
+                      className="relative -ml-3 shrink-0 rounded-md first:ml-0 disabled:cursor-default sm:-ml-4"
                       aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
                         playable ? ", legal option" : ""
                       }`}
@@ -1183,8 +1175,10 @@ export function OnlineRoomPanel({ authUser }: { readonly authUser: AuthUser | nu
                       }
                       animate={{
                         opacity: 1,
+                        x: 0,
                         y: shouldReduceMotion ? 0 : selected ? -18 : 0,
-                        scale: shouldReduceMotion ? 1 : selected ? 1.03 : 1
+                        scale: shouldReduceMotion ? 1 : selected ? 1.03 : 1,
+                        rotate: 0
                       }}
                       exit={
                         shouldReduceMotion
@@ -2204,7 +2198,7 @@ function ActiveRoomBar({
   readonly onLeaveRoom: () => void;
 }) {
   return (
-    <header className="hud-glass flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-white/10 px-3 py-2 backdrop-blur">
+    <header className="hud-glass flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-[1.25rem] border border-white/10 px-3 py-2 backdrop-blur sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
         <span
           className={cn(
@@ -2220,7 +2214,7 @@ function ActiveRoomBar({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
         {room !== null ? (
           <button
             className="rounded-full border border-white/10 bg-white/7 px-3 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)]"
@@ -3677,7 +3671,7 @@ function OnlineTable({
             <AnimatePresence mode="popLayout">
               {room?.currentTrick === null || room === null ? (
                 <motion.div
-                  className="rounded-full border border-dashed border-white/18 bg-black/18 px-7 py-7 text-sm text-zinc-300"
+                  className="sr-only rounded-full border border-dashed border-white/18 bg-black/18 px-7 py-7 text-sm text-zinc-300 sm:not-sr-only"
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
@@ -3997,11 +3991,13 @@ function OnlineSeat({
   const avatarCosmetic = getEquippedCosmetic(player, "AVATAR");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = getSeatPositionClass(position, seatCount);
+  const centeredSeat = position === 0 || (seatCount % 2 === 0 && position === seatCount / 2);
 
   return (
     <div
       className={cn(
-        "seat-panel absolute z-20 flex w-[min(13.5rem,calc(100%-2rem))] items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
+        "seat-panel absolute z-20 flex items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
+        centeredSeat ? "w-[min(13.5rem,calc(100%-2rem))]" : "w-36",
         seatPosition,
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
