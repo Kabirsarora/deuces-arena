@@ -29,11 +29,12 @@
 
 - Done: add rooms, lobby, ready states, reconnects, leave-room flow, and room links.
 - Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
-- Done: make lobby activity human-centered with peak and total user counters.
+- Done: make public lobby activity human-centered with online users and open/active room counts.
 - Done: add Socket.IO event contracts and server-authoritative move validation.
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
 - Done: add in-memory rate limits for noisy realtime actions.
 - Done: add disconnect grace auto-moves so active abandoned seats do not freeze a table.
+- Next: add an optional casual-only Trade Phase with a 20-second pregame window, one pending request and one accepted one-for-one trade per player, atomic server validation, and no ranked support.
 - Next: add Redis-backed room durability for multi-instance hosting.
 
 ## Phase 5: Accounts, Stats, and Replays
@@ -71,3 +72,9 @@
 - Done: add saved replay labels.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
 - Later: add Stripe support for optional supporter features.
+
+## Phase 8: Mobile and Messages
+
+- Next: build an Expo / React Native client that reuses the game engine, shared contracts, backend, persistence model, and simulation tooling.
+- Later: add universal room invitation links and native sharing from the mobile app.
+- Later: build a native iMessage extension with Apple's Messages framework so group conversations can send and join Deuces Arena games without claiming integration with GamePigeon.

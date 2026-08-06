@@ -144,6 +144,8 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Build AI coach explanations from legal moves, replay state, rollout outcomes, and future model scores.
 - Add replay timeline UI, searchable match history, and richer post-game analysis.
 - Add non-pay-to-win cosmetics such as card backs, table themes, avatars, profile borders, and supporter badges.
+- Add an optional casual-only Trade Phase with a short pregame window, one accepted one-for-one trade per player, and server-authoritative validation; keep it disabled in ranked.
+- Build a reusable mobile client, then add a native iMessage extension that sends Deuces Arena room invitations and game state inside group conversations.
 
 ## Known Limitations
 

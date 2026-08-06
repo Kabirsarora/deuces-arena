@@ -112,7 +112,7 @@ Run this after setting `DATABASE_URL`:
 
 ```bash
 npm run db:generate --workspace @deuces-arena/db
-npm run db:migrate --workspace @deuces-arena/db
+npm run db:migrate:deploy --workspace @deuces-arena/db
 npm run db:seed --workspace @deuces-arena/db
 ```
 
