@@ -47,6 +47,7 @@ import { Server } from "socket.io";
 
 import { sanitizeChatMessage } from "./chat.js";
 import {
+  abandonPersistedMatch,
   completePersistedMatch,
   createPersistedMatch,
   equipPersistedCosmetic,
@@ -383,7 +384,7 @@ io.on("connection", (socket) => {
     const currentRoom = rooms.get(normalizeRoomCode(socket.data.roomCode));
 
     if (currentRoom !== undefined) {
-      leaveRoom(currentRoom, socket.data.playerId);
+      leaveRoom(currentRoom, socket.data.playerId, true);
       socket.leave(currentRoom.code);
     }
 
@@ -592,7 +593,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    leaveRoom(room, player.id);
+    leaveRoom(room, player.id, true);
     socket.leave(room.code);
     socket.data = {};
     callback(ok(undefined));
@@ -1063,7 +1064,7 @@ function addHumanPlayer(
   return player;
 }
 
-function leaveRoom(room: Room, playerId: string): void {
+function leaveRoom(room: Room, playerId: string, explicitlyLeft = false): void {
   if (room.game === null) {
     room.players = room.players.filter((player) => player.id !== playerId);
 
@@ -1075,6 +1076,18 @@ function leaveRoom(room: Room, playerId: string): void {
     }
 
     emitRoomState(room);
+    emitLobbyState();
+    return;
+  }
+
+  const hasAnotherConnectedHuman = room.players.some(
+    (player) => player.id !== playerId && player.kind === "human" && player.socketId !== null
+  );
+
+  if (explicitlyLeft && !hasAnotherConnectedHuman) {
+    clearTurnTimer(room);
+    rooms.delete(room.code);
+    void abandonPersistedMatch(room.persistedMatch);
     emitLobbyState();
     return;
   }

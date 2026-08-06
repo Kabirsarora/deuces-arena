@@ -764,6 +764,38 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.rules.deckType).toBe("arena-six");
   });
 
+  it("closes a started bot room when its only human explicitly leaves", async () => {
+    const host = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Leaving Host",
+      guestId: "guest-leaving-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 3
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    const activeRoomsBefore = await getActiveRoomCount();
+    const leftRoom = await leaveStartedRoom(host, createdRoom.data.roomCode);
+    const activeRoomsAfter = await getActiveRoomCount();
+
+    expect(leftRoom.ok).toBe(true);
+    expect(activeRoomsAfter).toBe(activeRoomsBefore - 1);
+  });
+
   it("matches ranked queues with four humans and no bots", async () => {
     const players = await Promise.all([
       connectTestSocket(),
@@ -1086,6 +1118,20 @@ function startRoom(
       resolve(ack);
     });
   });
+}
+
+function leaveStartedRoom(socket: TestSocket, roomCode: string): Promise<ServerAck<undefined>> {
+  return new Promise((resolve) => {
+    socket.emit("room:leave", { roomCode }, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+async function getActiveRoomCount(): Promise<number> {
+  const response = await fetch(`${serverUrl}/lobby`);
+  const lobby = (await response.json()) as PublicLobbyState;
+  return lobby.activity.activeRooms;
 }
 
 function joinRanked(

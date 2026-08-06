@@ -1095,6 +1095,29 @@ export async function completePersistedMatch(
   }
 }
 
+export async function abandonPersistedMatch(persistedMatch: PersistedMatch | null): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || persistedMatch === null) {
+    return;
+  }
+
+  try {
+    await db.prisma.match.updateMany({
+      where: {
+        id: persistedMatch.matchId,
+        status: "IN_PROGRESS"
+      },
+      data: {
+        status: "ABANDONED",
+        completedAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error("Unable to abandon persisted match.", error);
+  }
+}
+
 function getArenaCoinReward(placement: number): number {
   if (placement === 1) {
     return ARENA_COIN_REWARDS.first;
