@@ -3,17 +3,23 @@ import { createServer } from "node:http";
 
 import {
   applyMove,
+  applyPreGameCardTrade,
+  ARENA_SUITS,
   chooseBotMove,
+  CLASSIC_SUITS,
   calculatePlacementRatingChanges,
   createDeck,
   createInitialGame,
   evaluateLegalMovesByRandomRollouts,
+  isSameCard,
+  RANKS,
   summarizeGame,
   type BotStrategy,
   type Card,
   type DeckType,
   type GameState,
-  type PlayerState
+  type PlayerState,
+  type Rank
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
@@ -23,7 +29,9 @@ import type {
   PublicBotDifficulty,
   PublicBotPace,
   PublicChatMessage,
+  PublicCardTradeRequest,
   PublicCoachEvaluationRecord,
+  PublicCompletedCardTrade,
   PublicCosmetic,
   PublicEquippedCosmetic,
   PublicGuestProfile,
@@ -35,6 +43,7 @@ import type {
   PublicRoomRules,
   PublicRoomPlayer,
   PublicRoomState,
+  PublicTradePhaseState,
   ProfileAvatarKey,
   RoomReplayExport,
   ServerAck,
@@ -101,6 +110,7 @@ type Room = {
   botPace: PublicBotPace;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
+  trade: RoomTradeState;
 };
 
 type RoomTimerSettings = {
@@ -109,6 +119,16 @@ type RoomTimerSettings = {
 };
 
 type RoomRuleSettings = PublicRoomRules;
+
+type RoomTradeState = {
+  status: PublicTradePhaseState["status"];
+  deadlineAt: Date | null;
+  requests: PublicCardTradeRequest[];
+  requestUsedPlayerIds: Set<string>;
+  completedPlayerIds: Set<string>;
+  completedTrades: PublicCompletedCardTrade[];
+  timeout: NodeJS.Timeout | null;
+};
 
 type RateLimitBucket = "chat" | "coach" | "feedback" | "replay-label";
 
@@ -138,6 +158,7 @@ const REALTIME_AUTH_SECRET = normalizeRealtimeAuthSecret(process.env.REALTIME_AU
 const CLASSIC_PLAYER_COUNT = 4;
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
+const TRADE_WINDOW_MS = 20_000;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
 const DEFAULT_TIMER_SECONDS = 45;
@@ -585,6 +606,7 @@ io.on("connection", (socket) => {
       }
     );
     room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
+    startTradePhase(room, payload.trade?.enabled === true);
     resetTurnTimer(room);
 
     callback(ok(publicStateForSocket(room, socket.id)));
@@ -865,6 +887,167 @@ io.on("connection", (socket) => {
     emitRankedQueueState();
   });
 
+  socket.on("trade:request", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined || room.game === null) {
+      callback(fail("Game not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+    const target = room.players.find((candidate) => candidate.id === payload.toPlayerId);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.mode !== "CASUAL" || room.trade.status !== "open") {
+      callback(fail("The card trade window is closed."));
+      return;
+    }
+
+    if (
+      target === undefined ||
+      target.kind !== "human" ||
+      target.socketId === null ||
+      target.id === player.id
+    ) {
+      callback(fail("Choose another connected human player."));
+      return;
+    }
+
+    if (
+      room.trade.requestUsedPlayerIds.has(player.id) ||
+      room.trade.completedPlayerIds.has(player.id)
+    ) {
+      callback(fail("You can send only one trade request per game."));
+      return;
+    }
+
+    if (room.trade.completedPlayerIds.has(target.id)) {
+      callback(fail("That player has already completed a trade."));
+      return;
+    }
+
+    if (!isValidRoomCard(payload.offeredCard, room.rules.deckType)) {
+      callback(fail("Choose a valid card to offer."));
+      return;
+    }
+
+    if (!isValidRank(payload.requestedRank)) {
+      callback(fail("Choose a valid requested rank."));
+      return;
+    }
+
+    const playerState = getGamePlayer(room.game, player.id);
+
+    if (!playerState.hand.some((card) => isSameCard(card, payload.offeredCard))) {
+      callback(fail("You do not hold the offered card."));
+      return;
+    }
+
+    const request: PublicCardTradeRequest = {
+      id: `trade-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fromPlayerId: player.id,
+      toPlayerId: target.id,
+      offeredCard: payload.offeredCard,
+      requestedRank: payload.requestedRank,
+      createdAt: new Date().toISOString()
+    };
+
+    room.trade.requests = [...room.trade.requests, request];
+    room.trade.requestUsedPlayerIds.add(player.id);
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+  });
+
+  socket.on("trade:respond", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined || room.game === null) {
+      callback(fail("Game not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+    const request = room.trade.requests.find((candidate) => candidate.id === payload.requestId);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.mode !== "CASUAL" || room.trade.status !== "open") {
+      callback(fail("The card trade window is closed."));
+      return;
+    }
+
+    if (request === undefined || request.toPlayerId !== player.id) {
+      callback(fail("Trade request not found."));
+      return;
+    }
+
+    if (!payload.accept) {
+      room.trade.requests = room.trade.requests.filter((candidate) => candidate.id !== request.id);
+      callback(ok(publicStateForSocket(room, socket.id)));
+      emitRoomState(room);
+      return;
+    }
+
+    if (
+      room.trade.completedPlayerIds.has(request.fromPlayerId) ||
+      room.trade.completedPlayerIds.has(request.toPlayerId)
+    ) {
+      callback(fail("One of these players has already completed a trade."));
+      return;
+    }
+
+    if (
+      payload.requestedCard === undefined ||
+      !isValidRoomCard(payload.requestedCard, room.rules.deckType) ||
+      payload.requestedCard.rank !== request.requestedRank
+    ) {
+      callback(fail(`Choose one of your ${request.requestedRank} cards to accept.`));
+      return;
+    }
+
+    const result = applyPreGameCardTrade(room.game, {
+      fromPlayerId: request.fromPlayerId,
+      toPlayerId: request.toPlayerId,
+      offeredCard: request.offeredCard,
+      requestedCard: payload.requestedCard
+    });
+
+    if (!result.ok) {
+      callback(fail(result.reason));
+      return;
+    }
+
+    room.game = result.state;
+    room.trade.completedPlayerIds.add(request.fromPlayerId);
+    room.trade.completedPlayerIds.add(request.toPlayerId);
+    room.trade.completedTrades = [
+      ...room.trade.completedTrades,
+      {
+        id: request.id,
+        fromPlayerId: request.fromPlayerId,
+        toPlayerId: request.toPlayerId,
+        offeredCard: request.offeredCard,
+        receivedCard: payload.requestedCard,
+        completedAt: new Date().toISOString()
+      }
+    ];
+    room.trade.requests = room.trade.requests.filter(
+      (candidate) =>
+        ![request.fromPlayerId, request.toPlayerId].includes(candidate.fromPlayerId) &&
+        ![request.fromPlayerId, request.toPlayerId].includes(candidate.toPlayerId)
+    );
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+  });
+
   socket.on("game:move", (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -877,6 +1060,11 @@ io.on("connection", (socket) => {
 
     if (player === undefined) {
       callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.trade.status === "open") {
+      callback(fail("Wait for the card trade window to close."));
       return;
     }
 
@@ -951,6 +1139,11 @@ io.on("connection", (socket) => {
 
     if (player === undefined) {
       callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.trade.status === "open") {
+      callback(fail("Move evaluation starts after the card trade window."));
       return;
     }
 
@@ -1065,6 +1258,10 @@ function closeServer(signal: NodeJS.Signals): void {
 
   isClosing = true;
   console.log(`Received ${signal}. Closing Deuces Arena server.`);
+  for (const room of rooms.values()) {
+    clearTurnTimer(room);
+    clearTradeTimer(room);
+  }
   io.close(() => {
     httpServer.close(() => {
       process.exit(0);
@@ -1103,7 +1300,8 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
     botDifficulty: "normal",
     botPace: "relaxed",
     turnDeadlineAt: null,
-    timerTimeout: null
+    timerTimeout: null,
+    trade: createDisabledTradeState()
   };
 }
 
@@ -1124,6 +1322,7 @@ function leaveRoom(room: Room, playerId: string, explicitlyLeft = false): void {
 
     if (room.players.length === 0) {
       clearTurnTimer(room);
+      clearTradeTimer(room);
       rooms.delete(room.code);
       emitLobbyState();
       return;
@@ -1140,6 +1339,7 @@ function leaveRoom(room: Room, playerId: string, explicitlyLeft = false): void {
 
   if (explicitlyLeft && !hasAnotherConnectedHuman) {
     clearTurnTimer(room);
+    clearTradeTimer(room);
     rooms.delete(room.code);
     void abandonPersistedMatch(room.persistedMatch);
     emitLobbyState();
@@ -1155,6 +1355,18 @@ function leaveRoom(room: Room, playerId: string, explicitlyLeft = false): void {
         }
       : player
   );
+  room.trade.requests = room.trade.requests.filter(
+    (request) => request.fromPlayerId !== playerId && request.toPlayerId !== playerId
+  );
+
+  if (
+    room.trade.status === "open" &&
+    room.players.filter((player) => player.kind === "human" && player.socketId !== null).length < 2
+  ) {
+    closeTradePhase(room);
+    return;
+  }
+
   emitRoomState(room);
   emitLobbyState();
   scheduleAutomatedTurn(room);
@@ -1256,6 +1468,23 @@ function normalizeDeckType(deckType: DeckType | undefined): DeckType {
   return deckType === "arena-six" ? "arena-six" : "classic";
 }
 
+function isValidRank(rank: unknown): rank is Rank {
+  return typeof rank === "string" && (RANKS as readonly string[]).includes(rank);
+}
+
+function isValidRoomCard(card: unknown, deckType: DeckType): card is Card {
+  if (typeof card !== "object" || card === null || !("rank" in card) || !("suit" in card)) {
+    return false;
+  }
+
+  const suits = deckType === "arena-six" ? ARENA_SUITS : CLASSIC_SUITS;
+  return (
+    isValidRank(card.rank) &&
+    typeof card.suit === "string" &&
+    (suits as readonly string[]).includes(card.suit)
+  );
+}
+
 function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): PublicBotDifficulty {
   return difficulty === "easy" || difficulty === "hard" ? difficulty : "normal";
 }
@@ -1264,10 +1493,73 @@ function normalizeBotPace(pace: PublicBotPace | undefined): PublicBotPace {
   return pace === "quick" || pace === "normal" ? pace : "relaxed";
 }
 
+function createDisabledTradeState(): RoomTradeState {
+  return {
+    status: "disabled",
+    deadlineAt: null,
+    requests: [],
+    requestUsedPlayerIds: new Set(),
+    completedPlayerIds: new Set(),
+    completedTrades: [],
+    timeout: null
+  };
+}
+
+function startTradePhase(room: Room, enabled: boolean): void {
+  clearTradeTimer(room);
+  const connectedHumans = room.players.filter(
+    (player) => player.kind === "human" && player.socketId !== null
+  );
+
+  if (!enabled || room.mode !== "CASUAL" || connectedHumans.length < 2) {
+    room.trade = createDisabledTradeState();
+    return;
+  }
+
+  const deadlineAt = new Date(Date.now() + TRADE_WINDOW_MS);
+  room.trade = {
+    status: "open",
+    deadlineAt,
+    requests: [],
+    requestUsedPlayerIds: new Set(),
+    completedPlayerIds: new Set(),
+    completedTrades: [],
+    timeout: setTimeout(() => closeTradePhase(room), TRADE_WINDOW_MS)
+  };
+  room.trade.timeout?.unref();
+}
+
+function closeTradePhase(room: Room): void {
+  if (room.trade.status !== "open") {
+    return;
+  }
+
+  clearTradeTimer(room);
+  room.trade.status = "closed";
+  room.trade.deadlineAt = null;
+  room.trade.requests = [];
+  resetTurnTimer(room);
+  emitRoomState(room);
+  emitLobbyState();
+  scheduleAutomatedTurn(room);
+}
+
+function clearTradeTimer(room: Room): void {
+  if (room.trade.timeout !== null) {
+    clearTimeout(room.trade.timeout);
+    room.trade.timeout = null;
+  }
+}
+
 function resetTurnTimer(room: Room): void {
   clearTurnTimer(room);
 
-  if (room.game === null || room.game.status === "complete" || !room.timer.enabled) {
+  if (
+    room.game === null ||
+    room.game.status === "complete" ||
+    room.trade.status === "open" ||
+    !room.timer.enabled
+  ) {
     room.turnDeadlineAt = null;
     return;
   }
@@ -1297,7 +1589,7 @@ function publicTurnTimer(room: Room) {
 function scheduleAutomatedTurn(room: Room): void {
   clearTurnTimer(room);
 
-  if (room.game === null || room.game.status === "complete") {
+  if (room.game === null || room.game.status === "complete" || room.trade.status === "open") {
     return;
   }
 
@@ -1343,7 +1635,7 @@ function botMoveDelayMs(pace: PublicBotPace): number {
 }
 
 function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy): void {
-  if (room.game === null || room.game.activePlayerId !== playerId) {
+  if (room.game === null || room.trade.status === "open" || room.game.activePlayerId !== playerId) {
     return;
   }
 
@@ -1449,13 +1741,14 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     botDifficulty: room.botDifficulty,
     botPace: room.botPace,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
-    activePlayerId: room.game?.activePlayerId ?? null,
+    activePlayerId: room.trade.status === "open" ? null : (room.game?.activePlayerId ?? null),
     currentTrick: room.game?.currentTrick ?? null,
     turnNumber: room.game?.turnNumber ?? 0,
     placements: room.game?.placements ?? [],
     recentEvents:
       room.game?.status === "complete" ? room.game.events : (room.game?.events.slice(-12) ?? []),
     recentChat: room.chatMessages.slice(-20),
+    tradePhase: publicTradePhase(room, player?.id ?? null),
     turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
     yourHand: hand
@@ -1471,7 +1764,24 @@ function replayExportForRoom(room: Room): RoomReplayExport {
     placements: room.game?.placements ?? [],
     turnNumber: room.game?.turnNumber ?? 0,
     events: room.game?.events ?? [],
+    tradeHistory: room.trade.completedTrades,
     coachEvaluations: room.coachEvaluations
+  };
+}
+
+function publicTradePhase(room: Room, playerId: string | null): PublicTradePhaseState {
+  return {
+    status: room.trade.status,
+    deadlineAt: room.trade.deadlineAt?.toISOString() ?? null,
+    requests:
+      playerId === null
+        ? []
+        : room.trade.requests.filter(
+            (request) => request.fromPlayerId === playerId || request.toPlayerId === playerId
+          ),
+    yourRequestUsed: playerId !== null && room.trade.requestUsedPlayerIds.has(playerId),
+    yourTradeCompleted: playerId !== null && room.trade.completedPlayerIds.has(playerId),
+    completedTradeCount: room.trade.completedTrades.length
   };
 }
 

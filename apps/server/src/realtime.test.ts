@@ -2,6 +2,7 @@ import { once } from "node:events";
 import type { Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import type { Card, Rank } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
   ChatPayload,
@@ -538,6 +539,152 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(2);
     expect(startedRoom.data.yourHand).toHaveLength(13);
     expect(startedRoom.data.turnTimer).toBeNull();
+  });
+
+  it("runs a private, server-authoritative casual card trade window", async () => {
+    const host = await connectTestSocket();
+    const guest = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Trade Host",
+      guestId: "guest-trade-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRoom = await joinRoom(guest, {
+      roomCode,
+      playerName: "Trade Guest",
+      guestId: "guest-trade-guest"
+    });
+
+    expect(joinedRoom.ok).toBe(true);
+
+    if (!joinedRoom.ok) {
+      return;
+    }
+
+    await setReady(host, { roomCode, ready: true });
+    await setReady(guest, { roomCode, ready: true });
+    const guestStartedState = waitForRoomStateMatching(
+      guest,
+      (state) => state.status === "in-progress" && state.tradePhase.status === "open"
+    );
+    const startedRoom = await startRoom(host, {
+      roomCode,
+      trade: { enabled: true }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    const guestState = await guestStartedState;
+    const hostPlayerId = startedRoom.data.yourPlayerId;
+    const guestPlayerId = guestState.yourPlayerId;
+    const offeredCard = startedRoom.data.yourHand[0];
+    const requestedCard = guestState.yourHand[0];
+
+    expect(startedRoom.data.tradePhase.status).toBe("open");
+    expect(startedRoom.data.tradePhase.deadlineAt).not.toBeNull();
+    expect(startedRoom.data.activePlayerId).toBeNull();
+    expect(hostPlayerId).not.toBeNull();
+    expect(guestPlayerId).not.toBeNull();
+    expect(offeredCard).toBeDefined();
+    expect(requestedCard).toBeDefined();
+
+    if (
+      hostPlayerId === null ||
+      guestPlayerId === null ||
+      offeredCard === undefined ||
+      requestedCard === undefined
+    ) {
+      return;
+    }
+
+    const guestRequestState = waitForRoomStateMatching(
+      guest,
+      (state) => state.tradePhase.requests.length === 1
+    );
+    const requestAck = await requestTrade(host, {
+      roomCode,
+      toPlayerId: guestPlayerId,
+      offeredCard,
+      requestedRank: requestedCard.rank
+    });
+
+    expect(requestAck.ok).toBe(true);
+
+    if (!requestAck.ok) {
+      return;
+    }
+
+    expect(requestAck.data.tradePhase.yourRequestUsed).toBe(true);
+    expect(requestAck.data.tradePhase.requests).toHaveLength(1);
+    const duplicateRequest = await requestTrade(host, {
+      roomCode,
+      toPlayerId: guestPlayerId,
+      offeredCard,
+      requestedRank: requestedCard.rank
+    });
+    expect(duplicateRequest.ok).toBe(false);
+    const requestId = requestAck.data.tradePhase.requests[0]?.id;
+    const guestWithRequest = await guestRequestState;
+    expect(guestWithRequest.tradePhase.requests[0]?.offeredCard).toEqual(offeredCard);
+
+    if (requestId === undefined) {
+      return;
+    }
+
+    const wrongRequestedCard = guestState.yourHand.find((card) => card.rank !== requestedCard.rank);
+
+    if (wrongRequestedCard !== undefined) {
+      const invalidResponse = await respondToTrade(guest, {
+        roomCode,
+        requestId,
+        accept: true,
+        requestedCard: wrongRequestedCard
+      });
+      expect(invalidResponse.ok).toBe(false);
+    }
+
+    const hostCompletedState = waitForRoomStateMatching(
+      host,
+      (state) => state.tradePhase.completedTradeCount === 1
+    );
+    const responseAck = await respondToTrade(guest, {
+      roomCode,
+      requestId,
+      accept: true,
+      requestedCard
+    });
+
+    expect(responseAck.ok).toBe(true);
+
+    if (!responseAck.ok) {
+      return;
+    }
+
+    const hostAfterTrade = await hostCompletedState;
+    expect(responseAck.data.tradePhase.yourTradeCompleted).toBe(true);
+    expect(responseAck.data.yourHand).toContainEqual(offeredCard);
+    expect(responseAck.data.yourHand).not.toContainEqual(requestedCard);
+    expect(hostAfterTrade.yourHand).toContainEqual(requestedCard);
+    expect(hostAfterTrade.yourHand).not.toContainEqual(offeredCard);
+    expect(hostAfterTrade.tradePhase.requests).toHaveLength(0);
+
+    const replay = await exportReplay(host, { roomCode });
+    expect(replay.ok).toBe(true);
+
+    if (replay.ok) {
+      expect(replay.data.tradeHistory).toHaveLength(1);
+    }
   });
 
   it("starts rooms with optional turn timer metadata", async () => {
@@ -1218,10 +1365,45 @@ function startRoom(
     };
     readonly rules?: PublicRoomState["rules"];
     readonly botPace?: PublicRoomState["botPace"];
+    readonly trade?: {
+      readonly enabled: boolean;
+    };
   }
 ): Promise<ServerAck<PublicRoomState>> {
   return new Promise((resolve) => {
     socket.emit("room:start", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function requestTrade(
+  socket: TestSocket,
+  payload: {
+    readonly roomCode: string;
+    readonly toPlayerId: string;
+    readonly offeredCard: Card;
+    readonly requestedRank: Rank;
+  }
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("trade:request", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function respondToTrade(
+  socket: TestSocket,
+  payload: {
+    readonly roomCode: string;
+    readonly requestId: string;
+    readonly accept: boolean;
+    readonly requestedCard?: Card;
+  }
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("trade:respond", payload, (ack) => {
       resolve(ack);
     });
   });

@@ -1,4 +1,11 @@
-import type { Card, CurrentTrick, DeckType, GameEvent, Move } from "@deuces-arena/game-engine";
+import type {
+  Card,
+  CurrentTrick,
+  DeckType,
+  GameEvent,
+  Move,
+  Rank
+} from "@deuces-arena/game-engine";
 
 export {
   createRealtimeAuthToken,
@@ -163,6 +170,33 @@ export type PublicCoachEvaluationRecord = {
   readonly evaluations: readonly PublicMoveEvaluation[];
 };
 
+export type PublicCardTradeRequest = {
+  readonly id: string;
+  readonly fromPlayerId: string;
+  readonly toPlayerId: string;
+  readonly offeredCard: Card;
+  readonly requestedRank: Rank;
+  readonly createdAt: string;
+};
+
+export type PublicCompletedCardTrade = {
+  readonly id: string;
+  readonly fromPlayerId: string;
+  readonly toPlayerId: string;
+  readonly offeredCard: Card;
+  readonly receivedCard: Card;
+  readonly completedAt: string;
+};
+
+export type PublicTradePhaseState = {
+  readonly status: "disabled" | "open" | "closed";
+  readonly deadlineAt: string | null;
+  readonly requests: readonly PublicCardTradeRequest[];
+  readonly yourRequestUsed: boolean;
+  readonly yourTradeCompleted: boolean;
+  readonly completedTradeCount: number;
+};
+
 export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI";
 
 export type PublicFeedbackReceipt = {
@@ -185,6 +219,7 @@ export type PublicRoomState = {
   readonly placements: readonly string[];
   readonly recentEvents: readonly GameEvent[];
   readonly recentChat: readonly PublicChatMessage[];
+  readonly tradePhase: PublicTradePhaseState;
   readonly turnTimer: PublicTurnTimerState | null;
   readonly yourPlayerId: string | null;
   readonly yourHand: readonly Card[];
@@ -211,6 +246,7 @@ export type RoomReplayExport = {
   readonly placements: readonly string[];
   readonly turnNumber: number;
   readonly events: readonly GameEvent[];
+  readonly tradeHistory: readonly PublicCompletedCardTrade[];
   readonly coachEvaluations: readonly PublicCoachEvaluationRecord[];
 };
 
@@ -283,6 +319,9 @@ export type ClientToServerEvents = {
       readonly rules?: PublicRoomRules;
       readonly botDifficulty?: PublicBotDifficulty;
       readonly botPace?: PublicBotPace;
+      readonly trade?: {
+        readonly enabled: boolean;
+      };
     },
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
@@ -339,6 +378,24 @@ export type ClientToServerEvents = {
   ) => void;
   "ranked:leave": (callback: (ack: ServerAck<PublicRankedQueueState>) => void) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
+  "trade:request": (
+    payload: {
+      readonly roomCode: string;
+      readonly toPlayerId: string;
+      readonly offeredCard: Card;
+      readonly requestedRank: Rank;
+    },
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "trade:respond": (
+    payload: {
+      readonly roomCode: string;
+      readonly requestId: string;
+      readonly accept: boolean;
+      readonly requestedCard?: Card;
+    },
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
   "chat:send": (
     payload: ChatPayload,
     callback: (ack: ServerAck<PublicChatMessage>) => void
