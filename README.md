@@ -1,8 +1,10 @@
 # Deuces Arena
 
-[![CI](https://github.com/jagjitarora/deuces-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/jagjitarora/deuces-arena/actions/workflows/ci.yml)
+[![CI](https://github.com/Kabirsarora/deuces-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/Kabirsarora/deuces-arena/actions/workflows/ci.yml)
 
 Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, and ML-ready strategy coaching.
+
+**Live demo:** [deuces-arena.vercel.app](https://deuces-arena.vercel.app)
 
 ## Current Features
 
@@ -127,7 +129,7 @@ npm run test
 npm run build
 ```
 
-Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
+Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, ranked matchmaking and account isolation, card trading, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
 
 The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`, and confirm the active value through `GET /health`.
 
@@ -138,23 +140,21 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 
 ## Roadmap
 
-- Polish online table UX, mobile layout, animations, and accessibility.
-- Add production Google sign-in and account/profile persistence with deployed OAuth credentials.
-- Deploy the frontend, backend, PostgreSQL database, and optional Redis layer.
-- Expand ranked mode with queue health, rating history, leaderboards, and anti-abuse checks.
+- Finish production OAuth verification and continue polishing mobile layout, animations, and accessibility.
+- Add Redis-backed room and matchmaking durability for backend restarts and future multi-instance hosting.
+- Expand ranked matchmaking with rating bands, durable queue health, rating history, and additional anti-abuse checks.
 - Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
-- Improve baseline bots, then add simulation-backed bots and self-play data generation.
-- Build AI coach explanations from legal moves, replay state, rollout outcomes, and future model scores.
-- Add replay timeline UI, searchable match history, and richer post-game analysis.
-- Add non-pay-to-win cosmetics such as card backs, table themes, avatars, profile borders, and supporter badges.
-- Add an optional casual-only Trade Phase with a short pregame window, one accepted one-for-one trade per player, and server-authoritative validation; keep it disabled in ranked.
+- Improve baseline bots with stronger Monte Carlo evaluation and self-play benchmarks.
+- Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
+- Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.
+- Expand the current non-pay-to-win cosmetic catalog and supporter presentation options.
 - Build a reusable mobile client, then add a native iMessage extension that sends Deuces Arena room invitations and game state inside group conversations.
 
 ## Known Limitations
 
 - Current bots are baseline opponents, not trained AI.
 - Move Lab uses random rollout simulation, so its recommendations are exploratory rather than perfect strategy.
-- Google auth requires local or deployed OAuth environment variables.
+- Production Google auth depends on correctly configured OAuth credentials and callback URLs.
 - Database persistence is optional locally; without `DATABASE_URL`, stats and match history use safe in-memory fallbacks.
 - Redis-backed scaling, matchmaking durability, anti-cheat hardening, and payment flows are future work.
 

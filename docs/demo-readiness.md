@@ -36,8 +36,10 @@ npm run build --workspace @deuces-arena/web
 - Confirm the lobby shows current online users, open rooms, and active rooms.
 - Create a casual bot table and start a game.
 - Create a casual room, copy the invite link, and join from another browser profile or incognito window.
+- Enable the casual trade window, send one human-to-human request, and confirm normal play waits until the trade phase closes.
 - Send one table chat message and confirm it appears for both clients.
 - Play at least one legal move and one pass.
+- Sign in, join ranked from four browser sessions, and confirm one four-human table starts with no bots and a 45-second timer.
 - Submit a short feedback report from the feedback panel.
 - Open a profile page and confirm public stats render.
 - Visit the server `/health` endpoint and verify the allowed origin, persistence mode, Redis mode, and disconnected-player grace delay.
@@ -46,7 +48,7 @@ npm run build --workspace @deuces-arena/web
 
 1. Start in the lobby and point out current online users, open rooms, and active rooms.
 2. Create a room with bots to show the app is playable solo.
-3. Open lobby settings and mention casual variants: timer, bot difficulty, player count, cards per player, bomb rule, and Arena 6 deck.
+3. Open lobby settings and mention casual variants: timer, bot difficulty, player count, cards per player, bomb rule, Arena 6 deck, and the optional pregame trade window.
 4. Start a hand and show server-authoritative validation by selecting cards and playing a legal move.
 5. Open rules/chat only when needed so the table stays uncluttered.
 6. Finish or simulate a match state, then show profile stats, match history, replay labels, and cosmetics.
@@ -64,7 +66,7 @@ npm run build --workspace @deuces-arena/web
 
 ## Known Demo Caveats
 
-- Free backend hosts may sleep, so the first Socket.IO connection after idle can take longer.
+- Free backend hosts may sleep, so the first Socket.IO connection after idle can take longer; the lobby displays a waking-server state while it reconnects.
 - Redis-backed multi-instance room durability is not implemented yet; run one backend instance for the public demo.
 - Move Lab uses random rollout simulations, so present it as analysis infrastructure rather than perfect AI.
 - Google sign-in requires real OAuth credentials and callback URLs in the deployed environment.
