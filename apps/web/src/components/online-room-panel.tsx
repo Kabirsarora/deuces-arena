@@ -1299,10 +1299,16 @@ export function OnlineRoomPanel({
                             ? { opacity: 0, y: 42, scale: 0.96 }
                             : {
                                 opacity: 0,
-                                x: 220 - index * 18,
-                                y: -260,
-                                scale: 0.72,
-                                rotate: index % 2 === 0 ? -8 : 8
+                                x: Math.max(
+                                  -180,
+                                  Math.min(180, ((displayedHand.length - 1) / 2 - index) * 30)
+                                ),
+                                y: -190,
+                                scale: 0.78,
+                                rotate: Math.max(
+                                  -4,
+                                  Math.min(4, (index - (displayedHand.length - 1) / 2) * 0.8)
+                                )
                               }
                       }
                       animate={{
@@ -1330,11 +1336,11 @@ export function OnlineRoomPanel({
                         ...(shouldReduceMotion
                           ? { duration: 0 }
                           : {
-                              delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.045),
+                              delay: dealAnimationKey === null ? 0 : Math.min(0.5, index * 0.035),
                               type: "spring",
-                              stiffness: 300,
-                              damping: 32,
-                              mass: 0.85
+                              stiffness: 260,
+                              damping: 30,
+                              mass: 0.9
                             })
                       }}
                       drag="x"
