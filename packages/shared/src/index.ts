@@ -5,7 +5,8 @@ import type {
   GameEvent,
   Move,
   Rank,
-  ReplayDecisionReview
+  ReplayDecisionReview,
+  RolloutPolicy
 } from "@deuces-arena/game-engine";
 
 export {
@@ -157,7 +158,12 @@ export type PublicMoveEvaluation = {
   readonly rollouts: number;
   readonly wins: number;
   readonly winRate: number;
+  readonly winRateLow: number;
+  readonly winRateHigh: number;
   readonly averagePlacement: number;
+  readonly completedRollouts: number;
+  readonly completionRate: number;
+  readonly rolloutPolicy: RolloutPolicy;
 };
 
 export type PublicReplayDecisionReview = ReplayDecisionReview;

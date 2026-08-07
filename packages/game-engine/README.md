@@ -8,7 +8,7 @@ It must not depend on React, Next.js, browser APIs, database clients, or server 
 
 Current bot support is intentionally modest: `random-legal`, `lowest-legal`, and `simple-heuristic` are baseline strategies for playable games, not trained AI.
 
-Current simulation support is intentionally basic: random legal rollouts can estimate one move or rank legal moves by win rate and average placement. These results are not presented as perfect strategy. Stronger bots and AI coach explanations should build on these primitives with better rollout policies, self-play data, and future model outputs.
+Simulation supports both random legal playouts and a mixed policy that usually follows the transparent baseline heuristic while retaining random exploration. Move evaluations report win rate, average placement, rollout completion, and a Wilson 95% win-rate interval. These results are estimates, not perfect strategy; future evaluators should be benchmarked with larger self-play datasets and learned model outputs.
 
 ## Rule Variants
 

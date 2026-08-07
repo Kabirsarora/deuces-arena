@@ -2491,13 +2491,19 @@ function publicMoveEvaluations(
     playerId,
     rolloutsPerMove: clampInteger(rollouts ?? 8, 1, 25),
     maxMoves: clampInteger(maxMoves ?? 12, 1, 25),
-    maxTurnsPerRollout: 300
+    maxTurnsPerRollout: 300,
+    rolloutPolicy: "heuristic-mixed"
   }).map((evaluation) => ({
     move: evaluation.move,
     rollouts: evaluation.rollouts,
     wins: evaluation.wins,
     winRate: evaluation.winRate,
-    averagePlacement: evaluation.averagePlacement
+    winRateLow: evaluation.winRateLow,
+    winRateHigh: evaluation.winRateHigh,
+    averagePlacement: evaluation.averagePlacement,
+    completedRollouts: evaluation.completedRollouts,
+    completionRate: evaluation.completionRate,
+    rolloutPolicy: evaluation.rolloutPolicy
   }));
 }
 

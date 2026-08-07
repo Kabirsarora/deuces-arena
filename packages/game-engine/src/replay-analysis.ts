@@ -2,7 +2,11 @@ import { getCardId, sortCards, type Card } from "./cards.js";
 import { applyMove, type GameEvent, type GameRules, type GameState } from "./game.js";
 import { generateLegalMoves } from "./legal-moves.js";
 import type { Move } from "./moves.js";
-import { evaluateMoveByRandomRollouts, type MoveEvaluation } from "./simulation.js";
+import {
+  evaluateMoveByRandomRollouts,
+  type MoveEvaluation,
+  type RolloutPolicy
+} from "./simulation.js";
 
 export type ReplayDecisionSeverity = "low" | "medium" | "high";
 
@@ -25,6 +29,7 @@ export type ReplayDecisionReviewInput = {
   readonly maxTurnsPerRollout?: number;
   readonly random?: () => number;
   readonly rules?: GameRules;
+  readonly rolloutPolicy?: RolloutPolicy;
 };
 
 type ReplayDecisionSnapshot = {
@@ -59,6 +64,7 @@ export function analyzeReplayDecisions(
       playerId: input.playerId,
       rolloutsPerMove: input.rolloutsPerMove,
       maxMoves: Math.max(2, input.maxMovesPerDecision ?? DEFAULT_MAX_MOVES),
+      rolloutPolicy: input.rolloutPolicy ?? "heuristic-mixed",
       ...(input.maxTurnsPerRollout === undefined
         ? {}
         : { maxTurnsPerRollout: input.maxTurnsPerRollout }),
@@ -129,6 +135,7 @@ function evaluateReplayDecision(input: {
   readonly maxMoves: number;
   readonly maxTurnsPerRollout?: number;
   readonly random?: () => number;
+  readonly rolloutPolicy: RolloutPolicy;
 }): ReplayDecisionReview {
   const player = input.state.players.find((candidate) => candidate.id === input.playerId);
 
@@ -151,6 +158,7 @@ function evaluateReplayDecision(input: {
         playerId: input.playerId,
         move,
         rollouts: input.rolloutsPerMove,
+        rolloutPolicy: input.rolloutPolicy,
         ...(input.maxTurnsPerRollout === undefined
           ? {}
           : { maxTurnsPerRollout: input.maxTurnsPerRollout }),

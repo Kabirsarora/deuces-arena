@@ -18,7 +18,7 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.
 - Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Signed-in and public profile pages with account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
-- Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, plus post-match review that reconstructs high-choice turns and compares the selected move with simulated alternatives. Results show rollout counts and uncertainty instead of claiming solved strategy.
+- Move Lab analysis that ranks legal moves with heuristic-guided Monte Carlo rollouts and random exploration, plus post-match review that reconstructs high-choice turns and compares the selected move with simulated alternatives. Results show rollout completion and 95% win-rate intervals instead of claiming solved strategy.
 - Cosmetics foundation with catalog APIs, earned unlock tracking, profile loadouts, equip validation, starter progression rewards, and non-pay-to-win supporter-ready data models.
 - Arena Coins soft-currency foundation for earned, non-real-money progression rewards.
 - Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
@@ -148,7 +148,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Add Redis-backed room and matchmaking durability for backend restarts and future multi-instance hosting.
 - Expand ranked matchmaking with rating bands, durable queue health, rating history, and additional anti-abuse checks.
 - Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
-- Improve baseline bots with stronger Monte Carlo evaluation and self-play benchmarks.
+- Benchmark and tune the current mixed-policy Monte Carlo evaluator with larger self-play datasets.
 - Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
 - Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.
 - Expand the current non-pay-to-win cosmetic catalog and supporter presentation options.
@@ -157,7 +157,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 ## Known Limitations
 
 - Current bots are baseline opponents, not trained AI.
-- Move Lab uses random rollout simulation, so its recommendations are exploratory rather than perfect strategy.
+- Move Lab uses heuristic-guided Monte Carlo simulation with random exploration; its wide confidence ranges make clear that recommendations are estimates, not perfect strategy.
 - Production Google auth depends on correctly configured OAuth credentials and callback URLs.
 - Database persistence is optional locally; without `DATABASE_URL`, stats and match history use safe in-memory fallbacks.
 - Redis-backed scaling, matchmaking durability, anti-cheat hardening, and payment flows are future work.
@@ -166,5 +166,5 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 
 - Built a real-time multiplayer Big Two platform with Next.js, TypeScript, Socket.IO, PostgreSQL, Prisma, and reusable monorepo packages for game logic, shared contracts, persistence, and ML experiments.
 - Developed a server-authoritative TypeScript game engine with legal move generation, replayable state transitions, baseline bots, trick validation, bomb rules, and structured move logging.
-- Designed an AI-readiness pipeline with random rollout move evaluation, coach-analysis replay records, persisted evaluation data, self-play generation, and JSONL export for future model training.
+- Designed an AI-readiness pipeline with heuristic-guided Monte Carlo move evaluation, uncertainty reporting, coach-analysis replay records, self-play generation, and JSONL export for future model training.
 - Implemented live room discovery, guest profiles, placement-based ratings, replay exports, chat moderation, non-pay-to-win cosmetic progression, and server-validated cosmetic loadouts.

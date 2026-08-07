@@ -1,8 +1,10 @@
+import { chooseBotMove } from "./bots.js";
 import { applyMove, type GameState } from "./game.js";
 import { generateLegalMoves } from "./legal-moves.js";
 import type { Move } from "./moves.js";
 
 export type SimulationStatus = "complete" | "max-turns-reached";
+export type RolloutPolicy = "random-legal" | "heuristic-mixed";
 
 export type PlayoutResult = {
   readonly finalState: GameState;
@@ -15,6 +17,8 @@ export type RandomPlayoutInput = {
   readonly state: GameState;
   readonly random?: () => number;
   readonly maxTurns?: number;
+  readonly rolloutPolicy?: RolloutPolicy;
+  readonly explorationRate?: number;
 };
 
 export type MoveEvaluationInput = {
@@ -24,6 +28,8 @@ export type MoveEvaluationInput = {
   readonly rollouts: number;
   readonly random?: () => number;
   readonly maxTurnsPerRollout?: number;
+  readonly rolloutPolicy?: RolloutPolicy;
+  readonly explorationRate?: number;
 };
 
 export type MoveEvaluation = {
@@ -31,7 +37,12 @@ export type MoveEvaluation = {
   readonly rollouts: number;
   readonly wins: number;
   readonly winRate: number;
+  readonly winRateLow: number;
+  readonly winRateHigh: number;
   readonly averagePlacement: number;
+  readonly completedRollouts: number;
+  readonly completionRate: number;
+  readonly rolloutPolicy: RolloutPolicy;
 };
 
 export type LegalMoveEvaluationInput = {
@@ -41,13 +52,23 @@ export type LegalMoveEvaluationInput = {
   readonly maxMoves?: number;
   readonly random?: () => number;
   readonly maxTurnsPerRollout?: number;
+  readonly rolloutPolicy?: RolloutPolicy;
+  readonly explorationRate?: number;
 };
 
 const DEFAULT_MAX_TURNS = 500;
+const DEFAULT_EXPLORATION_RATE = 0.2;
 
 export function simulateRandomPlayout(input: RandomPlayoutInput): PlayoutResult {
   const random = input.random ?? Math.random;
   const maxTurns = input.maxTurns ?? DEFAULT_MAX_TURNS;
+  const rolloutPolicy = input.rolloutPolicy ?? "random-legal";
+  const explorationRate = input.explorationRate ?? DEFAULT_EXPLORATION_RATE;
+
+  if (explorationRate < 0 || explorationRate > 1) {
+    throw new Error("Rollout exploration rate must be between 0 and 1.");
+  }
+
   let state = input.state;
   let turnsSimulated = 0;
 
@@ -58,11 +79,17 @@ export function simulateRandomPlayout(input: RandomPlayoutInput): PlayoutResult 
       break;
     }
 
-    const legalMoves = generateLegalMoves(activePlayer.hand, {
+    const context = {
       isFirstMove: state.turnNumber === 0,
       currentTrick: state.currentTrick
+    };
+    const move = chooseRolloutMove({
+      hand: activePlayer.hand,
+      context,
+      rolloutPolicy,
+      explorationRate,
+      random
     });
-    const move = chooseRandomMove(legalMoves, random);
     const result = applyMove(state, activePlayer.id, move);
 
     if (!result.ok) {
@@ -94,29 +121,40 @@ export function evaluateMoveByRandomRollouts(input: MoveEvaluationInput): MoveEv
 
   const random = input.random ?? Math.random;
   const placements: number[] = [];
+  let completedRollouts = 0;
+  const rolloutPolicy = input.rolloutPolicy ?? "random-legal";
 
   for (let index = 0; index < input.rollouts; index += 1) {
     const result = simulateRandomPlayout({
       state: firstStep.state,
       random,
+      rolloutPolicy,
+      ...(input.explorationRate === undefined ? {} : { explorationRate: input.explorationRate }),
       ...(input.maxTurnsPerRollout === undefined
         ? {}
         : {
             maxTurns: input.maxTurnsPerRollout
           })
     });
+    completedRollouts += result.status === "complete" ? 1 : 0;
     placements.push(getPlayerPlacement(result.placements, input.playerId));
   }
 
   const wins = placements.filter((placement) => placement === 1).length;
   const placementTotal = placements.reduce((sum, placement) => sum + placement, 0);
+  const [winRateLow, winRateHigh] = getWilsonScoreInterval(wins, input.rollouts);
 
   return {
     move: input.move,
     rollouts: input.rollouts,
     wins,
     winRate: wins / input.rollouts,
-    averagePlacement: placementTotal / input.rollouts
+    winRateLow,
+    winRateHigh,
+    averagePlacement: placementTotal / input.rollouts,
+    completedRollouts,
+    completionRate: completedRollouts / input.rollouts,
+    rolloutPolicy
   };
 }
 
@@ -160,25 +198,44 @@ export function evaluateLegalMovesByRandomRollouts(
           ? {}
           : {
               maxTurnsPerRollout: input.maxTurnsPerRollout
-            })
+            }),
+        ...(input.rolloutPolicy === undefined ? {} : { rolloutPolicy: input.rolloutPolicy }),
+        ...(input.explorationRate === undefined ? {} : { explorationRate: input.explorationRate })
       })
     )
     .sort(compareMoveEvaluations);
 }
 
-function chooseRandomMove(moves: readonly Move[], random: () => number): Move {
-  if (moves.length === 0) {
-    return {
-      type: "pass"
-    };
-  }
+function chooseRolloutMove(input: {
+  readonly hand: GameState["players"][number]["hand"];
+  readonly context: Parameters<typeof chooseBotMove>[0]["context"];
+  readonly rolloutPolicy: RolloutPolicy;
+  readonly explorationRate: number;
+  readonly random: () => number;
+}): Move {
+  const strategy =
+    input.rolloutPolicy === "random-legal" || input.random() < input.explorationRate
+      ? "random-legal"
+      : "simple-heuristic";
 
-  const index = Math.min(Math.floor(random() * moves.length), moves.length - 1);
-  return (
-    moves[index] ?? {
-      type: "pass"
-    }
-  );
+  return chooseBotMove({
+    hand: input.hand,
+    context: input.context,
+    strategy,
+    random: input.random
+  }).move;
+}
+
+function getWilsonScoreInterval(successes: number, attempts: number): readonly [number, number] {
+  const z = 1.96;
+  const proportion = successes / attempts;
+  const denominator = 1 + (z * z) / attempts;
+  const center = (proportion + (z * z) / (2 * attempts)) / denominator;
+  const margin =
+    (z / denominator) *
+    Math.sqrt((proportion * (1 - proportion)) / attempts + (z * z) / (4 * attempts * attempts));
+
+  return [Math.max(0, center - margin), Math.min(1, center + margin)];
 }
 
 function compareMoveEvaluations(left: MoveEvaluation, right: MoveEvaluation): number {

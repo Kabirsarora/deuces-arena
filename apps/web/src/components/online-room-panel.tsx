@@ -4257,7 +4257,7 @@ function MatchResultsPanel({
           <div className="mt-2 grid gap-1.5">
             {reviewStatus === "loading" ? (
               <p className="rounded-[0.7rem] bg-white/7 px-2 py-1.5 text-xs text-zinc-300">
-                Replaying your highest-choice turns with random rollouts...
+                Replaying your highest-choice turns with guided Monte Carlo rollouts...
               </p>
             ) : reviewStatus === "error" ? (
               <p className="rounded-[0.7rem] bg-red-400/12 px-2 py-1.5 text-xs text-red-200">
@@ -4294,7 +4294,7 @@ function MatchResultsPanel({
                     You played: {formatReviewMove(decision.chosen.move)}
                   </p>
                   <p className="mt-0.5 text-[11px] font-bold text-zinc-200">
-                    Simulation favorite: {formatReviewMove(decision.simulationFavorite.move)}
+                    Rollout favorite: {formatReviewMove(decision.simulationFavorite.move)}
                   </p>
                   <div className="mt-1.5 grid grid-cols-2 gap-1 text-[10px] text-zinc-400">
                     <span>
@@ -4308,8 +4308,15 @@ function MatchResultsPanel({
                   </div>
                   <p className="mt-1 text-[10px] text-zinc-500">
                     {decision.alternativesEvaluated} legal choices · {decision.chosen.rollouts}{" "}
-                    rollouts each
+                    rollouts each · 95% range {formatPercent(decision.chosen.winRateLow)}–
+                    {formatPercent(decision.chosen.winRateHigh)}
                   </p>
+                  {decision.chosen.completionRate < 1 ? (
+                    <p className="mt-0.5 text-[10px] text-[var(--gold)]">
+                      {formatPercent(decision.chosen.completionRate)} of chosen-move playouts
+                      finished before the turn cap.
+                    </p>
+                  ) : null}
                 </div>
               ))
             )}
@@ -4317,8 +4324,9 @@ function MatchResultsPanel({
           {reviewStatus !== "loading" ? (
             <>
               <p className="mt-2 text-[10px] leading-4 text-zinc-500">
-                Estimates come from random playouts, not a solved strategy model. Results can vary
-                between runs.
+                Estimates use heuristic-guided Monte Carlo playouts with random exploration, not a
+                solved strategy model. The 95% range shows uncertainty and results can vary between
+                runs.
               </p>
               <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
                 {review.map((item) => (

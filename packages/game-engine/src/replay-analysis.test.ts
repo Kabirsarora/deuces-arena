@@ -11,6 +11,7 @@ describe("replay decision analysis", () => {
       finalState,
       playerId: "player-1",
       rolloutsPerMove: 4,
+      rolloutPolicy: "random-legal",
       random: () => 0.999
     });
 

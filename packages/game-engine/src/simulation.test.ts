@@ -37,8 +37,13 @@ describe("simulation", () => {
       rollouts: 5,
       wins: 5,
       winRate: 1,
-      averagePlacement: 1
+      averagePlacement: 1,
+      completedRollouts: 5,
+      completionRate: 1,
+      rolloutPolicy: "random-legal"
     });
+    expect(evaluation.winRateLow).toBeGreaterThan(0.5);
+    expect(evaluation.winRateHigh).toBe(1);
   });
 
   it("rejects invalid moves before running rollouts", () => {
@@ -79,6 +84,33 @@ describe("simulation", () => {
         rolloutsPerMove: 1
       })
     ).toThrow("Legal move evaluation can only run for the active player.");
+  });
+
+  it("labels heuristic-guided evaluations and preserves random exploration controls", () => {
+    const evaluation = evaluateMoveByRandomRollouts({
+      state: oneCardWinState(),
+      playerId: "player-1",
+      move: {
+        type: "play",
+        cards: [createCard("3", "diamonds")]
+      },
+      rollouts: 2,
+      rolloutPolicy: "heuristic-mixed",
+      explorationRate: 0,
+      random: () => 0.5
+    });
+
+    expect(evaluation.rolloutPolicy).toBe("heuristic-mixed");
+    expect(evaluation.completedRollouts).toBe(2);
+  });
+
+  it("rejects invalid exploration rates", () => {
+    expect(() =>
+      simulateRandomPlayout({
+        state: oneCardWinState(),
+        explorationRate: 1.1
+      })
+    ).toThrow("between 0 and 1");
   });
 });
 

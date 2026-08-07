@@ -80,6 +80,7 @@ export type {
   MoveEvaluationInput,
   PlayoutResult,
   RandomPlayoutInput,
+  RolloutPolicy,
   SimulationStatus
 } from "./simulation.js";
 
