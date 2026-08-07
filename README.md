@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Kabirsarora/deuces-arena/actions/workflows/ci.yml/badge.svg)](https://github.com/Kabirsarora/deuces-arena/actions/workflows/ci.yml)
 
-Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, and ML-ready strategy coaching.
+Real-time multiplayer Big Two / Deuces platform with bot opponents, replay analysis, and ML-ready strategy coaching.
 
 **Live demo:** [deuces-arena.vercel.app](https://deuces-arena.vercel.app)
 
