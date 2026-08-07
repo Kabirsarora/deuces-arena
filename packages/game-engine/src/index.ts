@@ -60,6 +60,14 @@ export { createReplayTimeline } from "./replay.js";
 
 export type { ReplayTimelineItem } from "./replay.js";
 
+export { analyzeReplayDecisions } from "./replay-analysis.js";
+
+export type {
+  ReplayDecisionReview,
+  ReplayDecisionReviewInput,
+  ReplayDecisionSeverity
+} from "./replay-analysis.js";
+
 export {
   evaluateLegalMovesByRandomRollouts,
   evaluateMoveByRandomRollouts,
