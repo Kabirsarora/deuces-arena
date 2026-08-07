@@ -21,6 +21,18 @@ export default function SignInPage() {
         >
           Continue as guest
         </Link>
+
+        <p className="mt-5 text-xs leading-5 text-zinc-500">
+          By signing in, you agree to the{" "}
+          <Link className="font-bold underline hover:text-white" href="/terms">
+            Terms
+          </Link>{" "}
+          and acknowledge the{" "}
+          <Link className="font-bold underline hover:text-white" href="/privacy">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </section>
     </main>
   );

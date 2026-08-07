@@ -47,6 +47,41 @@ textarea {
   font: inherit;
 }
 
+.policy-content > section {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2rem 0;
+}
+
+.policy-content h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.policy-content p,
+.policy-content li {
+  color: #c7cbd3;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.policy-content p {
+  margin: 0.8rem 0 0;
+}
+
+.policy-content ul {
+  margin: 0.8rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.policy-content li + li {
+  margin-top: 0.55rem;
+}
+
+.policy-content strong {
+  color: #f4f4f5;
+}
+
 .card-face {
   background:
     linear-gradient(160deg, rgba(255, 255, 255, 0.99), rgba(235, 239, 246, 0.98)),

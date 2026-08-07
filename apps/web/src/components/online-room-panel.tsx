@@ -37,6 +37,7 @@ import type {
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
+import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
@@ -64,7 +65,6 @@ import {
   Users,
   X
 } from "lucide-react";
-import Link from "next/link";
 import {
   useEffect,
   useLayoutEffect,
@@ -1502,8 +1502,8 @@ function OnlineLobbyHub({
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="online-hub mx-auto min-h-[calc(100vh-4rem)] w-full max-w-[92rem] overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl">
-        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
+      <section className="online-hub mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[92rem] flex-col overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl">
+        <div className="grid flex-1 gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
           <section className="flex min-h-0 flex-col">
             <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1701,6 +1701,17 @@ function OnlineLobbyHub({
             </details>
           </aside>
         </div>
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-xs font-bold text-zinc-500 sm:px-7 lg:px-8">
+          <span>Deuces Arena · fair play, no pay-to-win advantages</span>
+          <span className="flex gap-4">
+            <Link className="transition hover:text-white" href="/privacy">
+              Privacy
+            </Link>
+            <Link className="transition hover:text-white" href="/terms">
+              Terms
+            </Link>
+          </span>
+        </footer>
       </section>
     </main>
   );
