@@ -28,6 +28,13 @@ export type InitialGameOptions = {
   readonly cardsPerPlayer?: number;
 };
 
+export type PreGameCardTrade = {
+  readonly fromPlayerId: string;
+  readonly toPlayerId: string;
+  readonly offeredCard: Card;
+  readonly requestedCard: Card;
+};
+
 export type GameEvent = {
   readonly turnNumber: number;
   readonly playerId: string;
@@ -97,6 +104,88 @@ export function createInitialGame(
     placements: [],
     status: "in-progress",
     events: []
+  };
+}
+
+export function applyPreGameCardTrade(state: GameState, trade: PreGameCardTrade): GameActionResult {
+  if (
+    state.status !== "in-progress" ||
+    state.turnNumber !== 0 ||
+    state.currentTrick !== null ||
+    state.events.length > 0
+  ) {
+    return {
+      ok: false,
+      reason: "Cards can only be traded before the first move."
+    };
+  }
+
+  if (trade.fromPlayerId === trade.toPlayerId) {
+    return {
+      ok: false,
+      reason: "Players cannot trade cards with themselves."
+    };
+  }
+
+  const fromPlayer = getPlayer(state, trade.fromPlayerId);
+  const toPlayer = getPlayer(state, trade.toPlayerId);
+
+  if (fromPlayer === undefined || toPlayer === undefined) {
+    return {
+      ok: false,
+      reason: "Both trade participants must be in the game."
+    };
+  }
+
+  if (!playerOwnsCards(fromPlayer, [trade.offeredCard])) {
+    return {
+      ok: false,
+      reason: "Offering player does not hold that card."
+    };
+  }
+
+  if (!playerOwnsCards(toPlayer, [trade.requestedCard])) {
+    return {
+      ok: false,
+      reason: "Receiving player does not hold the requested card."
+    };
+  }
+
+  const players = state.players.map((player) => {
+    if (player.id === fromPlayer.id) {
+      return {
+        ...player,
+        hand: sortCards([...removeCards(player.hand, [trade.offeredCard]), trade.requestedCard])
+      };
+    }
+
+    if (player.id === toPlayer.id) {
+      return {
+        ...player,
+        hand: sortCards([...removeCards(player.hand, [trade.requestedCard]), trade.offeredCard])
+      };
+    }
+
+    return player;
+  });
+  const startingPlayer = players.find((player) =>
+    player.hand.some((card) => isSameCard(card, LOWEST_CARD))
+  );
+
+  if (startingPlayer === undefined) {
+    return {
+      ok: false,
+      reason: "A trade cannot remove the 3 of diamonds from the game."
+    };
+  }
+
+  return {
+    ok: true,
+    state: {
+      ...state,
+      players,
+      activePlayerId: startingPlayer.id
+    }
   };
 }
 

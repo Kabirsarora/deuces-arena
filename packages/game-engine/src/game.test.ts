@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyMove,
+  applyPreGameCardTrade,
   createCard,
   createDeck,
   createInitialGame,
@@ -47,6 +48,101 @@ describe("game state", () => {
     });
 
     expect(game.players.every((player) => player.hand.length === 15)).toBe(true);
+  });
+
+  it("atomically swaps cards before the first move", () => {
+    const game = testGame();
+    const offeredCard = game.players[0]?.hand[1];
+    const requestedCard = game.players[1]?.hand[0];
+
+    expect(offeredCard).toBeDefined();
+    expect(requestedCard).toBeDefined();
+
+    if (offeredCard === undefined || requestedCard === undefined) {
+      return;
+    }
+
+    const result = applyPreGameCardTrade(game, {
+      fromPlayerId: "player-1",
+      toPlayerId: "player-2",
+      offeredCard,
+      requestedCard
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.state.players[0]?.hand).toContainEqual(requestedCard);
+    expect(result.state.players[0]?.hand).not.toContainEqual(offeredCard);
+    expect(result.state.players[1]?.hand).toContainEqual(offeredCard);
+    expect(result.state.players[1]?.hand).not.toContainEqual(requestedCard);
+    expect(result.state.players.every((player) => player.hand.length === 13)).toBe(true);
+  });
+
+  it("moves the opening turn when the 3 of diamonds is traded", () => {
+    const game = testGame();
+    const requestedCard = game.players[1]?.hand[0];
+
+    expect(requestedCard).toBeDefined();
+
+    if (requestedCard === undefined) {
+      return;
+    }
+
+    const result = applyPreGameCardTrade(game, {
+      fromPlayerId: "player-1",
+      toPlayerId: "player-2",
+      offeredCard: createCard("3", "diamonds"),
+      requestedCard
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.state.activePlayerId).toBe("player-2");
+    }
+  });
+
+  it("rejects card trades after the first move", () => {
+    const firstMove = applyMove(testGame(), "player-1", {
+      type: "play",
+      cards: [createCard("3", "diamonds")]
+    });
+
+    expect(firstMove.ok).toBe(true);
+
+    if (!firstMove.ok) {
+      return;
+    }
+
+    expect(
+      applyPreGameCardTrade(firstMove.state, {
+        fromPlayerId: "player-1",
+        toPlayerId: "player-2",
+        offeredCard: firstMove.state.players[0]?.hand[0] ?? createCard("4", "diamonds"),
+        requestedCard: firstMove.state.players[1]?.hand[0] ?? createCard("7", "diamonds")
+      })
+    ).toEqual({
+      ok: false,
+      reason: "Cards can only be traded before the first move."
+    });
+  });
+
+  it("rejects a trade when either player does not own the submitted card", () => {
+    const result = applyPreGameCardTrade(testGame(), {
+      fromPlayerId: "player-1",
+      toPlayerId: "player-2",
+      offeredCard: createCard("2", "spades"),
+      requestedCard: createCard("4", "diamonds")
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "Offering player does not hold that card."
+    });
   });
 
   it("rejects moves from players whose turn it is not", () => {
