@@ -6,6 +6,8 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 
 **Live demo:** [deuces-arena.vercel.app](https://deuces-arena.vercel.app)
 
+Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Current Features
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, and simulation-based move evaluation utilities.
