@@ -30,6 +30,7 @@ import type {
   PublicMatchHistoryItem,
   PublicOpenRoom,
   PublicRankedQueueState,
+  PublicReplayDecisionReview,
   PublicRoomPlayer,
   PublicRoomState,
   ProfileAvatarKey,
@@ -274,13 +275,15 @@ export function OnlineRoomPanel({
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const turnStatus =
-    room?.tradePhase.status === "open"
-      ? "Card trade window open"
-      : activePlayer?.kind === "bot"
-        ? `${activePlayer.name} is thinking...`
-        : isYourTurn
-          ? "Your move"
-          : "Waiting for your turn";
+    room?.status === "complete"
+      ? "Match complete"
+      : room?.tradePhase.status === "open"
+        ? "Card trade window open"
+        : activePlayer?.kind === "bot"
+          ? `${activePlayer.name} is thinking...`
+          : isYourTurn
+            ? "Your move"
+            : "Waiting for your turn";
 
   useEffect(() => {
     if (profile === null) {
@@ -856,6 +859,29 @@ export function OnlineRoomPanel({
     });
   }
 
+  function reviewCompletedMatch(): Promise<ServerAck<readonly PublicReplayDecisionReview[]>> {
+    return new Promise((resolve) => {
+      if (socketRef.current === null || room === null) {
+        resolve({
+          ok: false,
+          error: "Completed match is not connected."
+        });
+        return;
+      }
+
+      socketRef.current.emit(
+        "coach:review",
+        {
+          roomCode: room.roomCode,
+          rollouts: 3,
+          maxDecisions: 2,
+          maxMoves: 6
+        },
+        resolve
+      );
+    });
+  }
+
   function equipCosmetic(cosmetic: PublicCosmetic) {
     socketRef.current?.emit(
       "cosmetics:equip",
@@ -1153,6 +1179,7 @@ export function OnlineRoomPanel({
             dealAnimationKey={shouldReduceMotion ? null : dealAnimationKey}
             onCreateBotGame={createBotGame}
             onLeaveRoom={leaveRoom}
+            onReviewDecisions={reviewCompletedMatch}
           />
           {room.tradePhase.status === "open" ? (
             <TradePhaseOverlay
@@ -1175,7 +1202,12 @@ export function OnlineRoomPanel({
           />
         </section>
 
-        <section className="hand-dock min-w-0 border border-white/10 p-3 shadow-2xl backdrop-blur">
+        <section
+          className={cn(
+            "hand-dock min-w-0 border border-white/10 p-3 shadow-2xl backdrop-blur",
+            room.status === "complete" && "hidden"
+          )}
+        >
           <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-bold">Your Hand</p>
@@ -3927,13 +3959,15 @@ function OnlineTable({
   timerNow,
   dealAnimationKey,
   onCreateBotGame,
-  onLeaveRoom
+  onLeaveRoom,
+  onReviewDecisions
 }: {
   readonly room: PublicRoomState | null;
   readonly timerNow: number;
   readonly dealAnimationKey: string | null;
   readonly onCreateBotGame: () => void;
   readonly onLeaveRoom: () => void;
+  readonly onReviewDecisions: () => Promise<ServerAck<readonly PublicReplayDecisionReview[]>>;
 }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
@@ -4095,6 +4129,7 @@ function OnlineTable({
               room={room}
               onCreateBotGame={onCreateBotGame}
               onLeaveRoom={onLeaveRoom}
+              onReviewDecisions={onReviewDecisions}
             />
           ) : null}
         </div>
@@ -4106,25 +4141,57 @@ function OnlineTable({
 function MatchResultsPanel({
   room,
   onCreateBotGame,
-  onLeaveRoom
+  onLeaveRoom,
+  onReviewDecisions
 }: {
   readonly room: PublicRoomState;
   readonly onCreateBotGame: () => void;
   readonly onLeaveRoom: () => void;
+  readonly onReviewDecisions: () => Promise<ServerAck<readonly PublicReplayDecisionReview[]>>;
 }) {
   const rows = getPlacementRows(room);
   const [showReview, setShowReview] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [simulationReviews, setSimulationReviews] = useState<
+    readonly PublicReplayDecisionReview[] | null
+  >(null);
+  const [reviewStatus, setReviewStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [selectedStatsPlayerId, setSelectedStatsPlayerId] = useState<string | null>(null);
   const review = getPlayerMatchReview(room);
-  const reviewTargets = getReplayReviewTargets(room);
   const timeline = getMoveTimelineRows(room);
   const selectedStatsPlayer =
     room.players.find((player) => player.id === selectedStatsPlayerId) ?? null;
 
+  async function toggleDecisionReview() {
+    if (showReview) {
+      setShowReview(false);
+      return;
+    }
+
+    setShowReview(true);
+
+    if (simulationReviews !== null || reviewStatus === "loading") {
+      return;
+    }
+
+    setReviewStatus("loading");
+    setReviewError(null);
+    const result = await onReviewDecisions();
+
+    if (result.ok) {
+      setSimulationReviews(result.data);
+      setReviewStatus("idle");
+      return;
+    }
+
+    setReviewStatus("error");
+    setReviewError(result.error);
+  }
+
   return (
     <motion.div
-      className="mx-auto mt-5 w-[min(24rem,92vw)] rounded-[1rem] border border-[var(--gold)]/50 bg-black/42 p-3 text-left shadow-2xl backdrop-blur"
+      className="mx-auto mt-5 max-h-[min(27rem,68vh)] w-[min(24rem,92vw)] overflow-y-auto overscroll-contain rounded-[1rem] border border-[var(--gold)]/50 bg-black/42 p-3 text-left shadow-2xl backdrop-blur"
       initial={{ opacity: 0, y: 14, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 320, damping: 28 }}
@@ -4188,44 +4255,80 @@ function MatchResultsPanel({
         >
           <p className="text-xs font-black uppercase text-[var(--aqua)]">Decision review</p>
           <div className="mt-2 grid gap-1.5">
-            {reviewTargets.length === 0 ? (
+            {reviewStatus === "loading" ? (
               <p className="rounded-[0.7rem] bg-white/7 px-2 py-1.5 text-xs text-zinc-300">
-                No high-signal replay targets were detected yet. Play more turns or run Move Lab
-                during close spots.
+                Replaying your highest-choice turns with random rollouts...
+              </p>
+            ) : reviewStatus === "error" ? (
+              <p className="rounded-[0.7rem] bg-red-400/12 px-2 py-1.5 text-xs text-red-200">
+                {reviewError ?? "Replay analysis could not run."}
+              </p>
+            ) : simulationReviews?.length === 0 ? (
+              <p className="rounded-[0.7rem] bg-white/7 px-2 py-1.5 text-xs text-zinc-300">
+                This match had no multi-option turns to compare for your seat.
               </p>
             ) : (
-              reviewTargets.map((target) => (
+              simulationReviews?.map((decision) => (
                 <div
-                  key={target.id}
+                  key={decision.turnNumber}
                   className="rounded-[0.7rem] border border-white/10 bg-white/7 px-2 py-1.5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-black text-zinc-100">{target.title}</p>
+                    <p className="text-xs font-black text-zinc-100">
+                      Turn {decision.turnNumber} comparison
+                    </p>
                     <span
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[10px] font-black uppercase",
-                        target.severity === "high"
+                        decision.severity === "high"
                           ? "bg-red-400/15 text-red-200"
-                          : target.severity === "medium"
+                          : decision.severity === "medium"
                             ? "bg-[var(--gold)]/18 text-[var(--gold)]"
                             : "bg-white/8 text-zinc-300"
                       )}
                     >
-                      T{target.turnNumber}
+                      {decision.severity} gap
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-zinc-400">{target.description}</p>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    You played: {formatReviewMove(decision.chosen.move)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-bold text-zinc-200">
+                    Simulation favorite: {formatReviewMove(decision.simulationFavorite.move)}
+                  </p>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1 text-[10px] text-zinc-400">
+                    <span>
+                      Win estimate {formatPercent(decision.chosen.winRate)} →{" "}
+                      {formatPercent(decision.simulationFavorite.winRate)}
+                    </span>
+                    <span>
+                      Avg. place {decision.chosen.averagePlacement.toFixed(2)} →{" "}
+                      {decision.simulationFavorite.averagePlacement.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-zinc-500">
+                    {decision.alternativesEvaluated} legal choices · {decision.chosen.rollouts}{" "}
+                    rollouts each
+                  </p>
                 </div>
               ))
             )}
           </div>
-          <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
-            {review.map((item) => (
-              <li key={item} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
-                {item}
-              </li>
-            ))}
-          </ul>
+          {reviewStatus !== "loading" ? (
+            <>
+              <p className="mt-2 text-[10px] leading-4 text-zinc-500">
+                Estimates come from random playouts, not a solved strategy model. Results can vary
+                between runs.
+              </p>
+              <ul className="mt-2 grid gap-1.5 text-xs text-zinc-300">
+                {review.map((item) => (
+                  <li key={item} className="rounded-[0.7rem] bg-white/7 px-2 py-1.5">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </motion.div>
       ) : null}
 
@@ -4263,9 +4366,18 @@ function MatchResultsPanel({
       ) : null}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button size="sm" variant="secondary" onClick={() => setShowReview((current) => !current)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={reviewStatus === "loading"}
+          onClick={() => void toggleDecisionReview()}
+        >
           <Gauge className="size-4" />
-          {showReview ? "Hide review" : "Review decisions"}
+          {reviewStatus === "loading"
+            ? "Analyzing..."
+            : showReview
+              ? "Hide review"
+              : "Review decisions"}
         </Button>
         <Button
           size="sm"
@@ -4623,14 +4735,6 @@ type MoveTimelineRow = {
   readonly cardsRemainingLabel: string;
 };
 
-type ReplayReviewTarget = {
-  readonly id: string;
-  readonly turnNumber: number;
-  readonly title: string;
-  readonly description: string;
-  readonly severity: "low" | "medium" | "high";
-};
-
 function getMoveTimelineRows(room: PublicRoomState): readonly MoveTimelineRow[] {
   return room.recentEvents.map((event, index) => {
     const playerName = getRoomPlayerName(room, event.playerId);
@@ -4663,109 +4767,19 @@ function formatTimelineMove(event: PublicGameEvent): string {
   return `${handType === null ? "Played" : formatHandType(handType)}: ${cardList} · ${legalContext}`;
 }
 
-function getReplayReviewTargets(room: PublicRoomState): readonly ReplayReviewTarget[] {
-  const playerId = room.yourPlayerId;
-
-  if (playerId === null) {
-    return [];
+function formatReviewMove(move: Move): string {
+  if (move.type === "pass") {
+    return "Pass";
   }
 
-  const targets = room.recentEvents.flatMap((event, index): ReplayReviewTarget[] => {
-    if (event.playerId !== playerId) {
-      return [];
-    }
+  const hand = detectHand(move.cards);
+  const handLabel = hand.type === "invalid" ? "Play" : formatHandType(hand.type);
 
-    const cardsAfter = event.cardsRemainingAfter[event.playerId] ?? null;
-    const id = `${event.turnNumber}-${event.playerId}-${index}`;
-
-    if (event.wasPass || event.move.type === "pass") {
-      if (event.legalMoveCount > 1) {
-        return [
-          {
-            id,
-            turnNumber: event.turnNumber,
-            title: "Optional pass",
-            description: `${event.legalMoveCount} legal responses were available. This is a good candidate for future rollout comparison.`,
-            severity: "medium"
-          }
-        ];
-      }
-
-      return [];
-    }
-
-    const handType = getMoveHandType(event);
-
-    if (handType === "bomb") {
-      return [
-        {
-          id,
-          turnNumber: event.turnNumber,
-          title: "Bomb timing",
-          description:
-            "Bombs swing trick control. Later coach analysis should compare this play against saving the bomb.",
-          severity: "high"
-        }
-      ];
-    }
-
-    if (event.move.cards.length >= 4) {
-      return [
-        {
-          id,
-          turnNumber: event.turnNumber,
-          title: "Large shed",
-          description: `${event.move.cards.length} cards left your hand at once. Multi-card sheds often decide tempo and should be replayed closely.`,
-          severity: "medium"
-        }
-      ];
-    }
-
-    if (event.currentTrickBefore === null) {
-      return [
-        {
-          id,
-          turnNumber: event.turnNumber,
-          title: "Lead choice",
-          description: `${formatHandType(handType ?? "single")} opened the trick. Lead choices shape what everyone else is allowed to answer.`,
-          severity: "low"
-        }
-      ];
-    }
-
-    if (cardsAfter !== null && cardsAfter <= 3) {
-      return [
-        {
-          id,
-          turnNumber: event.turnNumber,
-          title: "Endgame pressure",
-          description: `You dropped to ${cardsAfter} ${pluralize("card", cardsAfter)}. These low-hand spots are important for mistake review.`,
-          severity: "high"
-        }
-      ];
-    }
-
-    return [];
-  });
-
-  return targets
-    .sort(
-      (left, right) =>
-        getReviewSeverityScore(right.severity) - getReviewSeverityScore(left.severity)
-    )
-    .slice(0, 4);
+  return `${handLabel} (${move.cards.map(formatCard).join(" ")})`;
 }
 
-function getReviewSeverityScore(severity: ReplayReviewTarget["severity"]): number {
-  if (severity === "high") {
-    return 3;
-  }
-
-  if (severity === "medium") {
-    return 2;
-  }
-
-  return 1;
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
@@ -4800,7 +4814,7 @@ function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
 
   if (summary.voluntaryPassCount > 0) {
     review.push(
-      `${summary.voluntaryPassCount} passes happened while at least one playable response likely existed. Those turns are good candidates for later simulation review.`
+      `${summary.voluntaryPassCount} passes happened with more than one legal option recorded.`
     );
   } else if (summary.passCount > 0) {
     review.push(
@@ -4810,23 +4824,21 @@ function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
 
   if (summary.multiCardShedCount > 0) {
     review.push(
-      `${summary.multiCardShedCount} plays shed multiple cards, removing ${summary.cardsShedByMultiCardPlays} cards total. Multi-card sheds are usually the first replay moments to inspect.`
+      `${summary.multiCardShedCount} plays shed multiple cards, removing ${summary.cardsShedByMultiCardPlays} cards total.`
     );
   } else {
-    review.push(
-      "No multi-card sheds were visible, so the match may have left too many cards moving one at a time."
-    );
+    review.push("No multi-card sheds were recorded from your seat.");
   }
 
   if (summary.leadCount > 0) {
     review.push(
-      `You led ${summary.leadCount} ${pluralize("trick", summary.leadCount)}: ${formatHandTypeBreakdown(summary.leadTypeCounts)}. Lead choices shape the table, so these are useful coach targets.`
+      `You led ${summary.leadCount} ${pluralize("trick", summary.leadCount)}: ${formatHandTypeBreakdown(summary.leadTypeCounts)}.`
     );
   }
 
   if (summary.bombCount > 0) {
     review.push(
-      `${summary.bombCount} bomb ${pluralize("play", summary.bombCount)} ${summary.bombCount === 1 ? "was" : "were"} recorded. Later review can compare whether saving it changed placement odds.`
+      `${summary.bombCount} bomb ${pluralize("play", summary.bombCount)} ${summary.bombCount === 1 ? "was" : "were"} recorded.`
     );
   }
 
@@ -4836,9 +4848,7 @@ function getPlayerMatchReview(room: PublicRoomState): readonly string[] {
     );
   }
 
-  review.push(
-    "Next step for stronger coaching: run simulations from these replay spots instead of guessing from fixed strategy rules."
-  );
+  review.push("The comparisons above are calculated from reconstructed game states and rollouts.");
 
   return review;
 }

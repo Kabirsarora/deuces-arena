@@ -1243,7 +1243,7 @@ io.on("connection", (socket) => {
         rolloutsPerMove: clampInteger(payload.rollouts ?? 6, 1, 12),
         maxDecisions: clampInteger(payload.maxDecisions ?? 3, 1, 5),
         maxMovesPerDecision: clampInteger(payload.maxMoves ?? 10, 2, 16),
-        maxTurnsPerRollout: 300,
+        maxTurnsPerRollout: 120,
         rules: {
           bombEndsTrick: room.rules.bombEndsTrick
         }
