@@ -1074,6 +1074,9 @@ describe("realtime rooms", () => {
     expect(secondJoin.data.joined).toBe(true);
     expect(secondJoin.data.queuePosition).toBe(2);
     expect(secondJoin.data.queuedPlayers).toBe(2);
+
+    await leaveRanked(first);
+    await leaveRanked(second);
   });
 
   it("requires a verified account before joining ranked", async () => {
@@ -1087,6 +1090,56 @@ describe("realtime rooms", () => {
 
     if (!join.ok) {
       expect(join.error).toContain("Sign in with Google");
+    }
+  });
+
+  it("prevents one account from taking multiple ranked queue seats", async () => {
+    const profileId = "auth-cccccccccccccccccccccccccccccccc";
+    const firstTab = await connectTestSocket(profileId);
+    const secondTab = await connectTestSocket(profileId);
+    const firstJoin = await joinRanked(firstTab, {
+      playerName: "Ranked Account",
+      guestId: profileId
+    });
+    const secondJoin = await joinRanked(secondTab, {
+      playerName: "Ranked Account Again",
+      guestId: profileId
+    });
+
+    expect(firstJoin.ok).toBe(true);
+    expect(secondJoin.ok).toBe(false);
+
+    if (!secondJoin.ok) {
+      expect(secondJoin.error).toContain("already in the ranked queue");
+    }
+
+    await leaveRanked(firstTab);
+  });
+
+  it("prevents an account seated at another table from entering ranked", async () => {
+    const profileId = "auth-dddddddddddddddddddddddddddddddd";
+    const seatedTab = await connectTestSocket(profileId);
+    const rankedTab = await connectTestSocket(profileId);
+    const createdRoom = await createRoom(seatedTab, {
+      playerName: "Already Playing",
+      guestId: profileId
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    const rankedJoin = await joinRanked(rankedTab, {
+      playerName: "Second Tab",
+      guestId: profileId
+    });
+
+    expect(rankedJoin.ok).toBe(false);
+
+    if (!rankedJoin.ok) {
+      expect(rankedJoin.error).toContain("already seated");
+    }
+
+    if (createdRoom.ok) {
+      await leaveStartedRoom(seatedTab, createdRoom.data.roomCode);
     }
   });
 
@@ -1429,6 +1482,14 @@ function joinRanked(
 ): Promise<ServerAck<PublicRankedQueueState>> {
   return new Promise((resolve) => {
     socket.emit("ranked:join", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function leaveRanked(socket: TestSocket): Promise<ServerAck<PublicRankedQueueState>> {
+  return new Promise((resolve) => {
+    socket.emit("ranked:leave", (ack) => {
       resolve(ack);
     });
   });

@@ -1634,6 +1634,7 @@ function OnlineLobbyHub({
                   queue={rankedQueue}
                   profile={profile}
                   connected={connected}
+                  signedIn={authUser !== null}
                   onJoin={onJoinRanked}
                   onLeave={onLeaveRanked}
                 />
@@ -2031,12 +2032,14 @@ function HubRankedCard({
   queue,
   profile,
   connected,
+  signedIn,
   onJoin,
   onLeave
 }: {
   readonly queue: PublicRankedQueueState | null;
   readonly profile: PublicGuestProfile | null;
   readonly connected: boolean;
+  readonly signedIn: boolean;
   readonly onJoin: () => void;
   readonly onLeave: () => void;
 }) {
@@ -2073,11 +2076,11 @@ function HubRankedCard({
       </div>
       <Button
         className="mt-6 h-14 w-full text-lg"
-        disabled={!connected}
+        disabled={!connected || (!joined && !signedIn)}
         variant={joined ? "secondary" : "primary"}
         onClick={joined ? onLeave : onJoin}
       >
-        {joined ? "Leave Queue" : "Find Ranked Match"}
+        {joined ? "Leave Queue" : signedIn ? "Find Ranked Match" : "Sign in to play ranked"}
       </Button>
     </section>
   );

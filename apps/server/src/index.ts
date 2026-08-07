@@ -853,7 +853,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("ranked:join", async (payload, callback) => {
-    if (REALTIME_AUTH_SECRET !== null && socket.data.authProfileId === undefined) {
+    const authenticatedProfileId = socket.data.authProfileId;
+
+    if (authenticatedProfileId === undefined) {
       callback(fail("Sign in with Google to join ranked."));
       return;
     }
@@ -863,13 +865,27 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const queuedAccount = rankedQueue.find(
+      (entry) => entry.guestId === authenticatedProfileId && entry.socketId !== socket.id
+    );
+
+    if (queuedAccount !== undefined) {
+      callback(fail("This account is already in the ranked queue."));
+      return;
+    }
+
+    if (isProfileSeatedElsewhere(authenticatedProfileId, socket.id)) {
+      callback(fail("This account is already seated at another table."));
+      return;
+    }
+
     if (!rankedQueue.some((entry) => entry.socketId === socket.id)) {
       rankedQueue = [
         ...rankedQueue,
         {
           socketId: socket.id,
           playerName: payload.playerName.trim() || "Ranked Player",
-          guestId: profileIdForSocket(payload.guestId),
+          guestId: authenticatedProfileId,
           joinedAt: new Date()
         }
       ];
@@ -1911,6 +1927,17 @@ function publicRankedQueueState(socketId: string): PublicRankedQueueState {
 
 function removeRankedQueueEntry(socketId: string): void {
   rankedQueue = rankedQueue.filter((entry) => entry.socketId !== socketId);
+}
+
+function isProfileSeatedElsewhere(profileId: string, socketId: string): boolean {
+  return [...rooms.values()].some(
+    (room) =>
+      room.game?.status !== "complete" &&
+      room.players.some(
+        (player) =>
+          player.guestId === profileId && player.socketId !== null && player.socketId !== socketId
+      )
+  );
 }
 
 async function maybeStartRankedMatch(): Promise<void> {
