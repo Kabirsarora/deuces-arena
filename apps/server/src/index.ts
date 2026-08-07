@@ -17,6 +17,7 @@ import {
   type BotStrategy,
   type Card,
   type DeckType,
+  type GameEvent,
   type GameState,
   type PlayerState,
   type Rank
@@ -34,6 +35,7 @@ import type {
   PublicCompletedCardTrade,
   PublicCosmetic,
   PublicEquippedCosmetic,
+  PublicGameEvent,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -680,6 +682,11 @@ io.on("connection", (socket) => {
 
     if (!isPlayerInRoom(room, socket.id)) {
       callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.game?.status !== "complete") {
+      callback(fail("Replay export is available after the match is complete."));
       return;
     }
 
@@ -1761,13 +1768,28 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     currentTrick: room.game?.currentTrick ?? null,
     turnNumber: room.game?.turnNumber ?? 0,
     placements: room.game?.placements ?? [],
-    recentEvents:
-      room.game?.status === "complete" ? room.game.events : (room.game?.events.slice(-12) ?? []),
+    recentEvents: (room.game?.status === "complete"
+      ? room.game.events
+      : (room.game?.events.slice(-12) ?? [])
+    ).map(toPublicGameEvent),
     recentChat: room.chatMessages.slice(-20),
     tradePhase: publicTradePhase(room, player?.id ?? null),
     turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
     yourHand: hand
+  };
+}
+
+function toPublicGameEvent(event: GameEvent): PublicGameEvent {
+  return {
+    turnNumber: event.turnNumber,
+    playerId: event.playerId,
+    move: event.move,
+    wasPass: event.wasPass,
+    currentTrickBefore: event.currentTrickBefore,
+    cardsRemainingBefore: event.cardsRemainingBefore,
+    cardsRemainingAfter: event.cardsRemainingAfter,
+    legalMoveCount: event.legalMoveCount
   };
 }
 

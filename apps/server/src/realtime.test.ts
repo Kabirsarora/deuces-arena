@@ -2,7 +2,7 @@ import { once } from "node:events";
 import type { Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import type { Card, Rank } from "@deuces-arena/game-engine";
+import { generateLegalMoves, type Card, type Move, type Rank } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
   ChatPayload,
@@ -680,10 +680,104 @@ describe("realtime rooms", () => {
     expect(hostAfterTrade.tradePhase.requests).toHaveLength(0);
 
     const replay = await exportReplay(host, { roomCode });
-    expect(replay.ok).toBe(true);
+    expect(replay.ok).toBe(false);
 
-    if (replay.ok) {
-      expect(replay.data.tradeHistory).toHaveLength(1);
+    if (!replay.ok) {
+      expect(replay.error).toContain("after the match");
+    }
+  });
+
+  it("never exposes private hand snapshots in live room events", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Expected four connected sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Privacy Host",
+      guestId: "guest-privacy-host"
+    });
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRooms = await Promise.all([
+      joinRoom(second, { roomCode, playerName: "Privacy Two", guestId: "guest-privacy-two" }),
+      joinRoom(third, {
+        roomCode,
+        playerName: "Privacy Three",
+        guestId: "guest-privacy-three"
+      }),
+      joinRoom(fourth, {
+        roomCode,
+        playerName: "Privacy Four",
+        guestId: "guest-privacy-four"
+      })
+    ]);
+    expect(joinedRooms.every((ack) => ack.ok)).toBe(true);
+
+    await Promise.all(players.map((socket) => setReady(socket, { roomCode, ready: true })));
+    const otherStartedStates = players
+      .slice(1)
+      .map((socket) => waitForRoomStateMatching(socket, (state) => state.status === "in-progress"));
+    const startedRoom = await startRoom(host, { roomCode });
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    const playerStates = [startedRoom.data, ...(await Promise.all(otherStartedStates))];
+    const activeIndex = playerStates.findIndex(
+      (state) => state.yourPlayerId === state.activePlayerId
+    );
+    const activeSocket = players[activeIndex];
+    const activeState = playerStates[activeIndex];
+    const observerSocket = players[(activeIndex + 1) % players.length];
+
+    if (activeSocket === undefined || activeState === undefined || observerSocket === undefined) {
+      throw new Error("Unable to resolve active and observing players.");
+    }
+
+    const move = generateLegalMoves(activeState.yourHand, {
+      isFirstMove: true,
+      currentTrick: null
+    })[0];
+
+    if (move === undefined) {
+      throw new Error("Expected a legal opening move.");
+    }
+
+    const observerUpdate = waitForRoomStateMatching(
+      observerSocket,
+      (state) => state.recentEvents.length === 1
+    );
+    const moveAck = await submitMove(activeSocket, { roomCode, move });
+    const observerState = await observerUpdate;
+
+    expect(moveAck.ok).toBe(true);
+
+    if (moveAck.ok) {
+      expect(moveAck.data.recentEvents[0]).not.toHaveProperty("handBefore");
+    }
+
+    expect(observerState.recentEvents[0]).not.toHaveProperty("handBefore");
+
+    const replay = await exportReplay(activeSocket, { roomCode });
+    expect(replay.ok).toBe(false);
+
+    if (!replay.ok) {
+      expect(replay.error).toContain("after the match");
     }
   });
 
@@ -1184,7 +1278,7 @@ describe("realtime rooms", () => {
     expect(broadcast.playerName).toBe("Host");
   });
 
-  it("only evaluates moves for the active player and includes coach records in replay export", async () => {
+  it("only evaluates moves for the active player", async () => {
     const players = await Promise.all([
       connectTestSocket(),
       connectTestSocket(),
@@ -1277,18 +1371,6 @@ describe("realtime rooms", () => {
     expect(activeEvaluation.data.length).toBeGreaterThan(0);
     expect(activeEvaluation.data.length).toBeLessThanOrEqual(2);
     expect(activeEvaluation.data[0]?.rollouts).toBe(1);
-
-    const replay = await exportReplay(activeSocket, { roomCode });
-
-    expect(replay.ok).toBe(true);
-
-    if (!replay.ok) {
-      return;
-    }
-
-    expect(replay.data.coachEvaluations).toHaveLength(1);
-    expect(replay.data.coachEvaluations[0]?.playerId).toBe(startedRoom.data.activePlayerId);
-    expect(replay.data.coachEvaluations[0]?.evaluations).toHaveLength(activeEvaluation.data.length);
   });
 
   it("accepts structured feedback without requiring database persistence", async () => {
@@ -1490,6 +1572,17 @@ function joinRanked(
 function leaveRanked(socket: TestSocket): Promise<ServerAck<PublicRankedQueueState>> {
   return new Promise((resolve) => {
     socket.emit("ranked:leave", (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function submitMove(
+  socket: TestSocket,
+  payload: { readonly roomCode: string; readonly move: Move }
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("game:move", payload, (ack) => {
       resolve(ack);
     });
   });

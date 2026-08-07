@@ -10,7 +10,6 @@ import {
   getSuitStrength,
   type Card,
   type DeckType,
-  type GameEvent,
   type HandType,
   type Move,
   type Rank
@@ -24,6 +23,7 @@ import type {
   PublicChatMessage,
   PublicCosmetic,
   PublicFeedbackReceipt,
+  PublicGameEvent,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicLobbyState,
@@ -4639,7 +4639,7 @@ function getMoveTimelineRows(room: PublicRoomState): readonly MoveTimelineRow[] 
   });
 }
 
-function formatTimelineMove(event: GameEvent): string {
+function formatTimelineMove(event: PublicGameEvent): string {
   if (event.wasPass || event.move.type === "pass") {
     return "Passed";
   }
@@ -4845,7 +4845,7 @@ type PlayerEventSummary = {
   readonly lowHandPressureTurn: number | null;
 };
 
-function summarizePlayerEvents(events: readonly GameEvent[]): PlayerEventSummary {
+function summarizePlayerEvents(events: readonly PublicGameEvent[]): PlayerEventSummary {
   let playCount = 0;
   let passCount = 0;
   let voluntaryPassCount = 0;
@@ -4917,7 +4917,7 @@ function summarizePlayerEvents(events: readonly GameEvent[]): PlayerEventSummary
   };
 }
 
-function getMoveHandType(event: GameEvent): HandType | null {
+function getMoveHandType(event: PublicGameEvent): HandType | null {
   if (event.move.type === "pass") {
     return null;
   }

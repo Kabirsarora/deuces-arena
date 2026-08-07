@@ -159,6 +159,8 @@ export type PublicMoveEvaluation = {
   readonly averagePlacement: number;
 };
 
+export type PublicGameEvent = Omit<GameEvent, "handBefore">;
+
 export type PublicCoachEvaluationRecord = {
   readonly id: string;
   readonly playerId: string;
@@ -217,7 +219,7 @@ export type PublicRoomState = {
   readonly currentTrick: CurrentTrick | null;
   readonly turnNumber: number;
   readonly placements: readonly string[];
-  readonly recentEvents: readonly GameEvent[];
+  readonly recentEvents: readonly PublicGameEvent[];
   readonly recentChat: readonly PublicChatMessage[];
   readonly tradePhase: PublicTradePhaseState;
   readonly turnTimer: PublicTurnTimerState | null;
