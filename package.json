@@ -13,6 +13,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "npm run lint --workspaces --if-present",
+    "smoke:production": "node scripts/smoke-production.mjs",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },

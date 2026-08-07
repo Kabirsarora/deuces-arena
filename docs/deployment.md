@@ -41,6 +41,17 @@ REALTIME_AUTH_SECRET="shared-realtime-secret"
 For Google OAuth, add the deployed callback URL in Google Cloud:
 `https://your-web-app.example.com/api/auth/callback/google`.
 
+For the current hosted demo, the Google OAuth application should use:
+
+- Homepage: `https://deuces-arena.vercel.app`
+- Authorized JavaScript origin: `https://deuces-arena.vercel.app`
+- Authorized redirect URI: `https://deuces-arena.vercel.app/api/auth/callback/google`
+- Privacy policy: `https://deuces-arena.vercel.app/privacy`
+- Terms of service: `https://deuces-arena.vercel.app/terms`
+
+Replace all five URLs together after adding a custom domain. Keep the old callback registered until
+the new domain is deployed and verified, then remove obsolete preview callbacks.
+
 Server:
 
 ```bash
@@ -81,6 +92,18 @@ COACH_EVALUATION_EXPORT_LIMIT="1000"
 The app can run without `DATABASE_URL`, but match history, move persistence, durable guest stats, coach-evaluation persistence, and earned cosmetic unlocks require PostgreSQL. Production should not run without `REALTIME_AUTH_SECRET` once signed-in accounts or ranked mode are public.
 
 `GET /health` returns safe deployment metadata such as allowed origins, uptime, room counts, whether PostgreSQL/Redis are configured, and the disconnected-player grace delay. It does not expose secret connection strings.
+
+Run the public production smoke test after each Vercel or Render deployment:
+
+```bash
+npm run smoke:production
+```
+
+It verifies the homepage, sign-in disclosure, privacy and terms pages, Render health, PostgreSQL,
+the allowed Vercel origin, and signed realtime identity. Render's free instance may take up to about
+a minute to wake. To diagnose a deployment before the identity bridge is configured, temporarily
+run `SMOKE_REQUIRE_REALTIME_AUTH=false npm run smoke:production`; do not use that override as the
+public-launch acceptance check.
 
 ## Build Commands
 
