@@ -99,10 +99,11 @@ Run the public production smoke test after each Vercel or Render deployment:
 npm run smoke:production
 ```
 
-It verifies the homepage, sign-in disclosure, privacy and terms pages, Render health, PostgreSQL,
-the allowed Vercel origin, and signed realtime identity. Render's free instance may take up to about
-a minute to wake. To diagnose a deployment before the identity bridge is configured, temporarily
-run `SMOKE_REQUIRE_REALTIME_AUTH=false npm run smoke:production`; do not use that override as the
+It verifies the homepage, sign-in disclosure, privacy and terms pages, install manifest, sitemap,
+app icons, social preview, Render health, PostgreSQL, the allowed Vercel origin, and signed realtime
+identity. Render's free instance may take up to about a minute to wake. To diagnose a deployment
+before the identity bridge is configured, temporarily run
+`SMOKE_REQUIRE_REALTIME_AUTH=false npm run smoke:production`; do not use that override as the
 public-launch acceptance check.
 
 ## Build Commands

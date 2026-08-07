@@ -39,7 +39,7 @@ npm run build --workspace @deuces-arena/web
 - Enable the casual trade window, send one human-to-human request, and confirm normal play waits until the trade phase closes.
 - Send one table chat message and confirm it appears for both clients.
 - Play at least one legal move and one pass.
-- Finish a match, run Decision Review, and confirm each comparison reports the actual move, simulation favorite, rollout count, win estimate, and average placement estimate.
+- Finish a match, run Decision Review, and confirm each comparison reports the actual move, rollout favorite, rollout count, win estimate, 95% range, and average placement estimate.
 - Sign in, join ranked from four browser sessions, and confirm one four-human table starts with no bots and a 45-second timer.
 - Submit a short feedback report from the feedback panel.
 - Open a profile page and confirm public stats render.
@@ -69,6 +69,6 @@ npm run build --workspace @deuces-arena/web
 
 - Free backend hosts may sleep, so the first Socket.IO connection after idle can take longer; the lobby displays a waking-server state while it reconnects.
 - Redis-backed multi-instance room durability is not implemented yet; run one backend instance for the public demo.
-- Move Lab uses random rollout simulations, so present it as analysis infrastructure rather than perfect AI.
+- Move Lab uses heuristic-guided Monte Carlo rollouts with random exploration and uncertainty ranges, so present it as analysis infrastructure rather than perfect AI.
 - Google sign-in requires real OAuth credentials and callback URLs in the deployed environment.
 - Arena 6 suit names/icons and any super-bomb variant are still product decisions.
