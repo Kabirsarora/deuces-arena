@@ -55,7 +55,8 @@
 - Done: add simulation-based move evaluation and exportable coach-evaluation records.
 - Done: add self-play data generation, JSONL exports, and future ML model hooks.
 - Done: split casual rooms and ranked matchmaking, requiring four verified human accounts, no bots, a default turn timer, queue position/ETA, and duplicate-account protection.
-- Next: add stronger Monte Carlo evaluators and replay-based mistake detection.
+- Done: add replay state reconstruction and on-demand mistake review that compares actual decisions with random-rollout alternatives.
+- Next: replace baseline random playouts with stronger Monte Carlo evaluators and calibrated confidence reporting.
 - Later: add AI coach explanations only when grounded in legal moves, simulations, replay data, and model outputs.
 - Requirement: keep core play and simulations free of paid model calls; future external AI must be opt-in, cached, rate-limited, protected by a kill switch, and deployed with strict provider budgets.
 

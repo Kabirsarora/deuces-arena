@@ -12,13 +12,13 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 
 ## Current Features
 
-- Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, and simulation-based move evaluation utilities.
-- Mobile-first Next.js table for local human vs bot play, with selected-card motion, trick display, turn state, game-over summaries, replay review targets, and hosted-demo metadata.
+- Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
+- Mobile-first Next.js table for human and bot play, with selected-card motion, trick display, turn state, uncluttered game-over summaries, move timelines, and on-demand simulation review.
 - Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, table chat, basic realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.
 - Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Signed-in and public profile pages with account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
-- Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, stores the analysis in replay exports, and can persist those records for future AI coach training/evaluation.
+- Move Lab analysis that ranks legal moves with random rollouts on the active player's turn, plus post-match review that reconstructs high-choice turns and compares the selected move with simulated alternatives. Results show rollout counts and uncertainty instead of claiming solved strategy.
 - Cosmetics foundation with catalog APIs, earned unlock tracking, profile loadouts, equip validation, starter progression rewards, and non-pay-to-win supporter-ready data models.
 - Arena Coins soft-currency foundation for earned, non-real-money progression rewards.
 - Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.

@@ -39,6 +39,7 @@ npm run build --workspace @deuces-arena/web
 - Enable the casual trade window, send one human-to-human request, and confirm normal play waits until the trade phase closes.
 - Send one table chat message and confirm it appears for both clients.
 - Play at least one legal move and one pass.
+- Finish a match, run Decision Review, and confirm each comparison reports the actual move, simulation favorite, rollout count, win estimate, and average placement estimate.
 - Sign in, join ranked from four browser sessions, and confirm one four-human table starts with no bots and a 45-second timer.
 - Submit a short feedback report from the feedback panel.
 - Open a profile page and confirm public stats render.
