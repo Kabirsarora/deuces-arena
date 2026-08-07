@@ -8,6 +8,8 @@ Real-time multiplayer Big Two / Deuces platform with AI bots, replay analysis, a
 
 Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+![Deuces Arena lobby showing bot, casual, and ranked play](docs/screenshots/lobby.png)
+
 ## Current Features
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, and simulation-based move evaluation utilities.
