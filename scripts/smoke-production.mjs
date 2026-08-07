@@ -51,10 +51,33 @@ async function checkPage(path, expectedText) {
   }
 }
 
+async function checkAsset(path, expectedType) {
+  const url = new URL(path, webUrl);
+
+  try {
+    const response = await fetchWithWakeup(url);
+    const contentType = response.headers.get("content-type") ?? "missing";
+    const body = await response.arrayBuffer();
+    const passed = response.ok && contentType.includes(expectedType) && body.byteLength > 1_000;
+    record(
+      url.pathname,
+      passed,
+      `HTTP ${response.status}; ${contentType}; ${body.byteLength} bytes`
+    );
+  } catch (error) {
+    record(url.pathname, false, error instanceof Error ? error.message : String(error));
+  }
+}
+
 await checkPage("/", "Choose a Table");
 await checkPage("/privacy", "Privacy Policy");
 await checkPage("/terms", "Terms of Service");
 await checkPage("/auth/sign-in", "Sign in");
+await checkPage("/manifest.webmanifest", '"name":"Deuces Arena"');
+await checkPage("/sitemap.xml", `${new URL(webUrl).origin}/privacy`);
+await checkAsset("/icon", "image/png");
+await checkAsset("/apple-icon", "image/png");
+await checkAsset("/opengraph-image", "image/png");
 
 try {
   const healthUrl = new URL("/health", serverUrl);
