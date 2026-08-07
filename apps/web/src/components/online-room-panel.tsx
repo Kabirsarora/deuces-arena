@@ -83,6 +83,7 @@ import { cn } from "@/lib/utils";
 type OnlineHubMode = "bots" | "casual" | "ranked";
 type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
+type RealtimeConnectionStatus = "waking" | "online" | "offline";
 type CosmeticFilterKind = "ALL" | CosmeticKind;
 type AuthUser = {
   readonly profileId: string;
@@ -159,7 +160,7 @@ export function OnlineRoomPanel({
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const lastObservedChatKeyRef = useRef<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
-  const [connected, setConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>("waking");
   const [playerName, setPlayerName] = useState("Player");
   const [profileDisplayName, setProfileDisplayName] = useState("Player");
   const [profileAvatarKey, setProfileAvatarKey] = useState<ProfileAvatarKey>("diamond");
@@ -193,6 +194,7 @@ export function OnlineRoomPanel({
   const [handDealtVisible, setHandDealtVisible] = useState(true);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
+  const connected = connectionStatus === "online";
 
   const selectedCards = useMemo(
     () => room?.yourHand.filter((card) => selectedCardIds.includes(getCardId(card))) ?? [],
@@ -328,10 +330,19 @@ export function OnlineRoomPanel({
       autoConnect: true,
       ...(realtimeAuthToken === null ? {} : { auth: { token: realtimeAuthToken } })
     });
+    const offlineTimeout = window.setTimeout(() => {
+      if (!socket.connected) {
+        setConnectionStatus("offline");
+        setMessage("Realtime server is unavailable. We will keep trying automatically.");
+      }
+    }, 75_000);
     socketRef.current = socket;
+    setConnectionStatus("waking");
+    setMessage("Connecting to live tables. The free server may need a moment to wake up.");
 
     socket.on("connect", () => {
-      setConnected(true);
+      window.clearTimeout(offlineTimeout);
+      setConnectionStatus("online");
       setMessage("Connected to realtime server.");
       refreshProfile(socket, getActiveProfileId(), setProfile);
       refreshLeaderboard(socket, setLeaderboard);
@@ -353,11 +364,15 @@ export function OnlineRoomPanel({
       }
     });
     socket.on("disconnect", () => {
-      setConnected(false);
-      setMessage("Disconnected from realtime server.");
+      setConnectionStatus(socket.active ? "waking" : "offline");
+      setMessage(
+        socket.active
+          ? "Connection interrupted. Rejoining the realtime server..."
+          : "Disconnected from realtime server."
+      );
     });
     socket.on("connect_error", (error) => {
-      setConnected(false);
+      setConnectionStatus(error.message.includes("account session") ? "offline" : "waking");
       setMessage(
         error.message.includes("account session")
           ? "Your account session expired. Refresh the page to reconnect."
@@ -388,6 +403,7 @@ export function OnlineRoomPanel({
     });
 
     return () => {
+      window.clearTimeout(offlineTimeout);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -1000,6 +1016,7 @@ export function OnlineRoomPanel({
     return (
       <OnlineLobbyHub
         connected={connected}
+        connectionStatus={connectionStatus}
         playerName={playerName}
         authUser={authUser}
         profile={profile}
@@ -1057,6 +1074,7 @@ export function OnlineRoomPanel({
       <OnlineWaitingRoom
         room={room}
         connected={connected}
+        connectionStatus={connectionStatus}
         message={message}
         botSeats={selectedBotSeats}
         maxBotSeats={availableBotSeats}
@@ -1101,7 +1119,7 @@ export function OnlineRoomPanel({
       <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
         <ActiveRoomBar
           room={room}
-          connected={connected}
+          connectionStatus={connectionStatus}
           turnStatus={turnStatus}
           message={message}
           activePanel={activeTablePanel}
@@ -1373,6 +1391,7 @@ export function OnlineRoomPanel({
 
 function OnlineLobbyHub({
   connected,
+  connectionStatus,
   playerName,
   authUser,
   profile,
@@ -1423,6 +1442,7 @@ function OnlineLobbyHub({
   onSubmitFeedback
 }: {
   readonly connected: boolean;
+  readonly connectionStatus: RealtimeConnectionStatus;
   readonly playerName: string;
   readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
@@ -1492,18 +1512,21 @@ function OnlineLobbyHub({
                 </p>
                 <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
                 <p className="mt-2 text-sm font-semibold text-zinc-400">
-                  {activity?.connectedUsers ?? 0} online · {activity?.openRooms ?? 0} open rooms ·{" "}
-                  {activity?.activeRooms ?? 0} active rooms
+                  {connectionStatus === "online"
+                    ? `${activity?.connectedUsers ?? 0} online · ${activity?.openRooms ?? 0} open rooms · ${activity?.activeRooms ?? 0} active rooms`
+                    : connectionStatus === "waking"
+                      ? "Connecting to live tables..."
+                      : "Live tables are temporarily unavailable"}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <span
                   className={cn(
                     "hidden rounded-full px-3 py-1 text-xs font-black sm:inline-flex",
-                    connected ? "bg-emerald-300 text-emerald-950" : "bg-red-300 text-red-950"
+                    getConnectionBadgeClass(connectionStatus)
                   )}
                 >
-                  {connected ? "Online" : "Offline"}
+                  {getConnectionLabel(connectionStatus)}
                 </span>
                 <HeaderAccountControl
                   authUser={authUser}
@@ -2317,7 +2340,7 @@ function ProfileDetails({
 
 function ActiveRoomBar({
   room,
-  connected,
+  connectionStatus,
   turnStatus,
   message,
   activePanel,
@@ -2328,7 +2351,7 @@ function ActiveRoomBar({
   onLeaveRoom
 }: {
   readonly room: PublicRoomState | null;
-  readonly connected: boolean;
+  readonly connectionStatus: RealtimeConnectionStatus;
   readonly turnStatus: string;
   readonly message: string;
   readonly activePanel: ActiveTablePanel | null;
@@ -2344,7 +2367,11 @@ function ActiveRoomBar({
         <span
           className={cn(
             "size-3 shrink-0 rounded-full",
-            connected ? "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.45)]" : "bg-red-300"
+            connectionStatus === "online"
+              ? "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.45)]"
+              : connectionStatus === "waking"
+                ? "bg-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.35)]"
+                : "bg-red-300"
           )}
         />
         <div className="min-w-0">
@@ -2431,6 +2458,7 @@ function TablePanelButton({
 function OnlineWaitingRoom({
   room,
   connected,
+  connectionStatus,
   message,
   botSeats,
   maxBotSeats,
@@ -2463,6 +2491,7 @@ function OnlineWaitingRoom({
 }: {
   readonly room: PublicRoomState;
   readonly connected: boolean;
+  readonly connectionStatus: RealtimeConnectionStatus;
   readonly message: string;
   readonly botSeats: number;
   readonly maxBotSeats: number;
@@ -2551,10 +2580,10 @@ function OnlineWaitingRoom({
             <span
               className={cn(
                 "rounded-full px-2 py-1 text-xs font-black",
-                connected ? "bg-emerald-400/15 text-emerald-200" : "bg-red-400/15 text-red-200"
+                getConnectionBadgeClass(connectionStatus)
               )}
             >
-              {connected ? "Online" : "Offline"}
+              {getConnectionLabel(connectionStatus)}
             </span>
           </div>
 
@@ -4916,6 +4945,22 @@ function formatHandTypeLabel(type: string): string {
 
 function pluralize(label: string, count: number): string {
   return count === 1 ? label : `${label}s`;
+}
+
+function getConnectionLabel(status: RealtimeConnectionStatus): string {
+  if (status === "online") {
+    return "Online";
+  }
+
+  return status === "waking" ? "Waking server" : "Offline";
+}
+
+function getConnectionBadgeClass(status: RealtimeConnectionStatus): string {
+  if (status === "online") {
+    return "bg-emerald-300 text-emerald-950";
+  }
+
+  return status === "waking" ? "bg-amber-300 text-amber-950" : "bg-red-300 text-red-950";
 }
 
 function OnlineCard({
