@@ -18,6 +18,7 @@ import type {
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
+  PublicReplayDecisionReview,
   PublicRoomState,
   RoomReplayExport,
   ServerAck,
@@ -1373,6 +1374,104 @@ describe("realtime rooms", () => {
     expect(activeEvaluation.data[0]?.rollouts).toBe(1);
   });
 
+  it("runs completed-match replay review only for a seated player", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Expected four connected sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Review Host",
+      guestId: "guest-review-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRooms = await Promise.all([
+      joinRoom(second, { roomCode, playerName: "Review Two", guestId: "guest-review-two" }),
+      joinRoom(third, { roomCode, playerName: "Review Three", guestId: "guest-review-three" }),
+      joinRoom(fourth, { roomCode, playerName: "Review Four", guestId: "guest-review-four" })
+    ]);
+
+    expect(joinedRooms.every((ack) => ack.ok)).toBe(true);
+    await Promise.all(players.map((socket) => setReady(socket, { roomCode, ready: true })));
+
+    const otherStartedStates = players
+      .slice(1)
+      .map((socket) => waitForRoomStateMatching(socket, (state) => state.status === "in-progress"));
+    const startedRoom = await startRoom(host, {
+      roomCode,
+      rules: {
+        bombEndsTrick: false,
+        deckType: "classic",
+        playerCount: 4,
+        cardsPerPlayer: 1
+      }
+    });
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    const playerStates = [startedRoom.data, ...(await Promise.all(otherStartedStates))];
+    const activeIndex = playerStates.findIndex(
+      (state) => state.yourPlayerId === state.activePlayerId
+    );
+    const activeSocket = players[activeIndex];
+    const activeState = playerStates[activeIndex];
+
+    if (activeSocket === undefined || activeState === undefined) {
+      throw new Error("Unable to resolve the opening player.");
+    }
+
+    const beforeCompletion = await reviewReplay(activeSocket, { roomCode, rollouts: 1 });
+    expect(beforeCompletion.ok).toBe(false);
+
+    const winningMove = generateLegalMoves(activeState.yourHand, {
+      isFirstMove: true,
+      currentTrick: null
+    })[0];
+
+    if (winningMove === undefined) {
+      throw new Error("Expected an opening move.");
+    }
+
+    const completedRoom = await submitMove(activeSocket, { roomCode, move: winningMove });
+    expect(completedRoom.ok).toBe(true);
+
+    if (!completedRoom.ok) {
+      return;
+    }
+
+    expect(completedRoom.data.status).toBe("complete");
+    const review = await reviewReplay(activeSocket, {
+      roomCode,
+      rollouts: 1,
+      maxDecisions: 2,
+      maxMoves: 2
+    });
+
+    expect(review.ok).toBe(true);
+
+    if (review.ok) {
+      expect(review.data).toEqual([]);
+    }
+  });
+
   it("accepts structured feedback without requiring database persistence", async () => {
     const socket = await connectTestSocket();
     const feedback = await submitFeedback(socket, {
@@ -1699,6 +1798,22 @@ function evaluateMoves(
 ): Promise<ServerAck<readonly PublicMoveEvaluation[]>> {
   return new Promise((resolve) => {
     socket.emit("coach:evaluate", payload, (ack) => {
+      resolve(ack);
+    });
+  });
+}
+
+function reviewReplay(
+  socket: TestSocket,
+  payload: {
+    readonly roomCode: string;
+    readonly rollouts?: number;
+    readonly maxDecisions?: number;
+    readonly maxMoves?: number;
+  }
+): Promise<ServerAck<readonly PublicReplayDecisionReview[]>> {
+  return new Promise((resolve) => {
+    socket.emit("coach:review", payload, (ack) => {
       resolve(ack);
     });
   });

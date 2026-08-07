@@ -4,7 +4,8 @@ import type {
   DeckType,
   GameEvent,
   Move,
-  Rank
+  Rank,
+  ReplayDecisionReview
 } from "@deuces-arena/game-engine";
 
 export {
@@ -158,6 +159,8 @@ export type PublicMoveEvaluation = {
   readonly winRate: number;
   readonly averagePlacement: number;
 };
+
+export type PublicReplayDecisionReview = ReplayDecisionReview;
 
 export type PublicGameEvent = Omit<GameEvent, "handBefore">;
 
@@ -405,6 +408,15 @@ export type ClientToServerEvents = {
   "coach:evaluate": (
     payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number },
     callback: (ack: ServerAck<readonly PublicMoveEvaluation[]>) => void
+  ) => void;
+  "coach:review": (
+    payload: {
+      readonly roomCode: string;
+      readonly rollouts?: number;
+      readonly maxDecisions?: number;
+      readonly maxMoves?: number;
+    },
+    callback: (ack: ServerAck<readonly PublicReplayDecisionReview[]>) => void
   ) => void;
   "feedback:submit": (
     payload: FeedbackPayload,

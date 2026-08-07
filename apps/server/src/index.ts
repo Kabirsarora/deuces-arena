@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 
 import {
+  analyzeReplayDecisions,
   applyMove,
   applyPreGameCardTrade,
   ARENA_SUITS,
@@ -42,6 +43,7 @@ import type {
   PublicMatchHistoryItem,
   PublicMoveEvaluation,
   PublicRankedQueueState,
+  PublicReplayDecisionReview,
   PublicRoomRules,
   PublicRoomPlayer,
   PublicRoomState,
@@ -1205,6 +1207,52 @@ io.on("connection", (socket) => {
     );
     void persistCoachEvaluation(room.persistedMatch, record);
     callback(ok(evaluations));
+  });
+
+  socket.on("coach:review", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined || room.game === null) {
+      callback(fail("Game not found."));
+      return;
+    }
+
+    const player = room.players.find((candidate) => candidate.socketId === socket.id);
+
+    if (player === undefined) {
+      callback(fail("You are not seated in this room."));
+      return;
+    }
+
+    if (room.game.status !== "complete") {
+      callback(fail("Decision review is available after the match."));
+      return;
+    }
+
+    const rateLimitError = checkSocketRateLimit(socket.id, "coach");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    try {
+      const reviews: readonly PublicReplayDecisionReview[] = analyzeReplayDecisions({
+        finalState: room.game,
+        playerId: player.id,
+        rolloutsPerMove: clampInteger(payload.rollouts ?? 6, 1, 12),
+        maxDecisions: clampInteger(payload.maxDecisions ?? 3, 1, 5),
+        maxMovesPerDecision: clampInteger(payload.maxMoves ?? 10, 2, 16),
+        maxTurnsPerRollout: 300,
+        rules: {
+          bombEndsTrick: room.rules.bombEndsTrick
+        }
+      });
+
+      callback(ok(reviews));
+    } catch (error) {
+      callback(fail(error instanceof Error ? error.message : "Unable to analyze this replay."));
+    }
   });
 
   socket.on("feedback:submit", async (payload, callback) => {
