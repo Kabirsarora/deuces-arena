@@ -35,7 +35,7 @@
 - Done: persist matches, moves, ratings, coach evaluations, and replays when a database is connected.
 - Done: add in-memory rate limits for noisy realtime actions.
 - Done: add disconnect grace auto-moves so active abandoned seats do not freeze a table.
-- Next: add an optional casual-only Trade Phase with a 20-second pregame window, one pending request and one accepted one-for-one trade per player, atomic server validation, and no ranked support.
+- Done: add an optional casual-only Trade Phase with a 20-second pregame window, one outbound request and one accepted one-for-one trade per player, private request details, atomic server validation, replay history, and no ranked support.
 - Next: add Redis-backed room durability for multi-instance hosting.
 
 ## Phase 5: Accounts, Stats, and Replays

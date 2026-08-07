@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  RANKS,
   compareCards,
   detectHand,
   generateLegalMoves,
@@ -11,7 +12,8 @@ import {
   type DeckType,
   type GameEvent,
   type HandType,
-  type Move
+  type Move,
+  type Rank
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
@@ -48,6 +50,7 @@ import {
   Crown,
   DoorOpen,
   Gauge,
+  Handshake,
   History,
   ListOrdered,
   LogOut,
@@ -182,6 +185,9 @@ export function OnlineRoomPanel({
   const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
+  const [tradingEnabled, setTradingEnabled] = useState(false);
+  const [tradeTargetPlayerId, setTradeTargetPlayerId] = useState("");
+  const [tradeRequestedRank, setTradeRequestedRank] = useState<Rank>("8");
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
   const [handDealtVisible, setHandDealtVisible] = useState(true);
@@ -201,7 +207,7 @@ export function OnlineRoomPanel({
     room?.status === "in-progress" &&
     room.turnNumber === 0 &&
     room.yourHand.length > 0
-      ? `${room.roomCode}-${room.yourHand.map((card) => getCardId(card)).join(".")}`
+      ? `${room.roomCode}-deal`
       : null;
   const legalMoves = useMemo(
     () =>
@@ -266,11 +272,13 @@ export function OnlineRoomPanel({
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const turnStatus =
-    activePlayer?.kind === "bot"
-      ? `${activePlayer.name} is thinking...`
-      : isYourTurn
-        ? "Your move"
-        : "Waiting for your turn";
+    room?.tradePhase.status === "open"
+      ? "Card trade window open"
+      : activePlayer?.kind === "bot"
+        ? `${activePlayer.name} is thinking...`
+        : isYourTurn
+          ? "Your move"
+          : "Waiting for your turn";
 
   useEffect(() => {
     if (profile === null) {
@@ -457,7 +465,9 @@ export function OnlineRoomPanel({
   }, [deckType, playerCount]);
 
   useEffect(() => {
-    if (room?.turnTimer?.deadlineAt === null || room?.turnTimer === null) {
+    const deadlineAt = room?.tradePhase.deadlineAt ?? room?.turnTimer?.deadlineAt;
+
+    if (deadlineAt === null || deadlineAt === undefined) {
       return;
     }
 
@@ -465,7 +475,20 @@ export function OnlineRoomPanel({
     const interval = window.setInterval(() => setTimerNow(Date.now()), 1000);
 
     return () => window.clearInterval(interval);
-  }, [room?.turnTimer]);
+  }, [room?.tradePhase.deadlineAt, room?.turnTimer?.deadlineAt]);
+
+  useEffect(() => {
+    if (room?.tradePhase.status !== "open") {
+      return;
+    }
+
+    const targets = room.players.filter(
+      (player) => player.id !== room.yourPlayerId && player.kind === "human" && player.connected
+    );
+    setTradeTargetPlayerId((current) =>
+      targets.some((player) => player.id === current) ? current : (targets[0]?.id ?? "")
+    );
+  }, [room?.players, room?.tradePhase.status, room?.yourPlayerId]);
 
   function createRoom() {
     socketRef.current?.emit(
@@ -511,7 +534,10 @@ export function OnlineRoomPanel({
               cardsPerPlayer: selectedCardsPerPlayer
             },
             botDifficulty,
-            botPace
+            botPace,
+            trade: {
+              enabled: false
+            }
           },
           handleRoomAck("Started a bot table.")
         );
@@ -611,7 +637,10 @@ export function OnlineRoomPanel({
           cardsPerPlayer: selectedCardsPerPlayer
         },
         botDifficulty,
-        botPace
+        botPace,
+        trade: {
+          enabled: tradingEnabled
+        }
       },
       handleRoomAck("Game started.")
     );
@@ -683,6 +712,75 @@ export function OnlineRoomPanel({
               ? "You passed."
               : `You played ${move.cards.map(formatCard).join(" ")}`
           );
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
+  function requestCardTrade() {
+    if (room === null || selectedCards.length !== 1 || selectedCards[0] === undefined) {
+      setMessage("Select exactly one card to offer.");
+      return;
+    }
+
+    if (tradeTargetPlayerId === "") {
+      setMessage("Choose a player for the trade request.");
+      return;
+    }
+
+    socketRef.current?.emit(
+      "trade:request",
+      {
+        roomCode: room.roomCode,
+        toPlayerId: tradeTargetPlayerId,
+        offeredCard: selectedCards[0],
+        requestedRank: tradeRequestedRank
+      },
+      (ack) => {
+        if (ack.ok) {
+          setRoom(ack.data);
+          setSelectedCardIds([]);
+          setMessage("Trade request sent.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
+  function respondToCardTrade(requestId: string, accept: boolean) {
+    if (room === null) {
+      return;
+    }
+
+    const request = room.tradePhase.requests.find((candidate) => candidate.id === requestId);
+    const requestedCard = selectedCards[0];
+
+    if (
+      accept &&
+      (selectedCards.length !== 1 ||
+        requestedCard === undefined ||
+        requestedCard.rank !== request?.requestedRank)
+    ) {
+      setMessage(`Select one ${request?.requestedRank ?? "requested"} card to accept.`);
+      return;
+    }
+
+    socketRef.current?.emit(
+      "trade:respond",
+      {
+        roomCode: room.roomCode,
+        requestId,
+        accept,
+        ...(accept && requestedCard !== undefined ? { requestedCard } : {})
+      },
+      (ack) => {
+        if (ack.ok) {
+          setRoom(ack.data);
+          setSelectedCardIds([]);
+          setMessage(accept ? "Trade accepted." : "Trade declined.");
         } else {
           setMessage(ack.error);
         }
@@ -968,6 +1066,7 @@ export function OnlineRoomPanel({
         timerEnabled={lobbyTimerEnabled}
         timerSeconds={turnTimerSeconds}
         bombEndsTrick={bombEndsTrick}
+        tradingEnabled={tradingEnabled}
         botDifficulty={botDifficulty}
         botPace={botPace}
         roomCanStart={roomCanStart}
@@ -990,6 +1089,7 @@ export function OnlineRoomPanel({
         onTimerEnabledChange={setLobbyTimerEnabled}
         onTimerSecondsChange={setTurnTimerSeconds}
         onBombEndsTrickChange={setBombEndsTrick}
+        onTradingEnabledChange={setTradingEnabled}
         onBotDifficultyChange={setBotDifficulty}
         onBotPaceChange={setBotPace}
       />
@@ -1036,6 +1136,19 @@ export function OnlineRoomPanel({
             onCreateBotGame={createBotGame}
             onLeaveRoom={leaveRoom}
           />
+          {room.tradePhase.status === "open" ? (
+            <TradePhaseOverlay
+              room={room}
+              timerNow={timerNow}
+              selectedCards={selectedCards}
+              targetPlayerId={tradeTargetPlayerId}
+              requestedRank={tradeRequestedRank}
+              onTargetPlayerChange={setTradeTargetPlayerId}
+              onRequestedRankChange={setTradeRequestedRank}
+              onRequest={requestCardTrade}
+              onRespond={respondToCardTrade}
+            />
+          ) : null}
           <ActiveTableDrawer
             panel={activeTablePanel}
             room={room}
@@ -1049,11 +1162,13 @@ export function OnlineRoomPanel({
             <div>
               <p className="text-sm font-bold">Your Hand</p>
               <p className="text-xs text-zinc-400">
-                {isYourTurn
-                  ? playableCardCount === 0 && canPass
-                    ? "No legal play available · pass to continue"
-                    : `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                  : turnStatus}
+                {room.tradePhase.status === "open"
+                  ? getTradeHandPrompt(room, selectedCards)
+                  : isYourTurn
+                    ? playableCardCount === 0 && canPass
+                      ? "No legal play available · pass to continue"
+                      : `${selectedCards.length} selected · ${legalMoves.length} legal options`
+                    : turnStatus}
               </p>
             </div>
             <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
@@ -1804,10 +1919,12 @@ function CompactDeckControl({
 
 function CompactRuleToggle({
   label,
+  description = "A bomb immediately wins the trick.",
   enabled,
   onChange
 }: {
   readonly label: string;
+  readonly description?: string;
   readonly enabled: boolean;
   readonly onChange: (enabled: boolean) => void;
 }) {
@@ -1815,9 +1932,7 @@ function CompactRuleToggle({
     <label className="flex min-h-20 items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
       <span>
         {label}
-        <span className="mt-1 block text-xs font-semibold text-zinc-400">
-          A bomb immediately wins the trick.
-        </span>
+        <span className="mt-1 block text-xs font-semibold text-zinc-400">{description}</span>
       </span>
       <input
         className="size-4 shrink-0 accent-[var(--gold)]"
@@ -2316,6 +2431,7 @@ function OnlineWaitingRoom({
   timerEnabled,
   timerSeconds,
   bombEndsTrick,
+  tradingEnabled,
   botDifficulty,
   botPace,
   roomCanStart,
@@ -2332,6 +2448,7 @@ function OnlineWaitingRoom({
   onTimerEnabledChange,
   onTimerSecondsChange,
   onBombEndsTrickChange,
+  onTradingEnabledChange,
   onBotDifficultyChange,
   onBotPaceChange
 }: {
@@ -2346,6 +2463,7 @@ function OnlineWaitingRoom({
   readonly timerEnabled: boolean;
   readonly timerSeconds: number;
   readonly bombEndsTrick: boolean;
+  readonly tradingEnabled: boolean;
   readonly botDifficulty: PublicBotDifficulty;
   readonly botPace: PublicBotPace;
   readonly roomCanStart: boolean;
@@ -2362,6 +2480,7 @@ function OnlineWaitingRoom({
   readonly onTimerEnabledChange: (enabled: boolean) => void;
   readonly onTimerSecondsChange: (seconds: number) => void;
   readonly onBombEndsTrickChange: (enabled: boolean) => void;
+  readonly onTradingEnabledChange: (enabled: boolean) => void;
   readonly onBotDifficultyChange: (difficulty: PublicBotDifficulty) => void;
   readonly onBotPaceChange: (pace: PublicBotPace) => void;
 }) {
@@ -2474,8 +2593,15 @@ function OnlineWaitingRoom({
           <CompactBotPace value={botPace} onChange={onBotPaceChange} />
           <CompactRuleToggle
             label="Bomb ends trick"
+            description="A bomb immediately wins the trick."
             enabled={bombEndsTrick}
             onChange={onBombEndsTrickChange}
+          />
+          <CompactRuleToggle
+            label="Card trade window"
+            description="20 seconds · humans only · one trade each."
+            enabled={tradingEnabled}
+            onChange={onTradingEnabledChange}
           />
 
           <Button className="h-12" variant={yourReady ? "secondary" : "primary"} onClick={onReady}>
@@ -3459,6 +3585,22 @@ function ActiveTableDrawer({
   );
 }
 
+function getTradeHandPrompt(room: PublicRoomState, selectedCards: readonly Card[]): string {
+  const incomingRequest = room.tradePhase.requests.find(
+    (request) => request.toPlayerId === room.yourPlayerId
+  );
+
+  if (incomingRequest !== undefined) {
+    return `${selectedCards.length} selected · choose one ${incomingRequest.requestedRank} to accept`;
+  }
+
+  if (room.tradePhase.yourRequestUsed || room.tradePhase.yourTradeCompleted) {
+    return "Trade decision complete · normal play starts shortly";
+  }
+
+  return `${selectedCards.length} selected · choose one card to offer`;
+}
+
 function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
   const bombRule =
     room?.rules.bombEndsTrick === true
@@ -3469,6 +3611,12 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
       ? "Diamonds, clubs, hearts, spades, stars, crowns from low to high. Stars and crowns are placeholder Arena 6 suits."
       : "Diamonds, clubs, hearts, spades from low to high.";
   const highestCard = room?.rules.deckType === "arena-six" ? "2 of crowns" : "2 of spades";
+  const tradeRule =
+    room?.tradePhase.status === "disabled"
+      ? []
+      : [
+          "Casual trade variant: humans have 20 seconds before the first move to send one request and complete at most one one-for-one trade."
+        ];
 
   return (
     <div className="grid gap-3">
@@ -3481,7 +3629,7 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
       </div>
 
       <ol className="grid gap-2">
-        {[...DEUCES_RULES, bombRule].map((rule, index) => (
+        {[...DEUCES_RULES, bombRule, ...tradeRule].map((rule, index) => (
           <li
             key={rule}
             className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
@@ -3562,6 +3710,166 @@ function RoomChat({
         </Button>
       </form>
     </section>
+  );
+}
+
+function TradePhaseOverlay({
+  room,
+  timerNow,
+  selectedCards,
+  targetPlayerId,
+  requestedRank,
+  onTargetPlayerChange,
+  onRequestedRankChange,
+  onRequest,
+  onRespond
+}: {
+  readonly room: PublicRoomState;
+  readonly timerNow: number;
+  readonly selectedCards: readonly Card[];
+  readonly targetPlayerId: string;
+  readonly requestedRank: Rank;
+  readonly onTargetPlayerChange: (playerId: string) => void;
+  readonly onRequestedRankChange: (rank: Rank) => void;
+  readonly onRequest: () => void;
+  readonly onRespond: (requestId: string, accept: boolean) => void;
+}) {
+  const yourPlayerId = room.yourPlayerId;
+  const incomingRequest = room.tradePhase.requests.find(
+    (request) => request.toPlayerId === yourPlayerId
+  );
+  const outgoingRequest = room.tradePhase.requests.find(
+    (request) => request.fromPlayerId === yourPlayerId
+  );
+  const targets = room.players.filter(
+    (player) => player.id !== yourPlayerId && player.kind === "human" && player.connected
+  );
+  const secondsRemaining =
+    room.tradePhase.deadlineAt === null
+      ? 0
+      : Math.max(0, Math.ceil((new Date(room.tradePhase.deadlineAt).getTime() - timerNow) / 1000));
+
+  return (
+    <motion.section
+      className="hud-glass absolute left-1/2 top-1/2 z-40 w-[min(31rem,calc(100%-1.5rem))] -translate-x-1/2 -translate-y-1/2 border border-[var(--gold)]/45 p-4 shadow-2xl backdrop-blur-xl sm:p-5"
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Handshake className="size-5 text-[var(--gold)]" />
+          <div>
+            <p className="text-sm font-black">Card trade</p>
+            <p className="text-xs text-zinc-400">One request · one accepted trade</p>
+          </div>
+        </div>
+        <span className="grid min-w-10 place-items-center rounded-full bg-[var(--gold)] px-2 py-1 font-mono text-sm font-black text-black">
+          {secondsRemaining}s
+        </span>
+      </div>
+
+      {incomingRequest !== undefined ? (
+        <div>
+          <p className="text-sm font-bold text-zinc-200">
+            {getRoomPlayerName(room, incomingRequest.fromPlayerId)} offers this card for one of your{" "}
+            <span className="text-[var(--gold)]">{incomingRequest.requestedRank}s</span>.
+          </p>
+          <div className="my-4 flex justify-center">
+            <OnlineCard card={incomingRequest.offeredCard} compact />
+          </div>
+          <p className="mb-3 text-center text-xs font-semibold text-zinc-400">
+            Select one matching card from your hand to accept.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" onClick={() => onRespond(incomingRequest.id, false)}>
+              Decline
+            </Button>
+            <Button
+              disabled={
+                selectedCards.length !== 1 ||
+                selectedCards[0]?.rank !== incomingRequest.requestedRank
+              }
+              onClick={() => onRespond(incomingRequest.id, true)}
+            >
+              Accept trade
+            </Button>
+          </div>
+        </div>
+      ) : outgoingRequest !== undefined ? (
+        <div className="py-4 text-center">
+          <p className="text-base font-black">Request sent</p>
+          <p className="mt-1 text-sm text-zinc-400">
+            Waiting for {getRoomPlayerName(room, outgoingRequest.toPlayerId)} to respond.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <OnlineCard card={outgoingRequest.offeredCard} compact />
+            <ArrowRight className="size-5 text-zinc-500" />
+            <span className="grid size-16 place-items-center rounded-full border border-white/12 bg-black/28 text-2xl font-black text-[var(--gold)]">
+              {outgoingRequest.requestedRank}
+            </span>
+          </div>
+        </div>
+      ) : room.tradePhase.yourTradeCompleted ? (
+        <p className="rounded-md bg-emerald-400/12 px-4 py-5 text-center text-sm font-bold text-emerald-200">
+          Trade complete. Normal play begins when the timer ends.
+        </p>
+      ) : room.tradePhase.yourRequestUsed ? (
+        <p className="rounded-md bg-white/7 px-4 py-5 text-center text-sm font-bold text-zinc-300">
+          Your request is finished. Waiting for the trade window to close.
+        </p>
+      ) : (
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold text-zinc-400">
+            Select exactly one card from your hand, then choose what rank you want back.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs font-bold text-zinc-300">
+              Player
+              <select
+                className="mt-1 h-10 w-full rounded-md border border-white/12 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-[var(--gold)]"
+                value={targetPlayerId}
+                onChange={(event) => onTargetPlayerChange(event.target.value)}
+              >
+                {targets.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-bold text-zinc-300">
+              Rank wanted
+              <select
+                className="mt-1 h-10 w-full rounded-md border border-white/12 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-[var(--gold)]"
+                value={requestedRank}
+                onChange={(event) => onRequestedRankChange(event.target.value as Rank)}
+              >
+                {RANKS.map((rank) => (
+                  <option key={rank} value={rank}>
+                    {rank}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Button
+            disabled={selectedCards.length !== 1 || targetPlayerId === ""}
+            onClick={onRequest}
+          >
+            <Handshake className="size-4" />
+            Send trade request
+          </Button>
+        </div>
+      )}
+
+      {room.tradePhase.completedTradeCount > 0 ? (
+        <p className="mt-3 text-center text-[11px] font-semibold text-zinc-500">
+          {room.tradePhase.completedTradeCount} trade
+          {room.tradePhase.completedTradeCount === 1 ? "" : "s"} completed at this table
+        </p>
+      ) : null}
+    </motion.section>
   );
 }
 
