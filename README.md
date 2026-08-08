@@ -12,15 +12,17 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 
 ## Current Features
 
-- Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, random/lowest/simple-heuristic baseline bots, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
+- Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, distinct random, lowest-legal, and simulation-guided bot levels, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
 - Mobile-first Next.js table for human and bot play, with selected-card motion, trick display, turn state, uncluttered game-over summaries, move timelines, and on-demand simulation review.
-- Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, table chat, basic realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
+- Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, moderated table chat, player mute/block/report controls, realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.
 - Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
-- Signed-in and public profile pages with account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
+- Signed-in and public profile pages with Google account photos, account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
 - Move Lab analysis that ranks legal moves with heuristic-guided Monte Carlo rollouts and random exploration, plus post-match review that reconstructs high-choice turns and compares the selected move with simulated alternatives. Results show rollout completion and 95% win-rate intervals instead of claiming solved strategy.
-- Cosmetics foundation with catalog APIs, earned unlock tracking, profile loadouts, equip validation, starter progression rewards, and non-pay-to-win supporter-ready data models.
-- Arena Coins soft-currency foundation for earned, non-real-money progression rewards.
+- Shop and Locker with catalog APIs, server-validated Arena Coin purchases, earned unlock tracking, profile loadouts, equip validation, account-photo fallbacks, original card/table artwork, ranked borders, and tournament rewards.
+- Arena Coins earned from completed casual, ranked, and tournament games. Coins cannot be purchased, transferred, or wagered.
+- Ranked matchmaking for four verified humans with no bots, a 45-second clock, placement-based rating changes, six visible rating tiers, tier progress, bonus coin rewards, and earned rank borders.
+- Eight-player Arena Cup tournaments with two simultaneous four-player semifinals, automatic top-two advancement, a four-player final, a live bracket, coin prizes, and a champion cosmetic.
 - Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
 - Early ML package for random self-play sample generation and JSONL export of persisted coach evaluations without pretending baseline bots are trained AI.
 
@@ -109,8 +111,11 @@ Current cosmetic progression is intentionally simple:
 
 - Complete 1 persisted match: unlock `classic-red-card-back`.
 - Win 1 persisted match: unlock `midnight-felt-table`.
+- Additional games and wins unlock avatars, card backs, tables, and profile borders.
+- Reaching Gold, Platinum, Diamond, or Arena Master unlocks the matching ranked profile border.
+- Winning an Arena Cup unlocks the tournament champion border.
 - Supporter cosmetics are modeled separately and do not affect gameplay.
-- Arena Coins are earned from completed matches and are not purchasable or bettable yet.
+- Arena Coins are earned from completed matches, with additional ranked placement and tournament prizes, and are not purchasable or bettable.
 - Cosmetic coin purchases are server-validated and only unlock non-supporter presentation items such as card backs, table themes, avatars, and profile borders.
 
 ## ML Data Export
@@ -133,7 +138,7 @@ npm run test
 npm run build
 ```
 
-Current automated coverage includes engine rule tests, bot behavior tests, replay/rating/simulation tests, chat sanitization tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, ranked matchmaking and account isolation, card trading, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
+Current automated coverage includes engine rule tests, bot and rollout behavior tests, replay/rating/ranked-tier tests, chat sanitization and moderation tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, ranked matchmaking and account isolation, tournament seeding, card trading, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
 
 The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`, and confirm the active value through `GET /health`.
 
@@ -146,7 +151,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 
 - Finish production OAuth verification and continue polishing mobile layout, animations, and accessibility.
 - Add Redis-backed room and matchmaking durability for backend restarts and future multi-instance hosting.
-- Expand ranked matchmaking with rating bands, durable queue health, rating history, and additional anti-abuse checks.
+- Expand ranked and tournament matchmaking with rating bands, durable queue health, rating history, reconnect recovery, and additional anti-abuse checks.
 - Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
 - Benchmark and tune the current mixed-policy Monte Carlo evaluator with larger self-play datasets.
 - Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
@@ -156,15 +161,16 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 
 ## Known Limitations
 
-- Current bots are baseline opponents, not trained AI.
+- Easy and normal bots are transparent baselines. Hard bots use bounded simulations, not a trained model or solved strategy.
 - Move Lab uses heuristic-guided Monte Carlo simulation with random exploration; its wide confidence ranges make clear that recommendations are estimates, not perfect strategy.
 - Production Google auth depends on correctly configured OAuth credentials and callback URLs.
 - Database persistence is optional locally; without `DATABASE_URL`, stats and match history use safe in-memory fallbacks.
-- Redis-backed scaling, matchmaking durability, anti-cheat hardening, and payment flows are future work.
+- Ranked and tournament queues currently live in one server process and are lost if that process restarts; Redis-backed durability and multi-instance coordination are future work.
+- Anti-cheat hardening and payment flows are future work.
 
 ## Resume Targets
 
 - Built a real-time multiplayer Big Two platform with Next.js, TypeScript, Socket.IO, PostgreSQL, Prisma, and reusable monorepo packages for game logic, shared contracts, persistence, and ML experiments.
 - Developed a server-authoritative TypeScript game engine with legal move generation, replayable state transitions, baseline bots, trick validation, bomb rules, and structured move logging.
 - Designed an AI-readiness pipeline with heuristic-guided Monte Carlo move evaluation, uncertainty reporting, coach-analysis replay records, self-play generation, and JSONL export for future model training.
-- Implemented live room discovery, guest profiles, placement-based ratings, replay exports, chat moderation, non-pay-to-win cosmetic progression, and server-validated cosmetic loadouts.
+- Implemented live room discovery, authenticated profiles, placement-based ranked tiers, eight-player tournament brackets, replay exports, persistent moderation controls, non-pay-to-win cosmetic progression, and server-validated cosmetic loadouts.

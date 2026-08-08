@@ -20,7 +20,7 @@
 
 - Done: build mobile-first web table.
 - Done: add human vs baseline bots.
-- Done: use `random-legal`, `lowest-legal`, and `simple-heuristic` bots only as honest baselines, not as claimed AI.
+- Done: use random and lowest-legal bots as honest baselines, plus a bounded simulation-guided hard bot that is not presented as trained AI.
 - Done: add accessible card selection labels and pressed states for the hand controls.
 - Done: respect reduced-motion preferences for deal and card-selection motion.
 - In progress: continue polishing table layout, card motion, and visual identity so the UI feels less generic.
@@ -47,6 +47,8 @@
 - Done: require verified signed-in identity for ranked entry when production realtime auth is configured.
 - Done: add searchable match history filters.
 - Done: add saved replay labels.
+- Done: use verified Google account photos as the profile and table-seat fallback while allowing equipped avatar cosmetics to override them.
+- Done: add persistent player blocks, local mutes, structured reports, profanity filtering, and moderation rate limits.
 
 ## Phase 6: Ranked and AI
 
@@ -57,6 +59,7 @@
 - Done: split casual rooms and ranked matchmaking, requiring four verified human accounts, no bots, a default turn timer, queue position/ETA, and duplicate-account protection.
 - Done: add replay state reconstruction and on-demand mistake review that compares actual decisions with simulated alternatives.
 - Done: add mixed-policy Monte Carlo playouts that combine the transparent baseline heuristic with random exploration, plus rollout completion and Wilson 95% win-rate intervals.
+- Done: add Bronze through Arena Master tiers, visible tier progress, ranked coin bonuses, and earned division borders.
 - Next: benchmark and tune rollout policies with larger self-play datasets, then calibrate estimates against held-out games.
 - Later: add AI coach explanations only when grounded in legal moves, simulations, replay data, and model outputs.
 - Requirement: keep core play and simulations free of paid model calls; future external AI must be opt-in, cached, rate-limited, protected by a kill switch, and deployed with strict provider budgets.
@@ -76,9 +79,17 @@
 - Done: add public profile cards for sharing player stats.
 - Done: add saved replay labels.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
+- Done: add a Shop and Locker flow with earned coins, secure purchases, original Arena Cup artwork, and an original Arena 6 card back.
 - Later: add Stripe support for optional supporter features.
 
-## Phase 8: Mobile and Messages
+## Phase 8: Tournaments
+
+- Done: add an eight-player signed-in queue that creates two four-player semifinals.
+- Done: automatically advance the top two players from each semifinal into a four-player final.
+- Done: add a live bracket, fixed competitive timer, placement coin prizes, and an earned champion border.
+- Next: persist tournament history and bracket records, recover queues after server restarts, and add scheduled events or additional formats.
+
+## Phase 9: Mobile and Messages
 
 - Next: build an Expo / React Native client that reuses the game engine, shared contracts, backend, persistence model, and simulation tooling.
 - Later: add universal room invitation links and native sharing from the mobile app.
