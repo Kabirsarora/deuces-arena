@@ -112,12 +112,13 @@ Current cosmetic progression is intentionally simple:
 
 - Complete 1 persisted match: unlock `classic-red-card-back`.
 - Win 1 persisted match: unlock `midnight-felt-table`.
-- Additional games and wins unlock avatars, card backs, tables, and profile borders.
+- Additional milestones scale from 8 wins through 75 wins for the rarest avatars, tables, and card backs; premium visuals are deliberately long-term rewards.
 - Reaching Gold, Platinum, Diamond, or Arena Master unlocks the matching ranked profile border.
 - Winning an Arena Cup unlocks the tournament champion border.
 - Supporter cosmetics are modeled separately and do not affect gameplay.
 - Arena Coins are earned from completed matches, with additional ranked placement and tournament prizes, and are not purchasable or bettable.
 - Cosmetic coin purchases are server-validated and only unlock non-supporter presentation items such as card backs, table themes, avatars, and profile borders.
+- Configured creator/admin accounts receive unlimited coin access and automatically own every current and future cosmetic without changing competitive gameplay.
 
 ## ML Data Export
 

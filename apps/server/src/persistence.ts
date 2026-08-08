@@ -127,37 +127,42 @@ const COSMETIC_UNLOCK_RULES: readonly {
   {
     slug: "aqua-pulse-avatar",
     source: "EARNED",
-    isUnlocked: (stats) => stats.gamesPlayed >= 5
+    isUnlocked: (stats) => stats.gamesPlayed >= 10
   },
   {
     slug: "lagoon-table",
     source: "EARNED",
-    isUnlocked: (stats) => stats.wins >= 3
+    isUnlocked: (stats) => stats.wins >= 8
   },
   {
     slug: "neon-grid-card-back",
     source: "EARNED",
-    isUnlocked: (stats) => stats.gamesPlayed >= 10
+    isUnlocked: (stats) => stats.gamesPlayed >= 20
   },
   {
     slug: "aqua-profile-border",
     source: "EARNED",
-    isUnlocked: (stats) => stats.wins >= 5
+    isUnlocked: (stats) => stats.wins >= 15
   },
   {
     slug: "crown-chip-avatar",
     source: "EARNED",
-    isUnlocked: (stats) => stats.wins >= 10
+    isUnlocked: (stats) => stats.wins >= 25
   },
   {
     slug: "obsidian-table",
     source: "EARNED",
-    isUnlocked: (stats) => stats.wins >= 20
+    isUnlocked: (stats) => stats.wins >= 50
   },
   {
     slug: "ember-court-card-back",
     source: "EARNED",
-    isUnlocked: (stats) => stats.gamesPlayed >= 25
+    isUnlocked: (stats) => stats.gamesPlayed >= 50
+  },
+  {
+    slug: "arena-six-crest-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 75
   },
   {
     slug: "gold-division-border",
@@ -762,6 +767,63 @@ export async function equipPersistedCosmetic(
       ok: false,
       reason: "profile-not-found"
     };
+  }
+}
+
+export async function equipPersistedAdminCosmetic(
+  guestId: string,
+  cosmeticId: string
+): Promise<PublicGuestProfile | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const profileExists = await db.prisma.$transaction(async (tx) => {
+      const [user, cosmetic] = await Promise.all([
+        tx.user.findUnique({ where: { guestId }, select: { id: true } }),
+        tx.cosmetic.findFirst({
+          where: { id: cosmeticId, isActive: true },
+          select: { id: true, kind: true }
+        })
+      ]);
+
+      if (user === null || cosmetic === null) {
+        return false;
+      }
+
+      await tx.userCosmeticUnlock.upsert({
+        where: { userId_cosmeticId: { userId: user.id, cosmeticId: cosmetic.id } },
+        create: {
+          userId: user.id,
+          cosmeticId: cosmetic.id,
+          source: "ADMIN_GRANT",
+          metadata: { reason: "creator-access" }
+        },
+        update: { source: "ADMIN_GRANT" }
+      });
+      await tx.userEquippedCosmetic.upsert({
+        where: { userId_kind: { userId: user.id, kind: cosmetic.kind } },
+        create: {
+          userId: user.id,
+          cosmeticId: cosmetic.id,
+          kind: cosmetic.kind
+        },
+        update: {
+          cosmeticId: cosmetic.id,
+          equippedAt: new Date()
+        }
+      });
+
+      return true;
+    });
+
+    return profileExists ? await getPersistedGuestProfile(guestId) : null;
+  } catch (error) {
+    console.error("Unable to persist admin cosmetic equipment.", error);
+    return null;
   }
 }
 

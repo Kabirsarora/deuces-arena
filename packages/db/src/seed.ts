@@ -28,16 +28,16 @@ const starterCosmetics = [
     description: "A bright teal table theme with a softer casino glow.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 450
+    coinPrice: 1000
   },
   {
     slug: "obsidian-table",
     kind: "TABLE_THEME" as const,
     name: "Obsidian Table",
     description: "A low-light table theme with gold edge lighting.",
-    rarity: "rare",
+    rarity: "legendary",
     isSupporter: false,
-    coinPrice: 800
+    coinPrice: 4000
   },
   {
     slug: "neon-grid-card-back",
@@ -46,25 +46,25 @@ const starterCosmetics = [
     description: "A blue circuit-style card back for sharper tables.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 350
+    coinPrice: 900
   },
   {
     slug: "ember-court-card-back",
     kind: "CARD_BACK" as const,
     name: "Ember Court",
     description: "A warm red-gold card back for endgame drama.",
-    rarity: "rare",
+    rarity: "epic",
     isSupporter: false,
-    coinPrice: 650
+    coinPrice: 2500
   },
   {
     slug: "arena-six-crest-card-back",
     kind: "CARD_BACK" as const,
     name: "Sixfold Crest",
     description: "Original engraved card art made for the six-suit Arena 6 deck.",
-    rarity: "epic",
+    rarity: "legendary",
     isSupporter: false,
-    coinPrice: 900,
+    coinPrice: 6000,
     previewUrl: "/art/arena-six-card-back.jpg"
   },
   {
@@ -74,7 +74,7 @@ const starterCosmetics = [
     description: "A clean glowing avatar mark for table seats.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 300
+    coinPrice: 750
   },
   {
     slug: "crown-chip-avatar",
@@ -83,7 +83,7 @@ const starterCosmetics = [
     description: "A gold chip avatar mark for players who like a little pressure.",
     rarity: "epic",
     isSupporter: false,
-    coinPrice: 700
+    coinPrice: 2200
   },
   {
     slug: "aqua-profile-border",
@@ -92,7 +92,7 @@ const starterCosmetics = [
     description: "A cool cyan seat border for online tables.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 550
+    coinPrice: 1400
   },
   {
     slug: "gold-division-border",

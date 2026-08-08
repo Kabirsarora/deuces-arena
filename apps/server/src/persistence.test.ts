@@ -21,16 +21,26 @@ describe("cosmetic progression rules", () => {
   });
 
   it("unlocks progression cosmetics across games and wins", () => {
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 10, wins: 5, rating: 1000 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 20, wins: 8, rating: 1000 })).toEqual([
+      "classic-red-card-back",
+      "midnight-felt-table",
+      "aqua-pulse-avatar",
+      "lagoon-table",
+      "neon-grid-card-back"
+    ]);
+
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 50, wins: 25, rating: 1000 })).toEqual([
       "classic-red-card-back",
       "midnight-felt-table",
       "aqua-pulse-avatar",
       "lagoon-table",
       "neon-grid-card-back",
-      "aqua-profile-border"
+      "aqua-profile-border",
+      "crown-chip-avatar",
+      "ember-court-card-back"
     ]);
 
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 25, wins: 20, rating: 1000 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 75, wins: 75, rating: 1000 })).toEqual([
       "classic-red-card-back",
       "midnight-felt-table",
       "aqua-pulse-avatar",
@@ -39,7 +49,8 @@ describe("cosmetic progression rules", () => {
       "aqua-profile-border",
       "crown-chip-avatar",
       "obsidian-table",
-      "ember-court-card-back"
+      "ember-court-card-back",
+      "arena-six-crest-card-back"
     ]);
   });
 

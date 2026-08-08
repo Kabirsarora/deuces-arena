@@ -220,7 +220,11 @@ describe("realtime rooms", () => {
     ).toBe(500);
     expect(
       socketCatalog.data.find((cosmetic) => cosmetic.slug === "obsidian-table")?.coinPrice
-    ).toBe(800);
+    ).toBe(4000);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "arena-six-crest-card-back")
+        ?.coinPrice
+    ).toBe(6000);
 
     const restResponse = await fetch(`${serverUrl}/cosmetics`);
 
@@ -346,6 +350,7 @@ describe("realtime rooms", () => {
       supporterCosmetic.id
     );
     expect(profile.data.isAdmin).toBe(true);
+    expect(profile.data.arenaCoins).toBe(Number.MAX_SAFE_INTEGER);
 
     const equipAck = await equipCosmetic(socket, {
       guestId: "guest-admin-cosmetics",

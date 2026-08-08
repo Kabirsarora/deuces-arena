@@ -34,7 +34,8 @@ export default async function PublicProfilePage({
             <p className="text-xs font-black uppercase text-[var(--aqua)]">Deuces Arena profile</p>
             <h1 className="mt-2 text-4xl font-black sm:text-5xl">{displayName}</h1>
             <p className="mt-2 text-sm text-zinc-400">
-              Public stats card · {profile?.arenaCoins ?? 0} coins earned
+              Public stats card · {profile?.isAdmin === true ? "∞" : (profile?.arenaCoins ?? 0)}{" "}
+              coins earned
             </p>
           </div>
           <Link

@@ -62,7 +62,8 @@ export default async function ProfilePage() {
             <p className="text-xs font-black uppercase text-[var(--aqua)]">Deuces Arena</p>
             <h1 className="mt-2 text-4xl font-black sm:text-5xl">{displayName}</h1>
             <p className="mt-2 text-sm text-zinc-400">
-              {session.user.email ?? "Signed-in profile"} · {profile?.arenaCoins ?? 0} coins
+              {session.user.email ?? "Signed-in profile"} ·{" "}
+              {profile?.isAdmin === true ? "∞" : (profile?.arenaCoins ?? 0)} coins
             </p>
           </div>
           <Link

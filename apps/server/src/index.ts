@@ -73,6 +73,7 @@ import {
   completePersistedMatch,
   createPersistedMatch,
   createPersistedTournament,
+  equipPersistedAdminCosmetic,
   equipPersistedCosmetic,
   getPersistedCosmetics,
   getPersistedBlockedGuestIds,
@@ -254,6 +255,7 @@ const BOT_MOVE_DELAY_RANGES: Readonly<
 };
 const RANKED_REQUIRED_PLAYERS = 4;
 const TOURNAMENT_REQUIRED_PLAYERS = 8;
+const ADMIN_ARENA_COINS = Number.MAX_SAFE_INTEGER;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
     id: "starter-classic-red-card-back",
@@ -285,7 +287,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A bright teal table theme with a softer casino glow.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 450,
+    coinPrice: 1000,
     previewUrl: null
   },
   {
@@ -294,9 +296,9 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     kind: "TABLE_THEME",
     name: "Obsidian Table",
     description: "A low-light table theme with gold edge lighting.",
-    rarity: "rare",
+    rarity: "legendary",
     isSupporter: false,
-    coinPrice: 800,
+    coinPrice: 4000,
     previewUrl: null
   },
   {
@@ -307,7 +309,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A blue circuit-style card back for sharper tables.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 350,
+    coinPrice: 900,
     previewUrl: null
   },
   {
@@ -316,9 +318,9 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     kind: "CARD_BACK",
     name: "Ember Court",
     description: "A warm red-gold card back for endgame drama.",
-    rarity: "rare",
+    rarity: "epic",
     isSupporter: false,
-    coinPrice: 650,
+    coinPrice: 2500,
     previewUrl: null
   },
   {
@@ -327,9 +329,9 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     kind: "CARD_BACK",
     name: "Sixfold Crest",
     description: "Original engraved card art made for the six-suit Arena 6 deck.",
-    rarity: "epic",
+    rarity: "legendary",
     isSupporter: false,
-    coinPrice: 900,
+    coinPrice: 6000,
     previewUrl: "/art/arena-six-card-back.jpg"
   },
   {
@@ -340,7 +342,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A clean glowing avatar mark for table seats.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 300,
+    coinPrice: 750,
     previewUrl: null
   },
   {
@@ -351,7 +353,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A gold chip avatar mark for players who like a little pressure.",
     rarity: "epic",
     isSupporter: false,
-    coinPrice: 700,
+    coinPrice: 2200,
     previewUrl: null
   },
   {
@@ -362,7 +364,7 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     description: "A cool cyan seat border for online tables.",
     rarity: "rare",
     isSupporter: false,
-    coinPrice: 550,
+    coinPrice: 1400,
     previewUrl: null
   },
   {
@@ -3101,6 +3103,13 @@ async function equipAdminCosmetic(
     return null;
   }
 
+  const persistedProfile = await equipPersistedAdminCosmetic(guestId, cosmeticId);
+
+  if (persistedProfile !== null) {
+    guestEquippedCosmetics.set(guestId, persistedProfile.equippedCosmetics);
+    return withAdminCosmeticAccess(persistedProfile);
+  }
+
   const equippedCosmetics: PublicEquippedCosmetic[] = [
     ...(guestEquippedCosmetics.get(guestId) ?? []).filter(
       (equipped) => equipped.kind !== cosmetic.kind
@@ -3122,6 +3131,7 @@ async function withAdminCosmeticAccess(profile: PublicGuestProfile): Promise<Pub
 
   return {
     ...profile,
+    arenaCoins: ADMIN_ARENA_COINS,
     isAdmin: true,
     unlocks: (await publicCosmetics()).map((cosmetic) => ({
       cosmetic,

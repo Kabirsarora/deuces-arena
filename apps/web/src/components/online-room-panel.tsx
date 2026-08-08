@@ -2596,7 +2596,8 @@ function MinimalProfileCard({
             ) : null}
           </div>
           <p className="text-sm text-zinc-400">
-            {profile?.rating ?? 1000} rating · {profile?.arenaCoins ?? 0} coins
+            {profile?.rating ?? 1000} rating ·{" "}
+            {profile?.isAdmin === true ? "∞" : (profile?.arenaCoins ?? 0)} coins
           </p>
         </div>
       </div>
@@ -3688,6 +3689,7 @@ function CosmeticsSummary({
     profile?.equippedCosmetics.map((equippedCosmetic) => equippedCosmetic.cosmetic.id) ?? []
   );
   const coinBalance = profile?.arenaCoins ?? 0;
+  const unlimitedCoins = profile?.isAdmin === true;
   const equippedCount = equippedIds.size;
   const ownedCount = unlockedIds.size;
   const visibleCosmetics = cosmetics.filter(
@@ -3704,7 +3706,7 @@ function CosmeticsSummary({
           Shop & Locker
         </span>
         <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
-          {coinBalance} coins
+          {unlimitedCoins ? "∞" : coinBalance} coins
         </span>
       </summary>
 
@@ -3733,8 +3735,9 @@ function CosmeticsSummary({
         </div>
 
         <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
-          Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a
-          placement bonus. Cosmetics never change gameplay.
+          {unlimitedCoins
+            ? "Creator access: every cosmetic is owned and coin costs are bypassed."
+            : "Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a placement bonus. Cosmetics never change gameplay."}
         </p>
 
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -3787,6 +3790,7 @@ function CosmeticsSummary({
                 owned={unlockedIds.has(cosmetic.id)}
                 equipped={equippedIds.has(cosmetic.id)}
                 coinBalance={coinBalance}
+                unlimitedCoins={unlimitedCoins}
                 onEquip={onEquip}
                 onPurchase={onPurchase}
               />
@@ -3802,13 +3806,14 @@ function getCosmeticMilestone(slug: string): string | null {
   const milestones: Readonly<Record<string, string>> = {
     "classic-red-card-back": "finish 1 match",
     "midnight-felt-table": "win 1 match",
-    "aqua-pulse-avatar": "finish 5 matches",
-    "lagoon-table": "win 3 matches",
-    "neon-grid-card-back": "finish 10 matches",
-    "aqua-profile-border": "win 5 matches",
-    "crown-chip-avatar": "win 10 matches",
-    "obsidian-table": "win 20 matches",
-    "ember-court-card-back": "finish 25 matches",
+    "aqua-pulse-avatar": "finish 10 matches",
+    "lagoon-table": "win 8 matches",
+    "neon-grid-card-back": "finish 20 matches",
+    "aqua-profile-border": "win 15 matches",
+    "crown-chip-avatar": "win 25 matches",
+    "obsidian-table": "win 50 matches",
+    "ember-court-card-back": "finish 50 matches",
+    "arena-six-crest-card-back": "win 75 matches",
     "gold-division-border": "reach Gold (1100)",
     "platinum-division-border": "reach Platinum (1300)",
     "diamond-division-border": "reach Diamond (1500)",
@@ -3835,6 +3840,7 @@ function CosmeticAction({
   owned,
   equipped,
   coinBalance,
+  unlimitedCoins,
   onEquip,
   onPurchase
 }: {
@@ -3842,6 +3848,7 @@ function CosmeticAction({
   readonly owned: boolean;
   readonly equipped: boolean;
   readonly coinBalance: number;
+  readonly unlimitedCoins: boolean;
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
   readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
@@ -3862,7 +3869,7 @@ function CosmeticAction({
   }
 
   if (!cosmetic.isSupporter && cosmetic.coinPrice !== null && cosmetic.coinPrice > 0) {
-    if (coinBalance >= cosmetic.coinPrice) {
+    if (unlimitedCoins || coinBalance >= cosmetic.coinPrice) {
       return (
         <Button
           className="h-7 shrink-0 px-2 text-[10px]"
