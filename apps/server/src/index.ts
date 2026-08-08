@@ -7,6 +7,7 @@ import {
   applyPreGameCardTrade,
   ARENA_SUITS,
   chooseBotMove,
+  chooseSimulationGuidedMove,
   CLASSIC_SUITS,
   calculatePlacementRatingChanges,
   createDeck,
@@ -1869,7 +1870,7 @@ function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy)
   }
 
   const playerState = getGamePlayer(room.game, playerId);
-  const decision = chooseBotMove({
+  const fallbackDecision = chooseBotMove({
     hand: playerState.hand,
     context: {
       isFirstMove: room.game.turnNumber === 0,
@@ -1877,7 +1878,24 @@ function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy)
     },
     strategy
   });
-  const result = applyMove(room.game, playerId, decision.move, room.rules);
+  const simulationDecision =
+    strategy === "simple-heuristic" && !room.rules.bombEndsTrick
+      ? chooseSimulationGuidedMove({
+          state: room.game,
+          playerId,
+          rolloutsPerMove: 2,
+          maxMoves: 8,
+          maxTurnsPerRollout: 180,
+          rolloutPolicy: "heuristic-mixed",
+          explorationRate: 0.15
+        })
+      : null;
+  const result = applyMove(
+    room.game,
+    playerId,
+    simulationDecision?.move ?? fallbackDecision.move,
+    room.rules
+  );
 
   if (result.ok) {
     room.game = result.state;

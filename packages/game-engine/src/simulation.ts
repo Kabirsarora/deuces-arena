@@ -56,6 +56,10 @@ export type LegalMoveEvaluationInput = {
   readonly explorationRate?: number;
 };
 
+export type SimulationBotDecisionInput = Omit<LegalMoveEvaluationInput, "rolloutsPerMove"> & {
+  readonly rolloutsPerMove?: number;
+};
+
 const DEFAULT_MAX_TURNS = 500;
 const DEFAULT_EXPLORATION_RATE = 0.2;
 
@@ -204,6 +208,21 @@ export function evaluateLegalMovesByRandomRollouts(
       })
     )
     .sort(compareMoveEvaluations);
+}
+
+export function chooseSimulationGuidedMove(
+  input: SimulationBotDecisionInput
+): MoveEvaluation | null {
+  return (
+    evaluateLegalMovesByRandomRollouts({
+      ...input,
+      rolloutsPerMove: input.rolloutsPerMove ?? 2,
+      maxMoves: input.maxMoves ?? 8,
+      maxTurnsPerRollout: input.maxTurnsPerRollout ?? 180,
+      rolloutPolicy: input.rolloutPolicy ?? "heuristic-mixed",
+      explorationRate: input.explorationRate ?? 0.15
+    })[0] ?? null
+  );
 }
 
 function chooseRolloutMove(input: {

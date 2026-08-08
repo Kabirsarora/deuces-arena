@@ -69,6 +69,7 @@ export type {
 } from "./replay-analysis.js";
 
 export {
+  chooseSimulationGuidedMove,
   evaluateLegalMovesByRandomRollouts,
   evaluateMoveByRandomRollouts,
   simulateRandomPlayout
@@ -81,6 +82,7 @@ export type {
   PlayoutResult,
   RandomPlayoutInput,
   RolloutPolicy,
+  SimulationBotDecisionInput,
   SimulationStatus
 } from "./simulation.js";
 

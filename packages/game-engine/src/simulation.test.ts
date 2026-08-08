@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createCard, type GameState } from "./index.js";
 import {
+  chooseSimulationGuidedMove,
   evaluateLegalMovesByRandomRollouts,
   evaluateMoveByRandomRollouts,
   simulateRandomPlayout
@@ -74,6 +75,22 @@ describe("simulation", () => {
       winRate: 1,
       averagePlacement: 1
     });
+  });
+
+  it("selects a bounded simulation-guided move for stronger bots", () => {
+    const decision = chooseSimulationGuidedMove({
+      state: oneCardWinState(),
+      playerId: "player-1",
+      rolloutsPerMove: 2,
+      random: () => 0
+    });
+
+    expect(decision).not.toBeNull();
+    expect(decision?.move).toEqual({
+      type: "play",
+      cards: [createCard("3", "diamonds")]
+    });
+    expect(decision?.rolloutPolicy).toBe("heuristic-mixed");
   });
 
   it("rejects legal move ranking for inactive players", () => {

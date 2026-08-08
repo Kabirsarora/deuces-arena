@@ -2043,6 +2043,13 @@ function CompactBotDifficulty({
           </button>
         ))}
       </div>
+      <p className="mt-2 text-xs font-semibold text-zinc-400">
+        {value === "easy"
+          ? "Explores random legal moves."
+          : value === "normal"
+            ? "Conserves strength with low legal plays."
+            : "Compares a bounded set of moves with simulated playouts."}
+      </p>
     </div>
   );
 }
