@@ -1,7 +1,8 @@
 import type {
   PublicCosmetic,
   PublicGuestProfile,
-  PublicMatchHistoryItem
+  PublicMatchHistoryItem,
+  PublicTournamentHistoryItem
 } from "@deuces-arena/shared";
 import Link from "next/link";
 
@@ -39,9 +40,10 @@ export default async function ProfilePage() {
   }
 
   const profileId = createAuthProfileId(session.user.email ?? session.user.name ?? "unknown");
-  const [profile, history, cosmetics] = await Promise.all([
+  const [profile, history, tournaments, cosmetics] = await Promise.all([
     fetchProfile(profileId),
     fetchMatchHistory(profileId),
+    fetchTournamentHistory(profileId),
     fetchCosmetics()
   ]);
   const displayName = profile?.displayName ?? session.user.name ?? "Arena Player";
@@ -172,8 +174,69 @@ export default async function ProfilePage() {
             </div>
           </section>
         </section>
+
+        <section className="online-panel p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--gold)]">Arena Cup</p>
+              <h2 className="mt-1 text-2xl font-black">Tournament history</h2>
+            </div>
+            <span className="rounded-full border border-white/10 bg-white/7 px-3 py-1 text-xs text-zinc-300">
+              {tournaments.length} entered
+            </span>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            {tournaments.length === 0 ? (
+              <p className="rounded-lg border border-white/10 bg-white/7 px-4 py-3 text-sm text-zinc-400 md:col-span-2">
+                Completed and active Arena Cups will appear here.
+              </p>
+            ) : (
+              tournaments.map((tournament) => (
+                <TournamentHistoryRow key={tournament.tournamentId} tournament={tournament} />
+              ))
+            )}
+          </div>
+        </section>
       </section>
     </main>
+  );
+}
+
+function TournamentHistoryRow({
+  tournament
+}: {
+  readonly tournament: PublicTournamentHistoryItem;
+}) {
+  const result =
+    tournament.finalPlacement === null
+      ? tournament.advancedToFinal
+        ? "Finalist"
+        : tournament.semifinalPlacement === null
+          ? "In progress"
+          : `Semifinal ${ordinal(tournament.semifinalPlacement)}`
+      : tournament.finalPlacement === 1
+        ? "Champion"
+        : `${ordinal(tournament.finalPlacement)} overall`;
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/7 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black">{result}</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Seed {tournament.seed} · {tournament.semifinalStage.replace("-", " ")}
+          </p>
+        </div>
+        <span className="rounded-full bg-black/24 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
+          {tournament.status}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-zinc-400">
+        {tournament.championName === null
+          ? new Date(tournament.createdAt).toLocaleDateString()
+          : `Champion: ${tournament.championName}`}
+      </p>
+    </div>
   );
 }
 
@@ -229,6 +292,16 @@ async function fetchMatchHistory(profileId: string): Promise<readonly PublicMatc
   return (
     (await fetchJson<readonly PublicMatchHistoryItem[]>(
       `${SERVER_URL}/profiles/${encodeURIComponent(profileId)}/history?limit=10`
+    )) ?? []
+  );
+}
+
+async function fetchTournamentHistory(
+  profileId: string
+): Promise<readonly PublicTournamentHistoryItem[]> {
+  return (
+    (await fetchJson<readonly PublicTournamentHistoryItem[]>(
+      `${SERVER_URL}/profiles/${encodeURIComponent(profileId)}/tournaments?limit=8`
     )) ?? []
   );
 }

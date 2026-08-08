@@ -87,7 +87,8 @@
 - Done: add an eight-player signed-in queue that creates two four-player semifinals.
 - Done: automatically advance the top two players from each semifinal into a four-player final.
 - Done: add a live bracket, fixed competitive timer, placement coin prizes, and an earned champion border.
-- Next: persist tournament history and bracket records, recover queues after server restarts, and add scheduled events or additional formats.
+- Done: persist tournament seeds, semifinal advancement, final placements, linked match records, and profile tournament history.
+- Next: recover queues after server restarts and add scheduled events or additional formats.
 
 ## Phase 9: Mobile and Messages
 

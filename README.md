@@ -22,8 +22,8 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 - Shop and Locker with catalog APIs, server-validated Arena Coin purchases, earned unlock tracking, profile loadouts, equip validation, account-photo fallbacks, original card/table artwork, ranked borders, and tournament rewards.
 - Arena Coins earned from completed casual, ranked, and tournament games. Coins cannot be purchased, transferred, or wagered.
 - Ranked matchmaking for four verified humans with no bots, a 45-second clock, placement-based rating changes, six visible rating tiers, tier progress, bonus coin rewards, and earned rank borders.
-- Eight-player Arena Cup tournaments with two simultaneous four-player semifinals, automatic top-two advancement, a four-player final, a live bracket, coin prizes, and a champion cosmetic.
-- Prisma/PostgreSQL schema and migrations for users, matches, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
+- Eight-player Arena Cup tournaments with two simultaneous four-player semifinals, automatic top-two advancement, a four-player final, a live bracket, coin prizes, a champion cosmetic, and durable tournament history on player profiles.
+- Prisma/PostgreSQL schema and migrations for users, matches, tournament brackets, match players, move history, coach evaluations, cosmetic unlocks/equipment, replay labels, and future AI/model scores.
 - Early ML package for random self-play sample generation and JSONL export of persisted coach evaluations without pretending baseline bots are trained AI.
 
 ## Architecture
@@ -88,6 +88,7 @@ Useful backend endpoints:
 - `GET /lobby`: public room/activity snapshot.
 - `GET /leaderboard`: persisted or in-memory guest leaderboard.
 - `GET /cosmetics`: active cosmetic catalog.
+- `GET /profiles/:guestId/tournaments`: persisted Arena Cup entries, advancement, and placements.
 
 ## Database Setup
 

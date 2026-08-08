@@ -20,7 +20,9 @@ import type {
   PublicLeaderboardEntry,
   PublicMatchHistoryItem,
   PublicModerationReceipt,
-  ProfileAvatarKey
+  PublicTournamentHistoryItem,
+  ProfileAvatarKey,
+  TournamentStage
 } from "@deuces-arena/shared";
 
 type PersistableRoomPlayer = {
@@ -28,6 +30,16 @@ type PersistableRoomPlayer = {
   readonly name: string;
   readonly kind: "human" | "bot" | "guest";
   readonly guestId?: string | null;
+};
+
+type PersistableTournamentParticipant = {
+  readonly guestId: string;
+  readonly playerName: string;
+};
+
+type PersistedTournamentContext = {
+  readonly tournamentId: string;
+  readonly stage: TournamentStage;
 };
 
 export type PersistedMatch = {
@@ -178,7 +190,8 @@ let dbModulePromise: Promise<typeof DbModule> | null = null;
 export async function createPersistedMatch(
   roomCode: string,
   players: readonly PersistableRoomPlayer[],
-  mode: MatchMode = "CASUAL"
+  mode: MatchMode = "CASUAL",
+  tournament: PersistedTournamentContext | null = null
 ): Promise<PersistedMatch | null> {
   const db = await getDb();
 
@@ -193,6 +206,12 @@ export async function createPersistedMatch(
         mode,
         status: "IN_PROGRESS",
         roomCode,
+        ...(tournament === null
+          ? {}
+          : {
+              tournamentId: tournament.tournamentId,
+              tournamentStage: toDbTournamentStage(tournament.stage)
+            }),
         players: {
           create: players.map((player, index) => {
             const user = usersByPlayerId[player.id];
@@ -235,6 +254,154 @@ export async function createPersistedMatch(
     };
   } catch (error) {
     console.error("Unable to persist match start.", error);
+    return null;
+  }
+}
+
+export async function createPersistedTournament(
+  publicId: string,
+  participants: readonly PersistableTournamentParticipant[]
+): Promise<string | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const users = await db.prisma.user.findMany({
+      where: { guestId: { in: participants.map((participant) => participant.guestId) } },
+      select: { id: true, guestId: true }
+    });
+    const userIdByGuestId = new Map(
+      users.flatMap((user) => (user.guestId === null ? [] : [[user.guestId, user.id] as const]))
+    );
+    const tournament = await db.prisma.tournament.create({
+      data: {
+        publicId,
+        participants: {
+          create: participants.map((participant, index) => ({
+            guestId: participant.guestId,
+            playerName: participant.playerName,
+            seed: index + 1,
+            semifinalStage: index < 4 ? "SEMIFINAL_A" : "SEMIFINAL_B",
+            ...(userIdByGuestId.get(participant.guestId) === undefined
+              ? {}
+              : { userId: userIdByGuestId.get(participant.guestId) })
+          }))
+        }
+      },
+      select: { id: true }
+    });
+
+    return tournament.id;
+  } catch (error) {
+    console.error("Unable to persist tournament start.", error);
+    return null;
+  }
+}
+
+export async function recordPersistedTournamentStage(input: {
+  readonly tournamentId: string | null;
+  readonly stage: TournamentStage;
+  readonly placedGuestIds: readonly string[];
+  readonly status: "semifinals" | "final" | "complete";
+  readonly championName?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || input.tournamentId === null) {
+    return;
+  }
+
+  try {
+    const tournamentId = input.tournamentId;
+    const placementUpdates = input.placedGuestIds.map((guestId, index) =>
+      db.prisma.tournamentParticipant.updateMany({
+        where: { tournamentId, guestId },
+        data:
+          input.stage === "final"
+            ? { finalPlacement: index + 1 }
+            : { semifinalPlacement: index + 1, advancedToFinal: index < 2 }
+      })
+    );
+    const championGuestId = input.status === "complete" ? input.placedGuestIds[0] : undefined;
+    const champion =
+      championGuestId === undefined
+        ? null
+        : await db.prisma.user.findUnique({
+            where: { guestId: championGuestId },
+            select: { id: true }
+          });
+
+    await db.prisma.$transaction([
+      ...placementUpdates,
+      db.prisma.tournament.update({
+        where: { id: tournamentId },
+        data: {
+          status: toDbTournamentStatus(input.status),
+          ...(input.status === "complete"
+            ? {
+                completedAt: new Date(),
+                championUserId: champion?.id ?? null,
+                championName: input.championName ?? null
+              }
+            : {})
+        }
+      })
+    ]);
+  } catch (error) {
+    console.error("Unable to persist tournament stage.", error);
+  }
+}
+
+export async function getPersistedTournamentHistory(
+  guestId: string,
+  limit = 10
+): Promise<readonly PublicTournamentHistoryItem[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const entries = await db.prisma.tournamentParticipant.findMany({
+      where: { guestId },
+      orderBy: { createdAt: "desc" },
+      take: Math.max(1, Math.min(limit, 25)),
+      select: {
+        seed: true,
+        semifinalStage: true,
+        semifinalPlacement: true,
+        advancedToFinal: true,
+        finalPlacement: true,
+        tournament: {
+          select: {
+            publicId: true,
+            status: true,
+            championName: true,
+            createdAt: true,
+            completedAt: true
+          }
+        }
+      }
+    });
+
+    return entries.map((entry) => ({
+      tournamentId: entry.tournament.publicId,
+      status: fromDbTournamentStatus(entry.tournament.status),
+      seed: entry.seed,
+      semifinalStage: entry.semifinalStage === "SEMIFINAL_B" ? "semifinal-b" : "semifinal-a",
+      semifinalPlacement: entry.semifinalPlacement,
+      advancedToFinal: entry.advancedToFinal,
+      finalPlacement: entry.finalPlacement,
+      championName: entry.tournament.championName,
+      createdAt: entry.tournament.createdAt.toISOString(),
+      completedAt: entry.tournament.completedAt?.toISOString() ?? null
+    }));
+  } catch (error) {
+    console.error("Unable to read tournament history.", error);
     return null;
   }
 }
@@ -1572,6 +1739,50 @@ function toDbPlayerKind(kind: PersistableRoomPlayer["kind"]): "HUMAN" | "BOT" | 
   }
 
   return "HUMAN";
+}
+
+function toDbTournamentStage(stage: TournamentStage): "SEMIFINAL_A" | "SEMIFINAL_B" | "FINAL" {
+  if (stage === "semifinal-a") {
+    return "SEMIFINAL_A";
+  }
+
+  if (stage === "semifinal-b") {
+    return "SEMIFINAL_B";
+  }
+
+  return "FINAL";
+}
+
+function toDbTournamentStatus(
+  status: "semifinals" | "final" | "complete"
+): "SEMIFINALS" | "FINAL" | "COMPLETED" {
+  if (status === "semifinals") {
+    return "SEMIFINALS";
+  }
+
+  if (status === "final") {
+    return "FINAL";
+  }
+
+  return "COMPLETED";
+}
+
+function fromDbTournamentStatus(
+  status: "SEMIFINALS" | "FINAL" | "COMPLETED" | "ABANDONED"
+): PublicTournamentHistoryItem["status"] {
+  if (status === "SEMIFINALS") {
+    return "semifinals";
+  }
+
+  if (status === "FINAL") {
+    return "final";
+  }
+
+  if (status === "COMPLETED") {
+    return "complete";
+  }
+
+  return "abandoned";
 }
 
 function fromDbPlayerKind(kind: "HUMAN" | "BOT" | "GUEST"): "human" | "bot" | "guest" {

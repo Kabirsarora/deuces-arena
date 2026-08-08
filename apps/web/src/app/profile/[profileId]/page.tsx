@@ -1,4 +1,8 @@
-import type { PublicGuestProfile, PublicMatchHistoryItem } from "@deuces-arena/shared";
+import type {
+  PublicGuestProfile,
+  PublicMatchHistoryItem,
+  PublicTournamentHistoryItem
+} from "@deuces-arena/shared";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +15,10 @@ export default async function PublicProfilePage({
   readonly params: Promise<{ readonly profileId: string }>;
 }) {
   const { profileId } = await params;
-  const [profile, history] = await Promise.all([
+  const [profile, history, tournaments] = await Promise.all([
     fetchProfile(profileId),
-    fetchMatchHistory(profileId)
+    fetchMatchHistory(profileId),
+    fetchTournamentHistory(profileId)
   ]);
   const displayName = profile?.displayName ?? "Arena Player";
   const winRate =
@@ -103,8 +108,58 @@ export default async function PublicProfilePage({
             </div>
           </section>
         )}
+
+        {profile !== null && tournaments.length > 0 ? (
+          <section className="online-panel p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--gold)]">Arena Cup</p>
+                <h2 className="mt-1 text-2xl font-black">Tournament results</h2>
+              </div>
+              <span className="rounded-full bg-white/7 px-2 py-1 text-xs text-zinc-300">
+                {tournaments.length} entered
+              </span>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {tournaments.map((tournament) => (
+                <PublicTournamentResult key={tournament.tournamentId} tournament={tournament} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
+  );
+}
+
+function PublicTournamentResult({
+  tournament
+}: {
+  readonly tournament: PublicTournamentHistoryItem;
+}) {
+  const result =
+    tournament.finalPlacement === 1
+      ? "Champion"
+      : tournament.finalPlacement !== null
+        ? `${ordinal(tournament.finalPlacement)} overall`
+        : tournament.advancedToFinal
+          ? "Finalist"
+          : tournament.semifinalPlacement === null
+            ? "In progress"
+            : `Semifinal ${ordinal(tournament.semifinalPlacement)}`;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/7 px-4 py-3">
+      <div>
+        <p className="text-sm font-black">{result}</p>
+        <p className="mt-1 text-xs text-zinc-400">
+          Seed {tournament.seed} · {new Date(tournament.createdAt).toLocaleDateString()}
+        </p>
+      </div>
+      <span className="rounded-full bg-black/24 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
+        {tournament.status}
+      </span>
+    </div>
   );
 }
 
@@ -131,6 +186,16 @@ async function fetchMatchHistory(profileId: string): Promise<readonly PublicMatc
   return (
     (await fetchJson<readonly PublicMatchHistoryItem[]>(
       `${SERVER_URL}/profiles/${encodeURIComponent(profileId)}/history?limit=3`
+    )) ?? []
+  );
+}
+
+async function fetchTournamentHistory(
+  profileId: string
+): Promise<readonly PublicTournamentHistoryItem[]> {
+  return (
+    (await fetchJson<readonly PublicTournamentHistoryItem[]>(
+      `${SERVER_URL}/profiles/${encodeURIComponent(profileId)}/tournaments?limit=4`
     )) ?? []
   );
 }

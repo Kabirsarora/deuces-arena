@@ -72,6 +72,7 @@ import {
   abandonPersistedMatch,
   completePersistedMatch,
   createPersistedMatch,
+  createPersistedTournament,
   equipPersistedCosmetic,
   getPersistedCosmetics,
   getPersistedBlockedGuestIds,
@@ -79,11 +80,13 @@ import {
   getPersistedLeaderboard,
   grantPersistedTournamentRewards,
   getPersistedMatchHistory,
+  getPersistedTournamentHistory,
   persistCoachEvaluation,
   persistFeedbackReport,
   persistPlayerReport,
   persistMoveEvent,
   purchasePersistedCosmetic,
+  recordPersistedTournamentStage,
   savePersistedReplayLabel,
   setPersistedUserBlock,
   updatePersistedGuestProfile,
@@ -179,6 +182,7 @@ type TournamentMatch = {
 
 type Tournament = {
   readonly id: string;
+  readonly persistedId: string | null;
   status: PublicTournament["status"];
   readonly participants: readonly TournamentParticipant[];
   readonly matches: TournamentMatch[];
@@ -500,6 +504,21 @@ app.get("/profiles/:guestId/history", async (request, response) => {
   }
 
   response.json(await publicMatchHistory(guestId, Number.isNaN(limit) ? undefined : limit));
+});
+
+app.get("/profiles/:guestId/tournaments", async (request, response) => {
+  const guestId = normalizeGuestId(request.params.guestId);
+  const limit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : undefined;
+
+  if (guestId === null) {
+    response.status(400).json({ error: "Profile not found." });
+    return;
+  }
+
+  response.json(
+    (await getPersistedTournamentHistory(guestId, Number.isNaN(limit) ? undefined : limit)) ?? []
+  );
 });
 
 const httpServer = createServer(app);
@@ -2148,6 +2167,13 @@ function advanceTournament(room: Room, game: GameState): void {
       }
     }
 
+    void recordPersistedTournamentStage({
+      tournamentId: tournament.persistedId,
+      stage: tournamentLink.stage,
+      placedGuestIds: placedParticipants.map((participant) => participant.guestId),
+      status: tournament.status
+    });
+
     emitTournamentQueueState();
     return;
   }
@@ -2168,6 +2194,13 @@ function advanceTournament(room: Room, game: GameState): void {
     })),
     tournament.champion?.guestId ?? null
   );
+  void recordPersistedTournamentStage({
+    tournamentId: tournament.persistedId,
+    stage: tournamentLink.stage,
+    placedGuestIds: placedParticipants.map((participant) => participant.guestId),
+    status: tournament.status,
+    championName: tournament.champion?.playerName ?? null
+  });
   emitTournamentQueueState();
   emitRoomStatesForTournament(tournament);
 }
@@ -2597,8 +2630,11 @@ async function maybeStartTournament(): Promise<void> {
   while (tournamentQueue.length >= TOURNAMENT_REQUIRED_PLAYERS) {
     const participants = tournamentQueue.slice(0, TOURNAMENT_REQUIRED_PLAYERS);
     tournamentQueue = tournamentQueue.slice(TOURNAMENT_REQUIRED_PLAYERS);
+    const tournamentId = `tournament-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const persistedId = await createPersistedTournament(tournamentId, participants);
     const tournament: Tournament = {
-      id: `tournament-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: tournamentId,
+      persistedId,
       status: "semifinals",
       participants,
       matches: [
@@ -2664,7 +2700,12 @@ async function createTournamentRoom(
     room.players.map((player) => player.id),
     shuffleDeck()
   );
-  room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
+  room.persistedMatch = await createPersistedMatch(
+    room.code,
+    room.players,
+    room.mode,
+    tournament.persistedId === null ? null : { tournamentId: tournament.persistedId, stage }
+  );
   resetTurnTimer(room);
   rooms.set(room.code, room);
 

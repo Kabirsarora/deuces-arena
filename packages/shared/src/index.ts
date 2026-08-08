@@ -162,6 +162,19 @@ export type PublicTournamentQueueState = {
   readonly tournament: PublicTournament | null;
 };
 
+export type PublicTournamentHistoryItem = {
+  readonly tournamentId: string;
+  readonly status: TournamentStatus | "abandoned";
+  readonly seed: number;
+  readonly semifinalStage: Extract<TournamentStage, "semifinal-a" | "semifinal-b">;
+  readonly semifinalPlacement: number | null;
+  readonly advancedToFinal: boolean;
+  readonly finalPlacement: number | null;
+  readonly championName: string | null;
+  readonly createdAt: string;
+  readonly completedAt: string | null;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;

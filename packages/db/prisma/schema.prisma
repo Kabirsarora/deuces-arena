@@ -19,6 +19,19 @@ enum MatchStatus {
   ABANDONED
 }
 
+enum TournamentStatus {
+  SEMIFINALS
+  FINAL
+  COMPLETED
+  ABANDONED
+}
+
+enum TournamentStage {
+  SEMIFINAL_A
+  SEMIFINAL_B
+  FINAL
+}
+
 enum PlayerKind {
   HUMAN
   BOT
@@ -63,32 +76,34 @@ enum PlayerReportStatus {
 }
 
 model User {
-  id                String                 @id @default(cuid())
-  username          String                 @unique
-  guestId           String?                @unique
-  email             String?                @unique
+  id                String                  @id @default(cuid())
+  username          String                  @unique
+  guestId           String?                 @unique
+  email             String?                 @unique
   displayName       String?
-  avatarKey         String                 @default("diamond")
+  avatarKey         String                  @default("diamond")
   imageUrl          String?
-  rating            Int                    @default(1000)
-  gamesPlayed       Int                    @default(0)
-  wins              Int                    @default(0)
-  losses            Int                    @default(0)
-  placementTotal    Int                    @default(0)
-  arenaCoins        Int                    @default(0)
+  rating            Int                     @default(1000)
+  gamesPlayed       Int                     @default(0)
+  wins              Int                     @default(0)
+  losses            Int                     @default(0)
+  placementTotal    Int                     @default(0)
+  arenaCoins        Int                     @default(0)
   supporterStatus   String?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
   matchPlayers      MatchPlayer[]
   cosmeticUnlocks   UserCosmeticUnlock[]
   equippedCosmetics UserEquippedCosmetic[]
   oauthAccounts     OAuthAccount[]
   feedbackReports   FeedbackReport[]
   replayLabels      ReplayLabel[]
-  blocksCreated     UserBlock[]            @relation("Blocker")
-  blocksReceived    UserBlock[]            @relation("Blocked")
-  reportsSubmitted  PlayerReport[]         @relation("Reporter")
-  reportsReceived   PlayerReport[]         @relation("Reported")
+  blocksCreated     UserBlock[]             @relation("Blocker")
+  blocksReceived    UserBlock[]             @relation("Blocked")
+  reportsSubmitted  PlayerReport[]          @relation("Reporter")
+  reportsReceived   PlayerReport[]          @relation("Reported")
+  tournamentEntries TournamentParticipant[]
+  tournamentWins    Tournament[]            @relation("TournamentChampion")
 
   @@index([rating])
 }
@@ -158,9 +173,51 @@ model Match {
   moves            MoveEvent[]
   coachEvaluations CoachEvaluation[]
   replayLabels     ReplayLabel[]
+  tournamentId     String?
+  tournamentStage  TournamentStage?
+  tournament       Tournament?       @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
 
+  @@unique([tournamentId, tournamentStage])
   @@index([mode, status])
   @@index([startedAt])
+}
+
+model Tournament {
+  id             String                  @id @default(cuid())
+  publicId       String                  @unique
+  status         TournamentStatus        @default(SEMIFINALS)
+  championUserId String?
+  championName   String?
+  createdAt      DateTime                @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime                @updatedAt
+  champion       User?                   @relation("TournamentChampion", fields: [championUserId], references: [id], onDelete: SetNull)
+  participants   TournamentParticipant[]
+  matches        Match[]
+
+  @@index([status, createdAt])
+  @@index([championUserId])
+}
+
+model TournamentParticipant {
+  id                 String          @id @default(cuid())
+  tournamentId       String
+  userId             String?
+  guestId            String
+  playerName         String
+  seed               Int
+  semifinalStage     TournamentStage
+  semifinalPlacement Int?
+  advancedToFinal    Boolean         @default(false)
+  finalPlacement     Int?
+  createdAt          DateTime        @default(now())
+  tournament         Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user               User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([tournamentId, guestId])
+  @@unique([tournamentId, seed])
+  @@index([userId, createdAt])
+  @@index([tournamentId, finalPlacement])
 }
 
 model MatchPlayer {

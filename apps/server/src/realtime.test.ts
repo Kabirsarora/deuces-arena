@@ -242,7 +242,7 @@ describe("realtime rooms", () => {
     expect(leaderboard.length).toBeLessThanOrEqual(3);
   });
 
-  it("serves profile and match history over REST", async () => {
+  it("serves profile, match history, and tournament history over REST", async () => {
     const profileResponse = await fetch(`${serverUrl}/profiles/guest-rest-profile`);
 
     expect(profileResponse.ok).toBe(true);
@@ -258,6 +258,13 @@ describe("realtime rooms", () => {
 
     const history = (await historyResponse.json()) as unknown[];
     expect(history).toEqual([]);
+
+    const tournamentResponse = await fetch(
+      `${serverUrl}/profiles/guest-rest-profile/tournaments?limit=3`
+    );
+
+    expect(tournamentResponse.ok).toBe(true);
+    expect((await tournamentResponse.json()) as unknown[]).toEqual([]);
   });
 
   it("accepts replay labels without requiring database persistence", async () => {
