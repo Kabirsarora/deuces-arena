@@ -19,4 +19,27 @@ describe("cosmetic progression rules", () => {
       "midnight-felt-table"
     ]);
   });
+
+  it("unlocks progression cosmetics across games and wins", () => {
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 10, wins: 5 })).toEqual([
+      "classic-red-card-back",
+      "midnight-felt-table",
+      "aqua-pulse-avatar",
+      "lagoon-table",
+      "neon-grid-card-back",
+      "aqua-profile-border"
+    ]);
+
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 25, wins: 20 })).toEqual([
+      "classic-red-card-back",
+      "midnight-felt-table",
+      "aqua-pulse-avatar",
+      "lagoon-table",
+      "neon-grid-card-back",
+      "aqua-profile-border",
+      "crown-chip-avatar",
+      "obsidian-table",
+      "ember-court-card-back"
+    ]);
+  });
 });

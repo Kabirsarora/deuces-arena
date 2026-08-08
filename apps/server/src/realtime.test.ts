@@ -162,6 +162,42 @@ describe("realtime rooms", () => {
     }
   });
 
+  it("syncs account names and secure profile photos for authenticated sockets", async () => {
+    const profileId = "auth-22222222222222222222222222222222";
+    const socket = await connectTestSocket(profileId);
+    const profile = await new Promise<ServerAck<PublicGuestProfile>>((resolve) => {
+      socket.emit(
+        "profile:sync-account",
+        {
+          displayName: "Photo Player",
+          imageUrl: "https://images.example.com/player.png"
+        },
+        resolve
+      );
+    });
+
+    expect(profile.ok).toBe(true);
+
+    if (profile.ok) {
+      expect(profile.data.guestId).toBe(profileId);
+      expect(profile.data.displayName).toBe("Photo Player");
+      expect(profile.data.imageUrl).toBe("https://images.example.com/player.png");
+    }
+  });
+
+  it("rejects account profile syncs from guest sockets", async () => {
+    const socket = await connectTestSocket();
+    const profile = await new Promise<ServerAck<PublicGuestProfile>>((resolve) => {
+      socket.emit(
+        "profile:sync-account",
+        { displayName: "Guest", imageUrl: "https://images.example.com/player.png" },
+        resolve
+      );
+    });
+
+    expect(profile.ok).toBe(false);
+  });
+
   it("serves the cosmetic catalog over REST and Socket.IO", async () => {
     const socket = await connectTestSocket();
     const socketCatalog = await listCosmetics(socket);

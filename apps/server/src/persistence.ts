@@ -109,6 +109,41 @@ const COSMETIC_UNLOCK_RULES: readonly {
     slug: "midnight-felt-table",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 1
+  },
+  {
+    slug: "aqua-pulse-avatar",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.gamesPlayed >= 5
+  },
+  {
+    slug: "lagoon-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 3
+  },
+  {
+    slug: "neon-grid-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.gamesPlayed >= 10
+  },
+  {
+    slug: "aqua-profile-border",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 5
+  },
+  {
+    slug: "crown-chip-avatar",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 10
+  },
+  {
+    slug: "obsidian-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 20
+  },
+  {
+    slug: "ember-court-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.gamesPlayed >= 25
   }
 ];
 
@@ -199,6 +234,7 @@ export async function getPersistedGuestProfile(
       select: {
         guestId: true,
         displayName: true,
+        imageUrl: true,
         avatarKey: true,
         rating: true,
         gamesPlayed: true,
@@ -259,6 +295,7 @@ export async function getPersistedGuestProfile(
     return {
       guestId: user.guestId,
       displayName: user.displayName,
+      imageUrl: user.imageUrl,
       avatarKey: toProfileAvatarKey(user.avatarKey),
       rating: user.rating,
       gamesPlayed: user.gamesPlayed,
@@ -287,6 +324,7 @@ export async function updatePersistedGuestProfile(input: {
   readonly guestId: string;
   readonly displayName: string;
   readonly avatarKey: ProfileAvatarKey;
+  readonly imageUrl?: string | null;
 }): Promise<UpdateProfileResult> {
   const db = await getDb();
 
@@ -308,11 +346,13 @@ export async function updatePersistedGuestProfile(input: {
           : `guest:${input.guestId}`,
         guestId: input.guestId,
         displayName: input.displayName,
-        avatarKey: input.avatarKey
+        avatarKey: input.avatarKey,
+        ...(input.imageUrl === undefined ? {} : { imageUrl: input.imageUrl })
       },
       update: {
         displayName: input.displayName,
-        avatarKey: input.avatarKey
+        avatarKey: input.avatarKey,
+        ...(input.imageUrl === undefined ? {} : { imageUrl: input.imageUrl })
       }
     });
 

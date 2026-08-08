@@ -376,7 +376,20 @@ export function OnlineRoomPanel({
       window.clearTimeout(offlineTimeout);
       setConnectionStatus("online");
       setMessage("Connected to realtime server.");
-      refreshProfile(socket, getActiveProfileId(), setProfile);
+      if (authUser !== null) {
+        socket.emit(
+          "profile:sync-account",
+          { displayName: authUser.name, imageUrl: authUser.image },
+          (ack) => {
+            if (ack.ok) {
+              setProfile(ack.data);
+              setPlayerName(ack.data.displayName ?? "Player");
+            }
+          }
+        );
+      } else {
+        refreshProfile(socket, getActiveProfileId(), setProfile);
+      }
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
       refreshRankedQueue(socket, setRankedQueue);
@@ -459,6 +472,7 @@ export function OnlineRoomPanel({
     setProfile({
       guestId: getActiveProfileId(),
       displayName: profile?.displayName ?? profileDisplayName,
+      imageUrl: profile?.imageUrl ?? authUser?.image ?? null,
       avatarKey: profile?.avatarKey ?? profileAvatarKey,
       ...player.stats,
       isAdmin: profile?.isAdmin ?? false,
@@ -478,7 +492,7 @@ export function OnlineRoomPanel({
       refreshLeaderboard(socketRef.current, setLeaderboard);
       refreshMatchHistory(socketRef.current, getActiveProfileId(), setMatchHistory);
     }
-  }, [profile?.equippedCosmetics, profile?.unlocks, room]);
+  }, [authUser?.image, profile?.equippedCosmetics, profile?.imageUrl, profile?.unlocks, room]);
 
   useEffect(() => {
     const latestChatMessage = room?.recentChat.at(-1) ?? null;
@@ -1826,6 +1840,13 @@ function OnlineLobbyHub({
               onProfileSave={onProfileSave}
             />
 
+            <CosmeticsSummary
+              cosmetics={cosmetics}
+              profile={profile}
+              onEquip={onEquipCosmetic}
+              onPurchase={onPurchaseCosmetic}
+            />
+
             <details className="online-panel p-4">
               <summary className="cursor-pointer list-none text-sm font-black">More</summary>
               <div className="mt-3 grid gap-3">
@@ -1836,12 +1857,6 @@ function OnlineLobbyHub({
                   onSubmitFeedback={onSubmitFeedback}
                 />
                 <RulesSummary />
-                <CosmeticsSummary
-                  cosmetics={cosmetics}
-                  profile={profile}
-                  onEquip={onEquipCosmetic}
-                  onPurchase={onPurchaseCosmetic}
-                />
               </div>
             </details>
           </aside>
@@ -2351,7 +2366,10 @@ function MinimalProfileCard({
   return (
     <section className="online-panel p-5">
       <div className="flex items-center gap-3">
-        <ProfileAvatar avatarKey={profile?.avatarKey ?? profileAvatarKey} />
+        <AccountAvatar
+          imageUrl={profile?.imageUrl ?? authUser?.image ?? null}
+          fallback={getAvatarSymbol(profile?.avatarKey ?? profileAvatarKey)}
+        />
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-lg font-black">{profile?.displayName ?? playerName}</p>
@@ -3027,25 +3045,6 @@ function refreshCosmetics(
   });
 }
 
-function ProfileAvatar({ avatarKey }: { readonly avatarKey: ProfileAvatarKey }) {
-  return (
-    <div
-      className={cn(
-        "grid size-10 shrink-0 place-items-center rounded-full border text-lg shadow-lg",
-        avatarKey === "heart"
-          ? "border-rose-200/40 bg-rose-500/15 text-rose-100"
-          : avatarKey === "spade"
-            ? "border-zinc-200/35 bg-zinc-100/10 text-zinc-100"
-            : avatarKey === "club"
-              ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
-              : "border-sky-200/35 bg-sky-400/12 text-sky-100"
-      )}
-    >
-      {getAvatarSymbol(avatarKey)}
-    </div>
-  );
-}
-
 function getAvatarSymbol(avatarKey: ProfileAvatarKey): string {
   if (avatarKey === "club") {
     return "C";
@@ -3453,9 +3452,7 @@ function CosmeticsSummary({
   readonly onPurchase: (cosmetic: PublicCosmetic) => void;
 }) {
   const [activeFilter, setActiveFilter] = useState<CosmeticFilterKind>("ALL");
-  const visibleCosmetics = cosmetics.filter(
-    (cosmetic) => activeFilter === "ALL" || cosmetic.kind === activeFilter
-  );
+  const [view, setView] = useState<"shop" | "locker">("shop");
   const unlocksByCosmeticId = new Map(
     profile?.unlocks.map((unlock) => [unlock.cosmetic.id, unlock]) ?? []
   );
@@ -3466,13 +3463,18 @@ function CosmeticsSummary({
   const coinBalance = profile?.arenaCoins ?? 0;
   const equippedCount = equippedIds.size;
   const ownedCount = unlockedIds.size;
+  const visibleCosmetics = cosmetics.filter(
+    (cosmetic) =>
+      (activeFilter === "ALL" || cosmetic.kind === activeFilter) &&
+      (view === "locker" ? unlockedIds.has(cosmetic.id) : !unlockedIds.has(cosmetic.id))
+  );
 
   return (
-    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
+    <details className="online-panel p-4">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
         <span className="flex items-center gap-2">
           <Palette className="size-4 text-[var(--gold)]" />
-          Cosmetics
+          Shop & Locker
         </span>
         <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
           {coinBalance} coins
@@ -3480,12 +3482,33 @@ function CosmeticsSummary({
       </summary>
 
       <div className="mt-3 grid gap-3">
+        <div className="grid grid-cols-2 rounded-full border border-white/10 bg-black/24 p-1">
+          {(["shop", "locker"] as const).map((option) => (
+            <button
+              key={option}
+              className={cn(
+                "h-8 rounded-full text-xs font-black capitalize transition",
+                view === option ? "bg-[var(--gold)] text-black" : "text-zinc-400 hover:text-white"
+              )}
+              type="button"
+              onClick={() => setView(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400">
           <span>
             {ownedCount}/{cosmetics.length} owned
           </span>
           <span>{equippedCount} equipped</span>
         </div>
+
+        <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
+          Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Cosmetics never
+          change gameplay.
+        </p>
 
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
           {COSMETIC_FILTERS.map((filter) => (
@@ -3509,7 +3532,9 @@ function CosmeticsSummary({
           <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
             {cosmetics.length === 0
               ? "Cosmetic catalog loads from the realtime server."
-              : "No cosmetics in this category yet."}
+              : view === "locker"
+                ? "No owned cosmetics in this category yet."
+                : "You own every cosmetic in this category."}
           </p>
         ) : (
           visibleCosmetics.map((cosmetic) => (
@@ -3524,6 +3549,11 @@ function CosmeticsSummary({
                   {formatCosmeticKind(cosmetic.kind)} ·{" "}
                   {getCosmeticOwnershipLabel(cosmetic, unlocksByCosmeticId.get(cosmetic.id))}
                 </p>
+                {!unlockedIds.has(cosmetic.id) && getCosmeticMilestone(cosmetic.slug) !== null ? (
+                  <p className="mt-0.5 text-[10px] text-[var(--aqua)]">
+                    Or earn: {getCosmeticMilestone(cosmetic.slug)}
+                  </p>
+                ) : null}
               </div>
               <CosmeticAction
                 cosmetic={cosmetic}
@@ -3539,6 +3569,22 @@ function CosmeticsSummary({
       </div>
     </details>
   );
+}
+
+function getCosmeticMilestone(slug: string): string | null {
+  const milestones: Readonly<Record<string, string>> = {
+    "classic-red-card-back": "finish 1 match",
+    "midnight-felt-table": "win 1 match",
+    "aqua-pulse-avatar": "finish 5 matches",
+    "lagoon-table": "win 3 matches",
+    "neon-grid-card-back": "finish 10 matches",
+    "aqua-profile-border": "win 5 matches",
+    "crown-chip-avatar": "win 10 matches",
+    "obsidian-table": "win 20 matches",
+    "ember-court-card-back": "finish 25 matches"
+  };
+
+  return milestones[slug] ?? null;
 }
 
 const COSMETIC_FILTERS: readonly {
@@ -4365,6 +4411,8 @@ function MatchResultsPanel({
   ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
   const rows = getPlacementRows(room);
+  const yourPlacement = rows.find((row) => row.player.id === room.yourPlayerId)?.placement ?? null;
+  const coinsEarned = yourPlacement === null ? null : getArenaCoinReward(yourPlacement);
   const [showReview, setShowReview] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [simulationReviews, setSimulationReviews] = useState<
@@ -4420,6 +4468,13 @@ function MatchResultsPanel({
           {formatMatchMode(room.mode)}
         </span>
       </div>
+
+      {coinsEarned !== null ? (
+        <div className="mb-3 flex items-center justify-between rounded-[0.8rem] border border-[var(--gold)]/35 bg-[var(--gold)]/10 px-3 py-2">
+          <span className="text-xs font-bold text-zinc-200">Match reward</span>
+          <span className="text-sm font-black text-[var(--gold)]">+{coinsEarned} Arena Coins</span>
+        </div>
+      ) : null}
 
       <ol className="grid gap-2">
         {rows.map(({ player, placement }) => (
@@ -4742,9 +4797,16 @@ function OnlineSeat({
             : getAvatarCosmeticClass(avatarCosmetic)
         )}
       >
-        {avatarCosmetic === null
-          ? player.name.slice(0, 1).toUpperCase()
-          : getAvatarCosmeticSymbol(avatarCosmetic)}
+        {avatarCosmetic === null && player.imageUrl !== null && player.imageUrl !== undefined ? (
+          <span
+            className="size-full rounded-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${player.imageUrl})` }}
+          />
+        ) : avatarCosmetic === null ? (
+          player.name.slice(0, 1).toUpperCase()
+        ) : (
+          getAvatarCosmeticSymbol(avatarCosmetic)
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <button
@@ -5072,6 +5134,22 @@ function getPlacementRows(
       (row): row is { readonly player: PublicRoomPlayer; readonly placement: number } =>
         row !== null
     );
+}
+
+function getArenaCoinReward(placement: number): number {
+  if (placement === 1) {
+    return 120;
+  }
+
+  if (placement === 2) {
+    return 80;
+  }
+
+  if (placement === 3) {
+    return 50;
+  }
+
+  return 25;
 }
 
 type MoveTimelineRow = {

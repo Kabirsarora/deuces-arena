@@ -95,6 +95,7 @@ type RoomPlayer = {
 type GuestProfile = {
   readonly guestId: string;
   displayName: string | null;
+  imageUrl: string | null;
   avatarKey: ProfileAvatarKey;
   rating: number;
   gamesPlayed: number;
@@ -750,6 +751,47 @@ io.on("connection", (socket) => {
       guestId,
       displayName,
       avatarKey
+    });
+    const profile = persistedProfile.ok
+      ? persistedProfile.profile
+      : await publicGuestProfile(guestId);
+
+    callback(ok(profile));
+    emitRoomStatesForGuest(guestId);
+  });
+
+  socket.on("profile:sync-account", async (payload, callback) => {
+    const guestId = socket.data.authProfileId ?? null;
+
+    if (guestId === null) {
+      callback(fail("Sign in before syncing an account profile."));
+      return;
+    }
+
+    const currentProfile = await publicGuestProfile(guestId);
+    const displayName = normalizeDisplayName(
+      payload.displayName ?? currentProfile.displayName ?? "Player"
+    );
+    const imageUrl = normalizeAccountImageUrl(payload.imageUrl);
+
+    if (displayName === null) {
+      callback(fail("Account display name must be 2-18 characters."));
+      return;
+    }
+
+    if (payload.imageUrl !== null && imageUrl === null) {
+      callback(fail("Account profile photo is not a valid secure image URL."));
+      return;
+    }
+
+    const inMemoryProfile = getOrCreateGuestProfile(guestId);
+    inMemoryProfile.displayName = displayName;
+    inMemoryProfile.imageUrl = imageUrl;
+    const persistedProfile = await updatePersistedGuestProfile({
+      guestId,
+      displayName,
+      avatarKey: currentProfile.avatarKey,
+      imageUrl
     });
     const profile = persistedProfile.ok
       ? persistedProfile.profile
@@ -2023,6 +2065,7 @@ function toPublicPlayer(room: Room, player: RoomPlayer): PublicRoomPlayer {
             averagePlacement:
               profile.gamesPlayed === 0 ? null : profile.placementTotal / profile.gamesPlayed
           },
+    imageUrl: profile?.imageUrl ?? null,
     equippedCosmetics:
       player.guestId === null ? [] : (guestEquippedCosmetics.get(player.guestId) ?? [])
   };
@@ -2263,6 +2306,19 @@ function normalizeDisplayName(displayName: string): string | null {
   return normalized;
 }
 
+function normalizeAccountImageUrl(imageUrl: string | null): string | null {
+  if (imageUrl === null) {
+    return null;
+  }
+
+  try {
+    const url = new URL(imageUrl);
+    return url.protocol === "https:" && url.toString().length <= 500 ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
   if (avatarKey === "club" || avatarKey === "heart" || avatarKey === "spade") {
     return avatarKey;
@@ -2448,6 +2504,7 @@ function getOrCreateGuestProfile(guestId: string): GuestProfile {
   const profile: GuestProfile = {
     guestId,
     displayName: null,
+    imageUrl: null,
     avatarKey: "diamond",
     rating: 1000,
     gamesPlayed: 0,
@@ -2484,6 +2541,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
   if (persistedProfile !== null) {
     const profile = getOrCreateGuestProfile(guestId);
     profile.displayName = persistedProfile.displayName;
+    profile.imageUrl = persistedProfile.imageUrl ?? null;
     profile.avatarKey = persistedProfile.avatarKey;
     profile.rating = persistedProfile.rating;
     profile.gamesPlayed = persistedProfile.gamesPlayed;
@@ -2503,6 +2561,7 @@ async function publicGuestProfile(guestId: string): Promise<PublicGuestProfile> 
   const fallbackProfile: PublicGuestProfile = {
     guestId,
     displayName: profile.displayName,
+    imageUrl: profile.imageUrl,
     avatarKey: profile.avatarKey,
     rating: profile.rating,
     gamesPlayed: profile.gamesPlayed,

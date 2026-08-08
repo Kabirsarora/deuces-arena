@@ -42,6 +42,7 @@ export type ProfileAvatarKey = "diamond" | "club" | "heart" | "spade";
 export type PublicGuestProfile = PublicPlayerStats & {
   readonly guestId: string;
   readonly displayName: string | null;
+  readonly imageUrl?: string | null;
   readonly avatarKey: ProfileAvatarKey;
   readonly isAdmin: boolean;
   readonly unlocks: readonly PublicCosmeticUnlock[];
@@ -142,6 +143,7 @@ export type PublicRoomPlayer = {
   readonly ready: boolean;
   readonly cardsRemaining: number;
   readonly stats: PublicPlayerStats | null;
+  readonly imageUrl?: string | null;
   readonly equippedCosmetics: readonly PublicEquippedCosmetic[];
 };
 
@@ -372,6 +374,13 @@ export type ClientToServerEvents = {
       readonly guestId: string;
       readonly displayName: string;
       readonly avatarKey: ProfileAvatarKey;
+    },
+    callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
+  "profile:sync-account": (
+    payload: {
+      readonly displayName: string | null;
+      readonly imageUrl: string | null;
     },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
   ) => void;
