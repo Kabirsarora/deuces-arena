@@ -52,9 +52,21 @@ export type {
 
 export { generateLegalMoves } from "./legal-moves.js";
 
-export { calculatePlacementRatingChanges } from "./rating.js";
+export {
+  RANK_TIERS,
+  calculatePlacementRatingChanges,
+  getRankProgress,
+  getRankTier,
+  getRankedCoinBonus
+} from "./rating.js";
 
-export type { RatedPlayerResult, RatingChange } from "./rating.js";
+export type {
+  RankProgress,
+  RankTier,
+  RankTierId,
+  RatedPlayerResult,
+  RatingChange
+} from "./rating.js";
 
 export { createReplayTimeline } from "./replay.js";
 

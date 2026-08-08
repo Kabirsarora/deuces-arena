@@ -1,6 +1,7 @@
 import {
   calculatePlacementRatingChanges,
   detectHand,
+  getRankedCoinBonus,
   summarizeGame,
   type GameEvent,
   type GameState,
@@ -86,6 +87,7 @@ export type SaveReplayLabelResult =
 type CosmeticProgressionStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
+  readonly rating: number;
 };
 
 const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other", number>> = {
@@ -144,6 +146,26 @@ const COSMETIC_UNLOCK_RULES: readonly {
     slug: "ember-court-card-back",
     source: "EARNED",
     isUnlocked: (stats) => stats.gamesPlayed >= 25
+  },
+  {
+    slug: "gold-division-border",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.rating >= 1100
+  },
+  {
+    slug: "platinum-division-border",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.rating >= 1300
+  },
+  {
+    slug: "diamond-division-border",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.rating >= 1500
+  },
+  {
+    slug: "arena-master-border",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.rating >= 1800
   }
 ];
 
@@ -1263,7 +1285,7 @@ export async function completePersistedMatch(
                 increment: placement
               },
               arenaCoins: {
-                increment: getArenaCoinReward(placement)
+                increment: getArenaCoinReward(placement, persistedMatch.mode)
               }
             }
           })
@@ -1299,20 +1321,22 @@ export async function abandonPersistedMatch(persistedMatch: PersistedMatch | nul
   }
 }
 
-function getArenaCoinReward(placement: number): number {
+function getArenaCoinReward(placement: number, mode: MatchMode): number {
+  const rankedBonus = mode === "RANKED" ? getRankedCoinBonus(placement as 1 | 2 | 3 | 4) : 0;
+
   if (placement === 1) {
-    return ARENA_COIN_REWARDS.first;
+    return ARENA_COIN_REWARDS.first + rankedBonus;
   }
 
   if (placement === 2) {
-    return ARENA_COIN_REWARDS.second;
+    return ARENA_COIN_REWARDS.second + rankedBonus;
   }
 
   if (placement === 3) {
-    return ARENA_COIN_REWARDS.third;
+    return ARENA_COIN_REWARDS.third + rankedBonus;
   }
 
-  return ARENA_COIN_REWARDS.other;
+  return ARENA_COIN_REWARDS.other + rankedBonus;
 }
 
 async function awardEarnedCosmetics(
@@ -1334,7 +1358,8 @@ async function awardEarnedCosmetics(
     select: {
       id: true,
       gamesPlayed: true,
-      wins: true
+      wins: true,
+      rating: true
     }
   });
   const unlockSlugs = [...new Set(users.flatMap(getEarnedCosmeticUnlockSlugs))];

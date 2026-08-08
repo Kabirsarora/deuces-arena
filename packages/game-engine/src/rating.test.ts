@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { calculatePlacementRatingChanges } from "./rating.js";
+import {
+  calculatePlacementRatingChanges,
+  getRankProgress,
+  getRankTier,
+  getRankedCoinBonus
+} from "./rating.js";
 
 describe("placement rating", () => {
   it("awards placement-based rating changes for four-player results", () => {
@@ -114,5 +119,34 @@ describe("placement rating", () => {
         }
       ])
     ).toThrow("Rating changes require unique placements from 1 through 4.");
+  });
+
+  it("maps rating boundaries to named tiers", () => {
+    expect(getRankTier(899).name).toBe("Bronze");
+    expect(getRankTier(900).name).toBe("Silver");
+    expect(getRankTier(1100).name).toBe("Gold");
+    expect(getRankTier(1500).name).toBe("Diamond");
+    expect(getRankTier(2100).name).toBe("Arena Master");
+  });
+
+  it("reports progress toward the next tier", () => {
+    expect(getRankProgress(1000)).toMatchObject({
+      tier: { id: "silver" },
+      nextTier: { id: "gold" },
+      ratingNeededForNextTier: 100,
+      progress: 0.5
+    });
+    expect(getRankProgress(1800)).toMatchObject({
+      tier: { id: "arena-master" },
+      nextTier: null,
+      ratingNeededForNextTier: null,
+      progress: 1
+    });
+  });
+
+  it("awards placement-based ranked coin bonuses", () => {
+    expect([1, 2, 3, 4].map((placement) => getRankedCoinBonus(placement as 1 | 2 | 3 | 4))).toEqual(
+      [60, 35, 20, 10]
+    );
   });
 });

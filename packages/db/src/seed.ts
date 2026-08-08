@@ -85,6 +85,42 @@ const starterCosmetics = [
     coinPrice: 550
   },
   {
+    slug: "gold-division-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Gold Division",
+    description: "Earned by reaching 1100 rating in ranked play.",
+    rarity: "ranked-gold",
+    isSupporter: false,
+    coinPrice: null
+  },
+  {
+    slug: "platinum-division-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Platinum Division",
+    description: "Earned by reaching 1300 rating in ranked play.",
+    rarity: "ranked-platinum",
+    isSupporter: false,
+    coinPrice: null
+  },
+  {
+    slug: "diamond-division-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Diamond Division",
+    description: "Earned by reaching 1500 rating in ranked play.",
+    rarity: "ranked-diamond",
+    isSupporter: false,
+    coinPrice: null
+  },
+  {
+    slug: "arena-master-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Arena Master",
+    description: "Earned by reaching 1800 rating in ranked play.",
+    rarity: "ranked-master",
+    isSupporter: false,
+    coinPrice: null
+  },
+  {
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER" as const,
     name: "Founder Gold",

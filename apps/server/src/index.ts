@@ -13,6 +13,7 @@ import {
   createDeck,
   createInitialGame,
   evaluateLegalMovesByRandomRollouts,
+  getRankedCoinBonus,
   isSameCard,
   RANKS,
   summarizeGame,
@@ -318,6 +319,50 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     rarity: "rare",
     isSupporter: false,
     coinPrice: 550,
+    previewUrl: null
+  },
+  {
+    id: "ranked-gold-division-border",
+    slug: "gold-division-border",
+    kind: "PROFILE_BORDER",
+    name: "Gold Division",
+    description: "Earned by reaching 1100 rating in ranked play.",
+    rarity: "ranked-gold",
+    isSupporter: false,
+    coinPrice: null,
+    previewUrl: null
+  },
+  {
+    id: "ranked-platinum-division-border",
+    slug: "platinum-division-border",
+    kind: "PROFILE_BORDER",
+    name: "Platinum Division",
+    description: "Earned by reaching 1300 rating in ranked play.",
+    rarity: "ranked-platinum",
+    isSupporter: false,
+    coinPrice: null,
+    previewUrl: null
+  },
+  {
+    id: "ranked-diamond-division-border",
+    slug: "diamond-division-border",
+    kind: "PROFILE_BORDER",
+    name: "Diamond Division",
+    description: "Earned by reaching 1500 rating in ranked play.",
+    rarity: "ranked-diamond",
+    isSupporter: false,
+    coinPrice: null,
+    previewUrl: null
+  },
+  {
+    id: "ranked-arena-master-border",
+    slug: "arena-master-border",
+    kind: "PROFILE_BORDER",
+    name: "Arena Master",
+    description: "Earned by reaching 1800 rating in ranked play.",
+    rarity: "ranked-master",
+    isSupporter: false,
+    coinPrice: null,
     previewUrl: null
   },
   {
@@ -1965,7 +2010,7 @@ function applyGuestStats(room: Room, game: GameState): void {
     profile.gamesPlayed += 1;
     profile.wins += placement === 1 ? 1 : 0;
     profile.placementTotal += placement;
-    profile.arenaCoins += getArenaCoinReward(placement);
+    profile.arenaCoins += getArenaCoinReward(placement, room.mode);
 
     if (ratingChange !== undefined) {
       profile.rating = ratingChange.ratingAfter;
@@ -2821,20 +2866,22 @@ function toPlacement(value: number): number {
   return Math.max(1, value);
 }
 
-function getArenaCoinReward(placement: number): number {
+function getArenaCoinReward(placement: number, mode: MatchMode): number {
+  const rankedBonus = mode === "RANKED" ? getRankedCoinBonus(toRankedPlacement(placement)) : 0;
+
   if (placement === 1) {
-    return ARENA_COIN_REWARDS.first;
+    return ARENA_COIN_REWARDS.first + rankedBonus;
   }
 
   if (placement === 2) {
-    return ARENA_COIN_REWARDS.second;
+    return ARENA_COIN_REWARDS.second + rankedBonus;
   }
 
   if (placement === 3) {
-    return ARENA_COIN_REWARDS.third;
+    return ARENA_COIN_REWARDS.third + rankedBonus;
   }
 
-  return ARENA_COIN_REWARDS.other;
+  return ARENA_COIN_REWARDS.other + rankedBonus;
 }
 
 function toRankedPlacement(value: number): 1 | 2 | 3 | 4 {

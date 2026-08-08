@@ -6,6 +6,8 @@ import {
   detectHand,
   generateLegalMoves,
   getCardId,
+  getRankProgress,
+  getRankedCoinBonus,
   getRankStrength,
   getSuitStrength,
   type Card,
@@ -2255,6 +2257,8 @@ function HubRankedCard({
       : queue.etaSeconds === 0
         ? "Matching now"
         : `~${queue.etaSeconds}s ETA`;
+  const rating = profile?.rating ?? 1000;
+  const rankProgress = getRankProgress(rating);
 
   return (
     <section className="online-panel p-5 sm:p-7">
@@ -2269,12 +2273,38 @@ function HubRankedCard({
           </p>
         </div>
       </div>
+      <div className="mb-5 rounded-[1rem] border border-white/10 bg-black/24 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-zinc-500">Current rank</p>
+            <p className="mt-0.5 text-xl font-black">{rankProgress.tier.name}</p>
+          </div>
+          <span className="rounded-full border border-[var(--gold)]/35 bg-[var(--gold)]/12 px-3 py-1 text-sm font-black text-[var(--gold)]">
+            {rating} rating
+          </span>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
+          <div
+            className="h-full rounded-full bg-[var(--gold)] transition-[width] duration-500"
+            style={{ width: `${Math.round(rankProgress.progress * 100)}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs font-semibold text-zinc-400">
+          {rankProgress.nextTier === null
+            ? "Highest division reached."
+            : `${rankProgress.ratingNeededForNextTier} rating to ${rankProgress.nextTier.name}`}
+        </p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ProfileMetric label="Queued" value={`${queuedPlayers}/${requiredPlayers}`} />
         <ProfileMetric label="Position" value={queuePosition} />
         <ProfileMetric label="ETA" value={etaLabel} />
         <ProfileMetric label="Your ELO" value={profile?.rating ?? 1000} />
       </div>
+      <p className="mt-4 text-xs font-semibold leading-5 text-zinc-400">
+        Ranked adds +60 / +35 / +20 / +10 bonus coins by placement. Gold, Platinum, Diamond, and
+        Arena Master each unlock an exclusive profile border.
+      </p>
       <Button
         className="mt-6 h-14 w-full text-lg"
         disabled={!connected || (!joined && !signedIn)}
@@ -3513,8 +3543,8 @@ function CosmeticsSummary({
         </div>
 
         <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
-          Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Cosmetics never
-          change gameplay.
+          Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a
+          placement bonus. Cosmetics never change gameplay.
         </p>
 
         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -3588,7 +3618,11 @@ function getCosmeticMilestone(slug: string): string | null {
     "aqua-profile-border": "win 5 matches",
     "crown-chip-avatar": "win 10 matches",
     "obsidian-table": "win 20 matches",
-    "ember-court-card-back": "finish 25 matches"
+    "ember-court-card-back": "finish 25 matches",
+    "gold-division-border": "reach Gold (1100)",
+    "platinum-division-border": "reach Platinum (1300)",
+    "diamond-division-border": "reach Diamond (1500)",
+    "arena-master-border": "reach Arena Master (1800)"
   };
 
   return milestones[slug] ?? null;
@@ -4419,7 +4453,7 @@ function MatchResultsPanel({
 }) {
   const rows = getPlacementRows(room);
   const yourPlacement = rows.find((row) => row.player.id === room.yourPlayerId)?.placement ?? null;
-  const coinsEarned = yourPlacement === null ? null : getArenaCoinReward(yourPlacement);
+  const coinsEarned = yourPlacement === null ? null : getArenaCoinReward(yourPlacement, room.mode);
   const [showReview, setShowReview] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [simulationReviews, setSimulationReviews] = useState<
@@ -5076,6 +5110,22 @@ function getProfileBorderClass(cosmetic: PublicCosmetic | null): string {
     return "profile-border-founder-gold";
   }
 
+  if (cosmetic?.slug === "gold-division-border") {
+    return "border-amber-300/80 shadow-[0_0_24px_rgba(252,211,77,0.28)]";
+  }
+
+  if (cosmetic?.slug === "platinum-division-border") {
+    return "border-cyan-100/80 shadow-[0_0_24px_rgba(207,250,254,0.24)]";
+  }
+
+  if (cosmetic?.slug === "diamond-division-border") {
+    return "border-sky-300/90 shadow-[0_0_28px_rgba(56,189,248,0.34)]";
+  }
+
+  if (cosmetic?.slug === "arena-master-border") {
+    return "border-fuchsia-300/90 shadow-[0_0_30px_rgba(232,121,249,0.38)]";
+  }
+
   return "border-[var(--gold)]/55";
 }
 
@@ -5143,20 +5193,22 @@ function getPlacementRows(
     );
 }
 
-function getArenaCoinReward(placement: number): number {
+function getArenaCoinReward(placement: number, mode: PublicRoomState["mode"]): number {
+  const rankedBonus = mode === "RANKED" ? getRankedCoinBonus(placement as 1 | 2 | 3 | 4) : 0;
+
   if (placement === 1) {
-    return 120;
+    return 120 + rankedBonus;
   }
 
   if (placement === 2) {
-    return 80;
+    return 80 + rankedBonus;
   }
 
   if (placement === 3) {
-    return 50;
+    return 50 + rankedBonus;
   }
 
-  return 25;
+  return 25 + rankedBonus;
 }
 
 type MoveTimelineRow = {

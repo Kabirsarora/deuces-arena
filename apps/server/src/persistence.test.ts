@@ -4,24 +4,24 @@ import { getEarnedCosmeticUnlockSlugs } from "./persistence.js";
 
 describe("cosmetic progression rules", () => {
   it("does not unlock cosmetics before a completed match", () => {
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 0, wins: 0 })).toEqual([]);
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 0, wins: 0, rating: 1000 })).toEqual([]);
   });
 
   it("unlocks the starter card back after one completed match", () => {
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 1, wins: 0 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 1, wins: 0, rating: 1000 })).toEqual([
       "classic-red-card-back"
     ]);
   });
 
   it("unlocks the table theme after the first win", () => {
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 1, wins: 1 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 1, wins: 1, rating: 1000 })).toEqual([
       "classic-red-card-back",
       "midnight-felt-table"
     ]);
   });
 
   it("unlocks progression cosmetics across games and wins", () => {
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 10, wins: 5 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 10, wins: 5, rating: 1000 })).toEqual([
       "classic-red-card-back",
       "midnight-felt-table",
       "aqua-pulse-avatar",
@@ -30,7 +30,7 @@ describe("cosmetic progression rules", () => {
       "aqua-profile-border"
     ]);
 
-    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 25, wins: 20 })).toEqual([
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 25, wins: 20, rating: 1000 })).toEqual([
       "classic-red-card-back",
       "midnight-felt-table",
       "aqua-pulse-avatar",
@@ -41,5 +41,17 @@ describe("cosmetic progression rules", () => {
       "obsidian-table",
       "ember-court-card-back"
     ]);
+  });
+
+  it("unlocks ranked borders at rating thresholds", () => {
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 2, wins: 1, rating: 1500 })).toContain(
+      "diamond-division-border"
+    );
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 2, wins: 1, rating: 1799 })).not.toContain(
+      "arena-master-border"
+    );
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 2, wins: 1, rating: 1800 })).toContain(
+      "arena-master-border"
+    );
   });
 });
