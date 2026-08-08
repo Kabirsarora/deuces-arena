@@ -121,6 +121,15 @@ const starterCosmetics = [
     coinPrice: null
   },
   {
+    slug: "tournament-champion-border",
+    kind: "PROFILE_BORDER" as const,
+    name: "Bracket Champion",
+    description: "Awarded for winning an eight-player Deuces Arena tournament.",
+    rarity: "tournament",
+    isSupporter: false,
+    coinPrice: null
+  },
+  {
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER" as const,
     name: "Founder Gold",

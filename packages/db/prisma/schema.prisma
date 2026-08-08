@@ -9,6 +9,7 @@ datasource db {
 enum MatchMode {
   CASUAL
   RANKED
+  TOURNAMENT
   LOCAL_DEMO
 }
 

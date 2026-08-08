@@ -21,6 +21,7 @@ import type {
   PublicRankedQueueState,
   PublicReplayDecisionReview,
   PublicRoomState,
+  PublicTournamentQueueState,
   RoomReplayExport,
   ServerAck,
   ServerToClientEvents
@@ -1182,6 +1183,31 @@ describe("realtime rooms", () => {
     expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);
   });
 
+  it("starts two tournament semifinals for eight authenticated humans", async () => {
+    const players = await Promise.all(
+      Array.from({ length: 8 }, (_, index) =>
+        connectTestSocket(`auth-${(index + 20).toString(16).padStart(32, "0")}`)
+      )
+    );
+    const matchedStates = players.map((socket) => waitForRoomState(socket));
+    const joins = await Promise.all(
+      players.map((socket, index) => joinTournament(socket, `Cup Player ${index + 1}`))
+    );
+
+    expect(joins.every((ack) => ack.ok)).toBe(true);
+
+    const states = await Promise.all(matchedStates);
+    const roomCodes = new Set(states.map((state) => state.roomCode));
+
+    expect(roomCodes.size).toBe(2);
+    expect(states.every((state) => state.mode === "TOURNAMENT")).toBe(true);
+    expect(states.every((state) => state.players.length === 4)).toBe(true);
+    expect(states.every((state) => state.players.every((player) => player.kind === "human"))).toBe(
+      true
+    );
+    expect(states.every((state) => state.turnTimer?.secondsPerTurn === 45)).toBe(true);
+  });
+
   it("reports ranked queue position before a match starts", async () => {
     const first = await connectTestSocket("auth-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     const second = await connectTestSocket("auth-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
@@ -1791,6 +1817,15 @@ function joinRanked(
     socket.emit("ranked:join", payload, (ack) => {
       resolve(ack);
     });
+  });
+}
+
+function joinTournament(
+  socket: TestSocket,
+  playerName: string
+): Promise<ServerAck<PublicTournamentQueueState>> {
+  return new Promise((resolve) => {
+    socket.emit("tournament:join", { playerName }, resolve);
   });
 }
 

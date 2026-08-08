@@ -52,6 +52,10 @@ import type {
   PublicRoomPlayer,
   PublicRoomState,
   PublicTradePhaseState,
+  PublicTournament,
+  PublicTournamentMatch,
+  PublicTournamentQueueState,
+  TournamentStage,
   ProfileAvatarKey,
   RoomReplayExport,
   ServerAck,
@@ -73,6 +77,7 @@ import {
   getPersistedBlockedGuestIds,
   getPersistedGuestProfile,
   getPersistedLeaderboard,
+  grantPersistedTournamentRewards,
   getPersistedMatchHistory,
   persistCoachEvaluation,
   persistFeedbackReport,
@@ -123,6 +128,7 @@ type Room = {
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
   trade: RoomTradeState;
+  tournament: { readonly id: string; readonly stage: TournamentStage } | null;
 };
 
 type RoomTimerSettings = {
@@ -155,6 +161,28 @@ type RankedQueuedPlayer = {
   readonly playerName: string;
   readonly guestId: string | null;
   readonly joinedAt: Date;
+};
+
+type TournamentParticipant = {
+  readonly socketId: string;
+  readonly playerName: string;
+  readonly guestId: string;
+};
+
+type TournamentMatch = {
+  readonly stage: TournamentStage;
+  roomCode: string | null;
+  status: PublicTournamentMatch["status"];
+  players: TournamentParticipant[];
+  advancingPlayers: TournamentParticipant[];
+};
+
+type Tournament = {
+  readonly id: string;
+  status: PublicTournament["status"];
+  readonly participants: readonly TournamentParticipant[];
+  readonly matches: TournamentMatch[];
+  champion: TournamentParticipant | null;
 };
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -221,6 +249,7 @@ const BOT_MOVE_DELAY_RANGES: Readonly<
   relaxed: { minMs: 5_800, maxMs: 8_000 }
 };
 const RANKED_REQUIRED_PLAYERS = 4;
+const TOURNAMENT_REQUIRED_PLAYERS = 8;
 const STARTER_COSMETICS: readonly PublicCosmetic[] = [
   {
     id: "starter-classic-red-card-back",
@@ -366,6 +395,17 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "tournament-champion-border",
+    slug: "tournament-champion-border",
+    kind: "PROFILE_BORDER",
+    name: "Bracket Champion",
+    description: "Awarded for winning an eight-player Deuces Arena tournament.",
+    rarity: "tournament",
+    isSupporter: false,
+    coinPrice: null,
+    previewUrl: null
+  },
+  {
     id: "starter-founder-gold-border",
     slug: "founder-gold-border",
     kind: "PROFILE_BORDER",
@@ -387,6 +427,8 @@ const socketRateLimitEvents = new Map<
   Partial<Record<RateLimitBucket, readonly number[]>>
 >();
 let rankedQueue: RankedQueuedPlayer[] = [];
+let tournamentQueue: TournamentParticipant[] = [];
+const tournaments = new Map<string, Tournament>();
 
 const app = express();
 app.use(cors({ origin: CLIENT_ORIGINS }));
@@ -507,6 +549,7 @@ io.on("connection", (socket) => {
 
   socket.on("room:create", async (payload, callback) => {
     removeRankedQueueEntry(socket.id);
+    removeTournamentQueueEntry(socket.id);
     leaveCurrentRoomForSocket();
     const room = createRoom(
       payload.playerName,
@@ -537,6 +580,7 @@ io.on("connection", (socket) => {
 
   socket.on("room:join", async (payload, callback) => {
     removeRankedQueueEntry(socket.id);
+    removeTournamentQueueEntry(socket.id);
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
     if (room === undefined) {
@@ -983,6 +1027,11 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (tournamentQueue.some((entry) => entry.socketId === socket.id)) {
+      callback(fail("Leave the tournament queue before joining ranked."));
+      return;
+    }
+
     const queuedAccount = rankedQueue.find(
       (entry) => entry.guestId === authenticatedProfileId && entry.socketId !== socket.id
     );
@@ -1021,6 +1070,65 @@ io.on("connection", (socket) => {
     removeRankedQueueEntry(socket.id);
     callback(ok(publicRankedQueueState(socket.id)));
     emitRankedQueueState();
+  });
+
+  socket.on("tournament:get", (callback) => {
+    callback(ok(publicTournamentQueueState(socket)));
+  });
+
+  socket.on("tournament:join", async (payload, callback) => {
+    const guestId = socket.data.authProfileId;
+
+    if (guestId === undefined) {
+      callback(fail("Sign in with Google to join tournaments."));
+      return;
+    }
+
+    if (socket.data.roomCode !== undefined) {
+      callback(fail("Leave your current room before joining a tournament."));
+      return;
+    }
+
+    if (rankedQueue.some((entry) => entry.socketId === socket.id)) {
+      callback(fail("Leave the ranked queue before joining a tournament."));
+      return;
+    }
+
+    if (
+      tournamentQueue.some((entry) => entry.guestId === guestId && entry.socketId !== socket.id)
+    ) {
+      callback(fail("This account is already in the tournament queue."));
+      return;
+    }
+
+    if (isProfileSeatedElsewhere(guestId, socket.id)) {
+      callback(fail("This account is already seated at another table."));
+      return;
+    }
+
+    await hydrateBlockedGuestIds(guestId);
+
+    if (!tournamentQueue.some((entry) => entry.socketId === socket.id)) {
+      tournamentQueue = [
+        ...tournamentQueue,
+        {
+          socketId: socket.id,
+          playerName: payload.playerName.trim() || "Tournament Player",
+          guestId
+        }
+      ];
+    }
+
+    callback(ok(publicTournamentQueueState(socket)));
+    emitTournamentQueueState();
+    await maybeStartTournament();
+    emitTournamentQueueState();
+  });
+
+  socket.on("tournament:leave", (callback) => {
+    removeTournamentQueueEntry(socket.id);
+    callback(ok(publicTournamentQueueState(socket)));
+    emitTournamentQueueState();
   });
 
   socket.on("trade:request", (payload, callback) => {
@@ -1495,7 +1603,9 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     clearSocketRateLimits(socket.id);
     removeRankedQueueEntry(socket.id);
+    removeTournamentQueueEntry(socket.id);
     emitRankedQueueState();
+    emitTournamentQueueState();
     emitLobbyState();
 
     const roomCode = socket.data.roomCode;
@@ -1576,7 +1686,8 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
     botPace: "relaxed",
     turnDeadlineAt: null,
     timerTimeout: null,
-    trade: createDisabledTradeState()
+    trade: createDisabledTradeState(),
+    tournament: null
   };
 }
 
@@ -1975,8 +2086,84 @@ function persistLastMove(room: Room): void {
   void persistMoveEvent(room.persistedMatch, event, game);
 
   if (game.status === "complete") {
+    const wasAlreadyApplied = room.statsApplied;
     applyGuestStats(room, game);
     void completePersistedMatch(room.persistedMatch, game);
+
+    if (!wasAlreadyApplied && room.tournament !== null) {
+      advanceTournament(room, game);
+    }
+  }
+}
+
+function advanceTournament(room: Room, game: GameState): void {
+  const tournamentLink = room.tournament;
+
+  if (tournamentLink === null) {
+    return;
+  }
+
+  const tournament = tournaments.get(tournamentLink.id);
+  const match = tournament?.matches.find((candidate) => candidate.stage === tournamentLink.stage);
+
+  if (tournament === undefined || match === undefined || match.status === "complete") {
+    return;
+  }
+
+  const placementPlayerIds = inferPlacements(game);
+  const placedParticipants = placementPlayerIds.flatMap((playerId) => {
+    const guestId = room.players.find((player) => player.id === playerId)?.guestId;
+    const participant = tournament.participants.find((candidate) => candidate.guestId === guestId);
+    return participant === undefined ? [] : [participant];
+  });
+
+  match.status = "complete";
+
+  if (tournamentLink.stage !== "final") {
+    match.advancingPlayers = placedParticipants.slice(0, 2);
+    const semifinalMatches = tournament.matches.filter((candidate) => candidate.stage !== "final");
+
+    if (
+      tournament.status === "semifinals" &&
+      semifinalMatches.every((candidate) => candidate.status === "complete")
+    ) {
+      const finalists = semifinalMatches.flatMap((candidate) => candidate.advancingPlayers);
+      const finalMatch = tournament.matches.find((candidate) => candidate.stage === "final");
+
+      if (finalMatch !== undefined && finalists.length === 4) {
+        tournament.status = "final";
+        finalMatch.players = finalists;
+        void createTournamentRoom(tournament, "final", finalists);
+      }
+    }
+
+    emitTournamentQueueState();
+    return;
+  }
+
+  match.advancingPlayers = placedParticipants.slice(0, 1);
+  tournament.status = "complete";
+  tournament.champion = placedParticipants[0] ?? null;
+  const finalBonuses = [500, 250, 100, 100] as const;
+
+  placedParticipants.forEach((participant, index) => {
+    const profile = getOrCreateGuestProfile(participant.guestId);
+    profile.arenaCoins += finalBonuses[index] ?? 0;
+  });
+  void grantPersistedTournamentRewards(
+    placedParticipants.map((participant, index) => ({
+      guestId: participant.guestId,
+      coins: finalBonuses[index] ?? 0
+    })),
+    tournament.champion?.guestId ?? null
+  );
+  emitTournamentQueueState();
+  emitRoomStatesForTournament(tournament);
+}
+
+function emitRoomStatesForTournament(tournament: Tournament): void {
+  for (const participant of tournament.participants) {
+    emitRoomStatesForGuest(participant.guestId);
   }
 }
 
@@ -2033,6 +2220,7 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     roomCode: room.code,
     mode: room.mode,
     status: room.game?.status ?? "waiting",
+    tournament: room.tournament,
     rules: room.rules,
     botDifficulty: room.botDifficulty,
     botPace: room.botPace,
@@ -2183,6 +2371,23 @@ function emitRankedQueueState(): void {
   }
 }
 
+function emitTournamentQueueState(): void {
+  const socketIds = new Set([
+    ...tournamentQueue.map((entry) => entry.socketId),
+    ...[...tournaments.values()].flatMap((tournament) =>
+      tournament.participants.map((participant) => participant.socketId)
+    )
+  ]);
+
+  for (const socketId of socketIds) {
+    const participantSocket = io.sockets.sockets.get(socketId);
+
+    if (participantSocket !== undefined) {
+      participantSocket.emit("tournament:state", publicTournamentQueueState(participantSocket));
+    }
+  }
+}
+
 function emitRoomStatesForGuest(guestId: string): void {
   for (const room of rooms.values()) {
     if (room.players.some((player) => player.guestId === guestId)) {
@@ -2262,8 +2467,59 @@ function publicRankedQueueState(socketId: string): PublicRankedQueueState {
   };
 }
 
+function publicTournamentQueueState(socket: {
+  readonly id: string;
+  readonly data: SocketData;
+}): PublicTournamentQueueState {
+  const queueIndex = tournamentQueue.findIndex((entry) => entry.socketId === socket.id);
+  const playersNeeded = Math.max(0, TOURNAMENT_REQUIRED_PLAYERS - tournamentQueue.length);
+  const tournament = findTournamentForProfile(socket.data.authProfileId);
+
+  return {
+    queuedPlayers: tournamentQueue.length,
+    requiredPlayers: TOURNAMENT_REQUIRED_PLAYERS,
+    etaSeconds: playersNeeded === 0 ? 0 : playersNeeded * 30,
+    joined: queueIndex >= 0,
+    queuePosition: queueIndex >= 0 ? queueIndex + 1 : null,
+    tournament: tournament === null ? null : toPublicTournament(tournament)
+  };
+}
+
 function removeRankedQueueEntry(socketId: string): void {
   rankedQueue = rankedQueue.filter((entry) => entry.socketId !== socketId);
+}
+
+function removeTournamentQueueEntry(socketId: string): void {
+  tournamentQueue = tournamentQueue.filter((entry) => entry.socketId !== socketId);
+}
+
+function findTournamentForProfile(profileId: string | undefined): Tournament | null {
+  if (profileId === undefined) {
+    return null;
+  }
+
+  return (
+    [...tournaments.values()]
+      .reverse()
+      .find((tournament) =>
+        tournament.participants.some((participant) => participant.guestId === profileId)
+      ) ?? null
+  );
+}
+
+function toPublicTournament(tournament: Tournament): PublicTournament {
+  return {
+    id: tournament.id,
+    status: tournament.status,
+    matches: tournament.matches.map((match) => ({
+      stage: match.stage,
+      roomCode: match.roomCode,
+      status: match.status,
+      playerNames: match.players.map((player) => player.playerName),
+      advancingPlayerNames: match.advancingPlayers.map((player) => player.playerName)
+    })),
+    championName: tournament.champion?.playerName ?? null
+  };
 }
 
 function isProfileSeatedElsewhere(profileId: string, socketId: string): boolean {
@@ -2323,6 +2579,119 @@ async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): P
 
   emitRoomState(room);
   emitLobbyState();
+  scheduleAutomatedTurn(room);
+}
+
+async function maybeStartTournament(): Promise<void> {
+  while (tournamentQueue.length >= TOURNAMENT_REQUIRED_PLAYERS) {
+    const participants = tournamentQueue.slice(0, TOURNAMENT_REQUIRED_PLAYERS);
+    tournamentQueue = tournamentQueue.slice(TOURNAMENT_REQUIRED_PLAYERS);
+    const tournament: Tournament = {
+      id: `tournament-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      status: "semifinals",
+      participants,
+      matches: [
+        {
+          stage: "semifinal-a",
+          roomCode: null,
+          status: "waiting",
+          players: participants.slice(0, 4),
+          advancingPlayers: []
+        },
+        {
+          stage: "semifinal-b",
+          roomCode: null,
+          status: "waiting",
+          players: participants.slice(4, 8),
+          advancingPlayers: []
+        },
+        {
+          stage: "final",
+          roomCode: null,
+          status: "waiting",
+          players: [],
+          advancingPlayers: []
+        }
+      ],
+      champion: null
+    };
+    tournaments.set(tournament.id, tournament);
+
+    await Promise.all([
+      createTournamentRoom(tournament, "semifinal-a", participants.slice(0, 4)),
+      createTournamentRoom(tournament, "semifinal-b", participants.slice(4, 8))
+    ]);
+    emitTournamentQueueState();
+  }
+}
+
+async function createTournamentRoom(
+  tournament: Tournament,
+  stage: TournamentStage,
+  participants: readonly TournamentParticipant[]
+): Promise<void> {
+  const room = createEmptyRoom("TOURNAMENT");
+  room.tournament = { id: tournament.id, stage };
+  room.players = participants.map((participant, index) => {
+    const connectedSocket = io.sockets.sockets.get(participant.socketId);
+    return {
+      ...createHumanPlayer(
+        participant.playerName,
+        participant.socketId,
+        index,
+        participant.guestId
+      ),
+      socketId: connectedSocket?.id ?? null,
+      ready: true
+    };
+  });
+  room.timer = {
+    enabled: true,
+    secondsPerTurn: DEFAULT_TIMER_SECONDS
+  };
+  room.game = createInitialGame(
+    room.players.map((player) => player.id),
+    shuffleDeck()
+  );
+  room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
+  resetTurnTimer(room);
+  rooms.set(room.code, room);
+
+  const match = tournament.matches.find((candidate) => candidate.stage === stage);
+
+  if (match !== undefined) {
+    match.roomCode = room.code;
+    match.status = "in-progress";
+  }
+
+  for (const player of room.players) {
+    if (player.socketId === null) {
+      continue;
+    }
+
+    const matchedSocket = io.sockets.sockets.get(player.socketId);
+    const previousRoomCode = matchedSocket?.data.roomCode;
+
+    if (matchedSocket === undefined) {
+      continue;
+    }
+
+    if (previousRoomCode !== undefined) {
+      matchedSocket.leave(previousRoomCode);
+    }
+
+    matchedSocket.join(room.code);
+    matchedSocket.data = {
+      ...matchedSocket.data,
+      playerId: player.id,
+      roomCode: room.code
+    };
+    matchedSocket.emit("room:state", publicStateForSocket(room, matchedSocket.id));
+  }
+
+  emitRoomState(room);
+  emitLobbyState();
+  emitTournamentQueueState();
   scheduleAutomatedTurn(room);
 }
 

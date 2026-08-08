@@ -1298,6 +1298,57 @@ export async function completePersistedMatch(
   }
 }
 
+export async function grantPersistedTournamentRewards(
+  rewards: readonly { readonly guestId: string; readonly coins: number }[],
+  championGuestId: string | null
+): Promise<void> {
+  const db = await getDb();
+
+  if (db === null) {
+    return;
+  }
+
+  try {
+    await db.prisma.$transaction(
+      rewards.map((reward) =>
+        db.prisma.user.updateMany({
+          where: { guestId: reward.guestId },
+          data: { arenaCoins: { increment: reward.coins } }
+        })
+      )
+    );
+
+    if (championGuestId === null) {
+      return;
+    }
+
+    const [champion, cosmetic] = await Promise.all([
+      db.prisma.user.findUnique({ where: { guestId: championGuestId }, select: { id: true } }),
+      db.prisma.cosmetic.findUnique({
+        where: { slug: "tournament-champion-border" },
+        select: { id: true }
+      })
+    ]);
+
+    if (champion !== null && cosmetic !== null) {
+      await db.prisma.userCosmeticUnlock.upsert({
+        where: {
+          userId_cosmeticId: { userId: champion.id, cosmeticId: cosmetic.id }
+        },
+        create: {
+          userId: champion.id,
+          cosmeticId: cosmetic.id,
+          source: "EARNED",
+          metadata: { reason: "tournament-champion" }
+        },
+        update: {}
+      });
+    }
+  } catch (error) {
+    console.error("Unable to grant tournament rewards.", error);
+  }
+}
+
 export async function abandonPersistedMatch(persistedMatch: PersistedMatch | null): Promise<void> {
   const db = await getDb();
 

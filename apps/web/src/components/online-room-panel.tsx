@@ -37,6 +37,7 @@ import type {
   PublicReplayDecisionReview,
   PublicRoomPlayer,
   PublicRoomState,
+  PublicTournamentQueueState,
   ProfileAvatarKey,
   ServerAck,
   ServerToClientEvents
@@ -68,6 +69,7 @@ import {
   Send,
   ShieldAlert,
   Sparkles,
+  Swords,
   Trophy,
   Users,
   Volume2,
@@ -89,7 +91,7 @@ import { SignInWithGoogleButton, SignOutButton } from "@/components/auth-buttons
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type OnlineHubMode = "bots" | "casual" | "ranked";
+type OnlineHubMode = "bots" | "casual" | "ranked" | "tournament";
 type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
 type RealtimeConnectionStatus = "waking" | "online" | "offline";
@@ -198,6 +200,7 @@ export function OnlineRoomPanel({
   const [leaderboard, setLeaderboard] = useState<readonly PublicLeaderboardEntry[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
   const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
+  const [tournamentQueue, setTournamentQueue] = useState<PublicTournamentQueueState | null>(null);
   const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
@@ -395,6 +398,7 @@ export function OnlineRoomPanel({
       refreshLeaderboard(socket, setLeaderboard);
       refreshLobby(socket, setLobby);
       refreshRankedQueue(socket, setRankedQueue);
+      refreshTournamentQueue(socket, setTournamentQueue);
       refreshMatchHistory(socket, getActiveProfileId(), setMatchHistory);
       refreshCosmetics(socket, setCosmetics);
       const session = loadRoomSession(getActiveProfileId());
@@ -434,6 +438,9 @@ export function OnlineRoomPanel({
     });
     socket.on("ranked:state", (state) => {
       setRankedQueue(state);
+    });
+    socket.on("tournament:state", (state) => {
+      setTournamentQueue(state);
     });
     socket.on("chat:message", (chatMessage) => {
       if (mutedPlayerIdsRef.current.has(chatMessage.playerId)) {
@@ -645,6 +652,28 @@ export function OnlineRoomPanel({
       if (ack.ok) {
         setRankedQueue(ack.data);
         setMessage("Left ranked queue.");
+      } else {
+        setMessage(ack.error);
+      }
+    });
+  }
+
+  function joinTournamentQueue() {
+    socketRef.current?.emit("tournament:join", { playerName }, (ack) => {
+      if (ack.ok) {
+        setTournamentQueue(ack.data);
+        setMessage("Joined the tournament queue. Eight humans are required.");
+      } else {
+        setMessage(ack.error);
+      }
+    });
+  }
+
+  function leaveTournamentQueue() {
+    socketRef.current?.emit("tournament:leave", (ack) => {
+      if (ack.ok) {
+        setTournamentQueue(ack.data);
+        setMessage("Left the tournament queue.");
       } else {
         setMessage(ack.error);
       }
@@ -1174,6 +1203,7 @@ export function OnlineRoomPanel({
         joinCode={joinCode}
         lobby={lobby}
         rankedQueue={rankedQueue}
+        tournamentQueue={tournamentQueue}
         leaderboard={leaderboard}
         matchHistory={matchHistory}
         cosmetics={cosmetics}
@@ -1200,6 +1230,8 @@ export function OnlineRoomPanel({
         onJoinOpenRoom={joinOpenRoom}
         onJoinRanked={joinRankedQueue}
         onLeaveRanked={leaveRankedQueue}
+        onJoinTournament={joinTournamentQueue}
+        onLeaveTournament={leaveTournamentQueue}
         onBotSeatsChange={setBotSeats}
         onDeckTypeChange={setDeckType}
         onPlayerCountChange={setPlayerCount}
@@ -1562,6 +1594,7 @@ function OnlineLobbyHub({
   joinCode,
   lobby,
   rankedQueue,
+  tournamentQueue,
   leaderboard,
   matchHistory,
   cosmetics,
@@ -1588,6 +1621,8 @@ function OnlineLobbyHub({
   onJoinOpenRoom,
   onJoinRanked,
   onLeaveRanked,
+  onJoinTournament,
+  onLeaveTournament,
   onBotSeatsChange,
   onDeckTypeChange,
   onPlayerCountChange,
@@ -1613,6 +1648,7 @@ function OnlineLobbyHub({
   readonly joinCode: string;
   readonly lobby: PublicLobbyState | null;
   readonly rankedQueue: PublicRankedQueueState | null;
+  readonly tournamentQueue: PublicTournamentQueueState | null;
   readonly leaderboard: readonly PublicLeaderboardEntry[];
   readonly matchHistory: readonly PublicMatchHistoryItem[];
   readonly cosmetics: readonly PublicCosmetic[];
@@ -1639,6 +1675,8 @@ function OnlineLobbyHub({
   readonly onJoinOpenRoom: (room: PublicOpenRoom) => void;
   readonly onJoinRanked: () => void;
   readonly onLeaveRanked: () => void;
+  readonly onJoinTournament: () => void;
+  readonly onLeaveTournament: () => void;
   readonly onBotSeatsChange: (count: number) => void;
   readonly onDeckTypeChange: (deckType: DeckType) => void;
   readonly onPlayerCountChange: (count: number) => void;
@@ -1698,7 +1736,7 @@ function OnlineLobbyHub({
               </div>
             </header>
 
-            <div className="mb-5 grid grid-cols-3 gap-2 rounded-full border border-white/10 bg-black/30 p-1.5">
+            <div className="mb-5 grid grid-cols-4 gap-1 rounded-full border border-white/10 bg-black/30 p-1.5 sm:gap-2">
               <HubModeButton
                 mode="bots"
                 activeMode={hubMode}
@@ -1718,6 +1756,13 @@ function OnlineLobbyHub({
                 activeMode={hubMode}
                 icon={<Trophy className="size-6" />}
                 label="Ranked"
+                onSelect={onHubModeChange}
+              />
+              <HubModeButton
+                mode="tournament"
+                activeMode={hubMode}
+                icon={<Swords className="size-6" />}
+                label="Cups"
                 onSelect={onHubModeChange}
               />
             </div>
@@ -1821,6 +1866,16 @@ function OnlineLobbyHub({
                   signedIn={authUser !== null}
                   onJoin={onJoinRanked}
                   onLeave={onLeaveRanked}
+                />
+              ) : null}
+
+              {hubMode === "tournament" ? (
+                <HubTournamentCard
+                  queue={tournamentQueue}
+                  connected={connected}
+                  signedIn={authUser !== null}
+                  onJoin={onJoinTournament}
+                  onLeave={onLeaveTournament}
                 />
               ) : null}
             </div>
@@ -2312,6 +2367,116 @@ function HubRankedCard({
         onClick={joined ? onLeave : onJoin}
       >
         {joined ? "Leave Queue" : signedIn ? "Find Ranked Match" : "Sign in to play ranked"}
+      </Button>
+    </section>
+  );
+}
+
+function HubTournamentCard({
+  queue,
+  connected,
+  signedIn,
+  onJoin,
+  onLeave
+}: {
+  readonly queue: PublicTournamentQueueState | null;
+  readonly connected: boolean;
+  readonly signedIn: boolean;
+  readonly onJoin: () => void;
+  readonly onLeave: () => void;
+}) {
+  const tournament = queue?.tournament ?? null;
+  const joined = queue?.joined ?? false;
+  const activeTournament = tournament !== null && tournament.status !== "complete";
+  const eta =
+    queue?.etaSeconds === null || queue === null ? "ETA pending" : `~${queue.etaSeconds}s`;
+
+  return (
+    <section className="online-panel p-5 sm:p-7">
+      <div className="flex items-center gap-4">
+        <div className="grid size-16 shrink-0 place-items-center rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]">
+          <Swords className="size-8" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-black">Arena Cup</h2>
+          <p className="mt-1 text-sm font-semibold text-zinc-400">
+            8 humans · two semifinals · top 2 advance
+          </p>
+        </div>
+      </div>
+
+      {tournament === null ? (
+        <div className="mt-6 grid grid-cols-3 gap-2">
+          <ProfileMetric
+            label="Queued"
+            value={`${queue?.queuedPlayers ?? 0}/${queue?.requiredPlayers ?? 8}`}
+          />
+          <ProfileMetric
+            label="Position"
+            value={
+              queue?.queuePosition === null || queue === null ? "-" : `#${queue.queuePosition}`
+            }
+          />
+          <ProfileMetric label="ETA" value={eta} />
+        </div>
+      ) : (
+        <div className="mt-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-black uppercase text-[var(--aqua)]">
+              {tournament.status === "complete" ? "Final standings" : tournament.status}
+            </p>
+            <span className="font-mono text-xs text-zinc-500">{tournament.id.slice(-6)}</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {tournament.matches.map((match) => (
+              <div
+                key={match.stage}
+                className="rounded-[0.9rem] border border-white/10 bg-black/24 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-black capitalize">{match.stage.replace("-", " ")}</p>
+                  <span className="text-[10px] font-black uppercase text-zinc-500">
+                    {match.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-zinc-400">
+                  {match.playerNames.length === 0
+                    ? "Waiting for qualifiers"
+                    : match.playerNames.join(" · ")}
+                </p>
+                {match.advancingPlayerNames.length > 0 ? (
+                  <p className="mt-2 text-[11px] font-bold text-emerald-200">
+                    Advance: {match.advancingPlayerNames.join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {tournament.championName !== null ? (
+            <p className="mt-3 text-center text-lg font-black text-[var(--gold)]">
+              Champion: {tournament.championName}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      <p className="mt-5 text-xs font-semibold leading-5 text-zinc-400">
+        Final rewards: champion +500 coins and Bracket Champion border, runner-up +250, other
+        finalists +100. Tournament matches do not change ranked rating.
+      </p>
+      <Button
+        className="mt-5 h-14 w-full text-lg"
+        disabled={!connected || activeTournament || (!joined && !signedIn)}
+        variant={joined ? "secondary" : "primary"}
+        onClick={joined ? onLeave : onJoin}
+      >
+        {activeTournament
+          ? "Tournament in progress"
+          : joined
+            ? "Leave Queue"
+            : signedIn
+              ? "Enter Arena Cup"
+              : "Sign in to enter"}
       </Button>
     </section>
   );
@@ -3059,6 +3224,17 @@ function refreshRankedQueue(
   });
 }
 
+function refreshTournamentQueue(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  setTournamentQueue: (state: PublicTournamentQueueState) => void
+): void {
+  socket.emit("tournament:get", (ack) => {
+    if (ack.ok) {
+      setTournamentQueue(ack.data);
+    }
+  });
+}
+
 function refreshMatchHistory(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   profileId: string,
@@ -3622,7 +3798,8 @@ function getCosmeticMilestone(slug: string): string | null {
     "gold-division-border": "reach Gold (1100)",
     "platinum-division-border": "reach Platinum (1300)",
     "diamond-division-border": "reach Diamond (1500)",
-    "arena-master-border": "reach Arena Master (1800)"
+    "arena-master-border": "reach Arena Master (1800)",
+    "tournament-champion-border": "win an 8-player Arena Cup"
   };
 
   return milestones[slug] ?? null;
@@ -3802,6 +3979,10 @@ function formatCosmeticKind(kind: PublicCosmetic["kind"]): string {
 function formatMatchMode(mode: PublicRoomState["mode"]): string {
   if (mode === "RANKED") {
     return "Ranked";
+  }
+
+  if (mode === "TOURNAMENT") {
+    return "Tournament";
   }
 
   if (mode === "LOCAL_DEMO") {
@@ -4454,6 +4635,10 @@ function MatchResultsPanel({
   const rows = getPlacementRows(room);
   const yourPlacement = rows.find((row) => row.player.id === room.yourPlayerId)?.placement ?? null;
   const coinsEarned = yourPlacement === null ? null : getArenaCoinReward(yourPlacement, room.mode);
+  const tournamentBonus =
+    room.tournament?.stage === "final" && yourPlacement !== null
+      ? ([500, 250, 100, 100] as const)[yourPlacement - 1]
+      : null;
   const [showReview, setShowReview] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [simulationReviews, setSimulationReviews] = useState<
@@ -4514,6 +4699,12 @@ function MatchResultsPanel({
         <div className="mb-3 flex items-center justify-between rounded-[0.8rem] border border-[var(--gold)]/35 bg-[var(--gold)]/10 px-3 py-2">
           <span className="text-xs font-bold text-zinc-200">Match reward</span>
           <span className="text-sm font-black text-[var(--gold)]">+{coinsEarned} Arena Coins</span>
+        </div>
+      ) : null}
+      {tournamentBonus !== null && tournamentBonus !== undefined ? (
+        <div className="mb-3 flex items-center justify-between rounded-[0.8rem] border border-rose-300/35 bg-rose-300/10 px-3 py-2">
+          <span className="text-xs font-bold text-zinc-200">Arena Cup final prize</span>
+          <span className="text-sm font-black text-rose-200">+{tournamentBonus} coins</span>
         </div>
       ) : null}
 
@@ -5124,6 +5315,10 @@ function getProfileBorderClass(cosmetic: PublicCosmetic | null): string {
 
   if (cosmetic?.slug === "arena-master-border") {
     return "border-fuchsia-300/90 shadow-[0_0_30px_rgba(232,121,249,0.38)]";
+  }
+
+  if (cosmetic?.slug === "tournament-champion-border") {
+    return "border-rose-300/90 shadow-[0_0_30px_rgba(251,113,133,0.38)]";
   }
 
   return "border-[var(--gold)]/55";

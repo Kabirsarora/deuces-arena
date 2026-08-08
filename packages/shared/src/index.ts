@@ -17,7 +17,7 @@ export {
 
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
-export type MatchMode = "CASUAL" | "RANKED" | "LOCAL_DEMO";
+export type MatchMode = "CASUAL" | "RANKED" | "TOURNAMENT" | "LOCAL_DEMO";
 export type PublicBotDifficulty = "easy" | "normal" | "hard";
 export type PublicBotPace = "quick" | "normal" | "relaxed";
 export type CosmeticKind =
@@ -135,6 +135,33 @@ export type PublicRankedQueueState = {
   readonly queuePosition: number | null;
 };
 
+export type TournamentStage = "semifinal-a" | "semifinal-b" | "final";
+export type TournamentStatus = "semifinals" | "final" | "complete";
+
+export type PublicTournamentMatch = {
+  readonly stage: TournamentStage;
+  readonly roomCode: string | null;
+  readonly status: "waiting" | "in-progress" | "complete";
+  readonly playerNames: readonly string[];
+  readonly advancingPlayerNames: readonly string[];
+};
+
+export type PublicTournament = {
+  readonly id: string;
+  readonly status: TournamentStatus;
+  readonly matches: readonly PublicTournamentMatch[];
+  readonly championName: string | null;
+};
+
+export type PublicTournamentQueueState = {
+  readonly queuedPlayers: number;
+  readonly requiredPlayers: number;
+  readonly etaSeconds: number | null;
+  readonly joined: boolean;
+  readonly queuePosition: number | null;
+  readonly tournament: PublicTournament | null;
+};
+
 export type PublicRoomPlayer = {
   readonly id: string;
   readonly name: string;
@@ -236,6 +263,7 @@ export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;
   readonly status: RoomStatus;
+  readonly tournament: { readonly id: string; readonly stage: TournamentStage } | null;
   readonly rules: PublicRoomRules;
   readonly botDifficulty: PublicBotDifficulty;
   readonly botPace: PublicBotPace;
@@ -412,6 +440,12 @@ export type ClientToServerEvents = {
     callback: (ack: ServerAck<PublicRankedQueueState>) => void
   ) => void;
   "ranked:leave": (callback: (ack: ServerAck<PublicRankedQueueState>) => void) => void;
+  "tournament:get": (callback: (ack: ServerAck<PublicTournamentQueueState>) => void) => void;
+  "tournament:join": (
+    payload: { readonly playerName: string },
+    callback: (ack: ServerAck<PublicTournamentQueueState>) => void
+  ) => void;
+  "tournament:leave": (callback: (ack: ServerAck<PublicTournamentQueueState>) => void) => void;
   "game:move": (payload: MovePayload, callback: (ack: ServerAck<PublicRoomState>) => void) => void;
   "trade:request": (
     payload: {
@@ -476,6 +510,7 @@ export type ServerToClientEvents = {
   "room:state": (state: PublicRoomState) => void;
   "lobby:state": (state: PublicLobbyState) => void;
   "ranked:state": (state: PublicRankedQueueState) => void;
+  "tournament:state": (state: PublicTournamentQueueState) => void;
   "chat:message": (message: PublicChatMessage) => void;
   "game:error": (payload: { readonly message: string }) => void;
 };
