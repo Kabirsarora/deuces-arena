@@ -28,6 +28,7 @@ import type {
   FeedbackKind,
   InterServerEvents,
   MatchMode,
+  PlayerReportReason,
   PublicBotDifficulty,
   PublicBotPace,
   PublicChatMessage,
@@ -41,6 +42,7 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicModerationReceipt,
   PublicMoveEvaluation,
   PublicRankedQueueState,
   PublicReplayDecisionReview,
@@ -66,14 +68,17 @@ import {
   createPersistedMatch,
   equipPersistedCosmetic,
   getPersistedCosmetics,
+  getPersistedBlockedGuestIds,
   getPersistedGuestProfile,
   getPersistedLeaderboard,
   getPersistedMatchHistory,
   persistCoachEvaluation,
   persistFeedbackReport,
+  persistPlayerReport,
   persistMoveEvent,
   purchasePersistedCosmetic,
   savePersistedReplayLabel,
+  setPersistedUserBlock,
   updatePersistedGuestProfile,
   type PersistedMatch
 } from "./persistence.js";
@@ -134,7 +139,7 @@ type RoomTradeState = {
   timeout: NodeJS.Timeout | null;
 };
 
-type RateLimitBucket = "chat" | "coach" | "feedback" | "replay-label";
+type RateLimitBucket = "chat" | "coach" | "feedback" | "moderation-report" | "replay-label";
 
 type RateLimitRule = {
   readonly maxEvents: number;
@@ -187,6 +192,11 @@ const RATE_LIMITS: Readonly<Record<RateLimitBucket, RateLimitRule>> = {
     maxEvents: 3,
     windowMs: 60_000,
     message: "Please wait before sending more feedback."
+  },
+  "moderation-report": {
+    maxEvents: 5,
+    windowMs: 60 * 60_000,
+    message: "You have submitted several reports. Please wait before sending another."
   },
   "replay-label": {
     maxEvents: 10,
@@ -324,6 +334,7 @@ const rooms = new Map<string, Room>();
 const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
 const guestReplayLabels = new Map<string, readonly string[]>();
+const blockedGuestIdsByGuestId = new Map<string, Set<string>>();
 const socketRateLimitEvents = new Map<
   string,
   Partial<Record<RateLimitBucket, readonly number[]>>
@@ -447,7 +458,7 @@ io.on("connection", (socket) => {
     clearSocketRoomData();
   }
 
-  socket.on("room:create", (payload, callback) => {
+  socket.on("room:create", async (payload, callback) => {
     removeRankedQueueEntry(socket.id);
     leaveCurrentRoomForSocket();
     const room = createRoom(
@@ -468,13 +479,16 @@ io.on("connection", (socket) => {
       roomCode: room.code
     };
     socket.join(room.code);
+    if (player.guestId !== null) {
+      await hydrateBlockedGuestIds(player.guestId);
+    }
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
   });
 
-  socket.on("room:join", (payload, callback) => {
+  socket.on("room:join", async (payload, callback) => {
     removeRankedQueueEntry(socket.id);
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -513,13 +527,16 @@ io.on("connection", (socket) => {
       roomCode: room.code
     };
     socket.join(room.code);
+    if (player.guestId !== null) {
+      await hydrateBlockedGuestIds(player.guestId);
+    }
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
     emitLobbyState();
   });
 
-  socket.on("room:reconnect", (payload, callback) => {
+  socket.on("room:reconnect", async (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
     if (room === undefined) {
@@ -554,6 +571,9 @@ io.on("connection", (socket) => {
       roomCode: room.code
     };
     socket.join(room.code);
+    if (player.guestId !== null) {
+      await hydrateBlockedGuestIds(player.guestId);
+    }
 
     callback(ok(publicStateForSocket(room, socket.id)));
     emitRoomState(room);
@@ -703,6 +723,7 @@ io.on("connection", (socket) => {
       return;
     }
 
+    await hydrateBlockedGuestIds(guestId);
     callback(ok(await publicGuestProfile(guestId)));
   });
 
@@ -887,6 +908,8 @@ io.on("connection", (socket) => {
       callback(fail("This account is already seated at another table."));
       return;
     }
+
+    await hydrateBlockedGuestIds(authenticatedProfileId);
 
     if (!rankedQueue.some((entry) => entry.socketId === socket.id)) {
       rankedQueue = [
@@ -1149,7 +1172,100 @@ io.on("connection", (socket) => {
 
     room.chatMessages = [...room.chatMessages, message].slice(-MAX_CHAT_MESSAGES_PER_ROOM);
     callback(ok(message));
-    io.to(room.code).emit("chat:message", message);
+    emitChatMessage(room, message);
+  });
+
+  socket.on("moderation:block", async (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+    const player = room?.players.find((candidate) => candidate.socketId === socket.id);
+    const target = room?.players.find((candidate) => candidate.id === payload.targetPlayerId);
+
+    if (room === undefined || player === undefined || target === undefined) {
+      callback(fail("Player not found."));
+      return;
+    }
+
+    if (
+      player.id === target.id ||
+      player.guestId === null ||
+      target.guestId === null ||
+      target.kind === "bot"
+    ) {
+      callback(fail("This player cannot be blocked."));
+      return;
+    }
+
+    const blockedGuestIds = blockedGuestIdsByGuestId.get(player.guestId) ?? new Set<string>();
+
+    if (payload.blocked) {
+      blockedGuestIds.add(target.guestId);
+    } else {
+      blockedGuestIds.delete(target.guestId);
+    }
+
+    blockedGuestIdsByGuestId.set(player.guestId, blockedGuestIds);
+    void setPersistedUserBlock({
+      blockerGuestId: player.guestId,
+      blockedGuestId: target.guestId,
+      blocked: payload.blocked
+    });
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+  });
+
+  socket.on("moderation:report", async (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+    const player = room?.players.find((candidate) => candidate.socketId === socket.id);
+    const target = room?.players.find((candidate) => candidate.id === payload.targetPlayerId);
+    const reason = normalizePlayerReportReason(payload.reason);
+
+    if (room === undefined || player === undefined || target === undefined) {
+      callback(fail("Player not found."));
+      return;
+    }
+
+    if (
+      player.id === target.id ||
+      player.guestId === null ||
+      target.guestId === null ||
+      target.kind === "bot"
+    ) {
+      callback(fail("This player cannot be reported."));
+      return;
+    }
+
+    if (reason === null) {
+      callback(fail("Choose a valid report reason."));
+      return;
+    }
+
+    const rateLimitError = checkSocketRateLimit(socket.id, "moderation-report");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    const message =
+      typeof payload.messageId === "string"
+        ? (room.chatMessages.find(
+            (candidate) => candidate.id === payload.messageId && candidate.playerId === target.id
+          ) ?? null)
+        : null;
+    const createdAt = new Date();
+    const receipt: PublicModerationReceipt = await persistPlayerReport({
+      id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      reporterGuestId: player.guestId,
+      reportedGuestId: target.guestId,
+      roomCode: room.code,
+      messageId: message?.id ?? null,
+      messageBody: message?.body ?? null,
+      reason,
+      details: normalizeReportDetails(payload.details),
+      createdAt
+    });
+
+    callback(ok(receipt));
   });
 
   socket.on("coach:evaluate", (payload, callback) => {
@@ -1801,6 +1917,10 @@ function applyGuestStats(room: Room, game: GameState): void {
 
 function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
   const player = room.players.find((candidate) => candidate.socketId === socketId);
+  const blockedGuestIds =
+    player?.guestId === null || player?.guestId === undefined
+      ? new Set<string>()
+      : (blockedGuestIdsByGuestId.get(player.guestId) ?? new Set<string>());
   const hand =
     room.game === null || player === undefined ? [] : getGamePlayer(room.game, player.id).hand;
 
@@ -1820,7 +1940,17 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
       ? room.game.events
       : (room.game?.events.slice(-12) ?? [])
     ).map(toPublicGameEvent),
-    recentChat: room.chatMessages.slice(-20),
+    recentChat: room.chatMessages
+      .filter((message) => {
+        const sender = room.players.find((candidate) => candidate.id === message.playerId);
+        return sender?.guestId === null || sender?.guestId === undefined
+          ? true
+          : !blockedGuestIds.has(sender.guestId);
+      })
+      .slice(-20),
+    blockedPlayerIds: room.players.flatMap((candidate) =>
+      candidate.guestId !== null && blockedGuestIds.has(candidate.guestId) ? [candidate.id] : []
+    ),
     tradePhase: publicTradePhase(room, player?.id ?? null),
     turnTimer: publicTurnTimer(room),
     yourPlayerId: player?.id ?? null,
@@ -1903,6 +2033,37 @@ function emitRoomState(room: Room): void {
     if (player.socketId !== null) {
       io.to(player.socketId).emit("room:state", publicStateForSocket(room, player.socketId));
     }
+  }
+}
+
+function emitChatMessage(room: Room, message: PublicChatMessage): void {
+  const sender = room.players.find((candidate) => candidate.id === message.playerId);
+
+  for (const recipient of room.players) {
+    if (recipient.socketId === null) {
+      continue;
+    }
+
+    const blockedGuestIds =
+      recipient.guestId === null ? undefined : blockedGuestIdsByGuestId.get(recipient.guestId);
+
+    if (
+      sender?.guestId !== null &&
+      sender?.guestId !== undefined &&
+      blockedGuestIds?.has(sender.guestId)
+    ) {
+      continue;
+    }
+
+    io.to(recipient.socketId).emit("chat:message", message);
+  }
+}
+
+async function hydrateBlockedGuestIds(guestId: string): Promise<void> {
+  const persistedBlockedGuestIds = await getPersistedBlockedGuestIds(guestId);
+
+  if (persistedBlockedGuestIds !== null) {
+    blockedGuestIdsByGuestId.set(guestId, new Set(persistedBlockedGuestIds));
   }
 }
 
@@ -2126,6 +2287,30 @@ function normalizeFeedbackBody(body: string): string | null {
   }
 
   return normalized;
+}
+
+function normalizePlayerReportReason(reason: PlayerReportReason): PlayerReportReason | null {
+  if (
+    reason === "HARASSMENT" ||
+    reason === "HATE_SPEECH" ||
+    reason === "SPAM" ||
+    reason === "CHEATING" ||
+    reason === "INAPPROPRIATE_NAME" ||
+    reason === "OTHER"
+  ) {
+    return reason;
+  }
+
+  return null;
+}
+
+function normalizeReportDetails(details: string | undefined): string | null {
+  if (details === undefined) {
+    return null;
+  }
+
+  const normalized = details.replace(/\s+/g, " ").trim().slice(0, 500);
+  return normalized === "" ? null : normalized;
 }
 
 function normalizeContactEmail(email: string | undefined): string | null {

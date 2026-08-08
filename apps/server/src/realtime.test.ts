@@ -16,6 +16,7 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicModerationReceipt,
   PublicMoveEvaluation,
   PublicRankedQueueState,
   PublicReplayDecisionReview,
@@ -1279,6 +1280,95 @@ describe("realtime rooms", () => {
     expect(broadcast.playerName).toBe("Host");
   });
 
+  it("blocks player chat history and accepts structured moderation reports", async () => {
+    const host = await connectTestSocket();
+    const guest = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Safety Host",
+      guestId: "guest-safety-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    const joinedRoom = await joinRoom(guest, {
+      roomCode: createdRoom.data.roomCode,
+      playerName: "Safety Guest",
+      guestId: "guest-safety-guest"
+    });
+
+    expect(joinedRoom.ok).toBe(true);
+
+    if (!joinedRoom.ok) {
+      return;
+    }
+
+    const hostPlayerId = createdRoom.data.yourPlayerId;
+
+    if (hostPlayerId === null) {
+      throw new Error("Expected host player id.");
+    }
+
+    const firstMessage = await sendChat(host, {
+      roomCode: createdRoom.data.roomCode,
+      body: "message to moderate"
+    });
+
+    expect(firstMessage.ok).toBe(true);
+
+    if (!firstMessage.ok) {
+      return;
+    }
+
+    const blockAck = await setPlayerBlocked(guest, {
+      roomCode: createdRoom.data.roomCode,
+      targetPlayerId: hostPlayerId,
+      blocked: true
+    });
+
+    expect(blockAck.ok).toBe(true);
+
+    if (!blockAck.ok) {
+      return;
+    }
+
+    expect(blockAck.data.blockedPlayerIds).toContain(hostPlayerId);
+    expect(blockAck.data.recentChat).toEqual([]);
+
+    const reportAck = await reportPlayer(guest, {
+      roomCode: createdRoom.data.roomCode,
+      targetPlayerId: hostPlayerId,
+      messageId: firstMessage.data.id,
+      reason: "HARASSMENT",
+      details: "Repeated unwanted comments."
+    });
+
+    expect(reportAck.ok).toBe(true);
+
+    if (reportAck.ok) {
+      expect(reportAck.data.id).toMatch(/^report-/);
+      expect(reportAck.data.stored).toBe(false);
+    }
+
+    const unblockAck = await setPlayerBlocked(guest, {
+      roomCode: createdRoom.data.roomCode,
+      targetPlayerId: hostPlayerId,
+      blocked: false
+    });
+
+    expect(unblockAck.ok).toBe(true);
+
+    if (unblockAck.ok) {
+      expect(unblockAck.data.blockedPlayerIds).not.toContain(hostPlayerId);
+      expect(unblockAck.data.recentChat.map((message) => message.id)).toContain(
+        firstMessage.data.id
+      );
+    }
+  });
+
   it("only evaluates moves for the active player", async () => {
     const players = await Promise.all([
       connectTestSocket(),
@@ -1729,6 +1819,30 @@ function sendChat(socket: TestSocket, payload: ChatPayload): Promise<ServerAck<P
     socket.emit("chat:send", payload, (ack) => {
       resolve(ack);
     });
+  });
+}
+
+function setPlayerBlocked(
+  socket: TestSocket,
+  payload: { readonly roomCode: string; readonly targetPlayerId: string; readonly blocked: boolean }
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("moderation:block", payload, resolve);
+  });
+}
+
+function reportPlayer(
+  socket: TestSocket,
+  payload: {
+    readonly roomCode: string;
+    readonly targetPlayerId: string;
+    readonly messageId?: string;
+    readonly reason: "HARASSMENT";
+    readonly details?: string;
+  }
+): Promise<ServerAck<PublicModerationReceipt>> {
+  return new Promise((resolve) => {
+    socket.emit("moderation:report", payload, resolve);
   });
 }
 

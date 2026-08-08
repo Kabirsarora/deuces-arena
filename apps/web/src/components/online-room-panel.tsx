@@ -18,6 +18,7 @@ import type {
   ClientToServerEvents,
   CosmeticKind,
   FeedbackKind,
+  PlayerReportReason,
   PublicBotDifficulty,
   PublicBotPace,
   PublicChatMessage,
@@ -28,6 +29,7 @@ import type {
   PublicLeaderboardEntry,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicModerationReceipt,
   PublicOpenRoom,
   PublicRankedQueueState,
   PublicReplayDecisionReview,
@@ -42,6 +44,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
   BookOpen,
   Bot,
   CheckCircle2,
@@ -61,9 +64,12 @@ import {
   Play,
   RotateCcw,
   Send,
+  ShieldAlert,
   Sparkles,
   Trophy,
   Users,
+  Volume2,
+  VolumeX,
   X
 } from "lucide-react";
 import {
@@ -91,6 +97,12 @@ type AuthUser = {
   readonly name: string | null;
   readonly email: string | null;
   readonly image: string | null;
+};
+type ReportPlayerInput = {
+  readonly targetPlayerId: string;
+  readonly reason: PlayerReportReason;
+  readonly details?: string;
+  readonly messageId?: string;
 };
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000";
@@ -143,6 +155,17 @@ const FEEDBACK_KIND_OPTIONS: readonly { readonly value: FeedbackKind; readonly l
   { value: "UI", label: "UI" },
   { value: "BALANCE", label: "Balance" }
 ];
+const REPORT_REASON_OPTIONS: readonly {
+  readonly value: PlayerReportReason;
+  readonly label: string;
+}[] = [
+  { value: "HARASSMENT", label: "Harassment" },
+  { value: "HATE_SPEECH", label: "Hate speech" },
+  { value: "SPAM", label: "Spam" },
+  { value: "CHEATING", label: "Cheating" },
+  { value: "INAPPROPRIATE_NAME", label: "Inappropriate name" },
+  { value: "OTHER", label: "Other" }
+];
 const CLASSIC_CLOCKWISE_SEAT_LAYOUT: readonly string[] = [
   "bottom-5 left-1/2 -translate-x-1/2",
   "left-4 top-1/2 -translate-y-1/2 sm:left-6",
@@ -160,6 +183,7 @@ export function OnlineRoomPanel({
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const lastCompletionRefreshRef = useRef<string | null>(null);
   const lastObservedChatKeyRef = useRef<string | null>(null);
+  const mutedPlayerIdsRef = useRef<Set<string>>(new Set());
   const shouldReduceMotion = useReducedMotion();
   const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>("waking");
   const [playerName, setPlayerName] = useState("Player");
@@ -194,6 +218,7 @@ export function OnlineRoomPanel({
   const [dealAnimationKey, setDealAnimationKey] = useState<string | null>(null);
   const [handDealtVisible, setHandDealtVisible] = useState(true);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [mutedPlayerIds, setMutedPlayerIds] = useState<ReadonlySet<string>>(new Set());
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
   const connected = connectionStatus === "online";
 
@@ -299,6 +324,10 @@ export function OnlineRoomPanel({
   }, [handSortMode]);
 
   useEffect(() => {
+    mutedPlayerIdsRef.current = new Set(mutedPlayerIds);
+  }, [mutedPlayerIds]);
+
+  useEffect(() => {
     setManualCardOrderIds((current) => normalizeManualCardOrder(current, room?.yourHand ?? []));
   }, [room?.yourHand]);
 
@@ -392,6 +421,10 @@ export function OnlineRoomPanel({
       setRankedQueue(state);
     });
     socket.on("chat:message", (chatMessage) => {
+      if (mutedPlayerIdsRef.current.has(chatMessage.playerId)) {
+        return;
+      }
+
       setRoom((currentRoom) =>
         currentRoom === null
           ? currentRoom
@@ -819,6 +852,79 @@ export function OnlineRoomPanel({
     });
   }
 
+  function toggleMutePlayer(playerId: string) {
+    setMutedPlayerIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(playerId)) {
+        next.delete(playerId);
+        setMessage("Player unmuted.");
+      } else {
+        next.add(playerId);
+        setMessage("Player muted for this session.");
+      }
+
+      return next;
+    });
+  }
+
+  function setPlayerBlocked(playerId: string, blocked: boolean) {
+    if (room === null) {
+      return;
+    }
+
+    socketRef.current?.emit(
+      "moderation:block",
+      { roomCode: room.roomCode, targetPlayerId: playerId, blocked },
+      (ack) => {
+        if (ack.ok) {
+          setRoom(ack.data);
+          setMutedPlayerIds((current) => {
+            const next = new Set(current);
+            if (blocked) {
+              next.add(playerId);
+            } else {
+              next.delete(playerId);
+            }
+            return next;
+          });
+          setMessage(blocked ? "Player blocked. Their chat is hidden." : "Player unblocked.");
+        } else {
+          setMessage(ack.error);
+        }
+      }
+    );
+  }
+
+  function reportPlayer(input: {
+    readonly targetPlayerId: string;
+    readonly reason: PlayerReportReason;
+    readonly details?: string;
+    readonly messageId?: string;
+  }): Promise<ServerAck<PublicModerationReceipt>> {
+    return new Promise((resolve) => {
+      if (room === null || socketRef.current === null) {
+        resolve({ ok: false, error: "Join a room before reporting a player." });
+        return;
+      }
+
+      socketRef.current.emit(
+        "moderation:report",
+        {
+          roomCode: room.roomCode,
+          targetPlayerId: input.targetPlayerId,
+          reason: input.reason,
+          ...(input.details === undefined ? {} : { details: input.details }),
+          ...(input.messageId === undefined ? {} : { messageId: input.messageId })
+        },
+        (ack) => {
+          setMessage(ack.ok ? "Report submitted for review." : ack.error);
+          resolve(ack);
+        }
+      );
+    });
+  }
+
   function submitFeedback(input: {
     readonly kind: FeedbackKind;
     readonly body: string;
@@ -1180,6 +1286,10 @@ export function OnlineRoomPanel({
             onCreateBotGame={createBotGame}
             onLeaveRoom={leaveRoom}
             onReviewDecisions={reviewCompletedMatch}
+            mutedPlayerIds={mutedPlayerIds}
+            onToggleMute={toggleMutePlayer}
+            onSetBlocked={setPlayerBlocked}
+            onReportPlayer={reportPlayer}
           />
           {room.tradePhase.status === "open" ? (
             <TradePhaseOverlay
@@ -1199,6 +1309,9 @@ export function OnlineRoomPanel({
             room={room}
             onClose={() => setActiveTablePanel(null)}
             onSendChat={sendChat}
+            mutedPlayerIds={mutedPlayerIds}
+            onToggleMute={toggleMutePlayer}
+            onReportPlayer={reportPlayer}
           />
         </section>
 
@@ -3630,12 +3743,20 @@ function ActiveTableDrawer({
   panel,
   room,
   onClose,
-  onSendChat
+  onSendChat,
+  mutedPlayerIds,
+  onToggleMute,
+  onReportPlayer
 }: {
   readonly panel: ActiveTablePanel | null;
   readonly room: PublicRoomState | null;
   readonly onClose: () => void;
   readonly onSendChat: (body: string) => void;
+  readonly mutedPlayerIds: ReadonlySet<string>;
+  readonly onToggleMute: (playerId: string) => void;
+  readonly onReportPlayer: (
+    input: ReportPlayerInput
+  ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
   if (panel === null) {
     return null;
@@ -3658,7 +3779,15 @@ function ActiveTableDrawer({
       </div>
 
       {panel === "chat" ? (
-        <RoomChat messages={room?.recentChat ?? []} disabled={room === null} onSend={onSendChat} />
+        <RoomChat
+          messages={room?.recentChat ?? []}
+          disabled={room === null}
+          mutedPlayerIds={mutedPlayerIds}
+          yourPlayerId={room?.yourPlayerId ?? null}
+          onSend={onSendChat}
+          onToggleMute={onToggleMute}
+          onReportPlayer={onReportPlayer}
+        />
       ) : null}
 
       {panel === "rules" ? <TableRulesPanel room={room} /> : null}
@@ -3727,14 +3856,26 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
 function RoomChat({
   messages,
   disabled,
-  onSend
+  mutedPlayerIds,
+  yourPlayerId,
+  onSend,
+  onToggleMute,
+  onReportPlayer
 }: {
   readonly messages: readonly PublicChatMessage[];
   readonly disabled: boolean;
+  readonly mutedPlayerIds: ReadonlySet<string>;
+  readonly yourPlayerId: string | null;
   readonly onSend: (body: string) => void;
+  readonly onToggleMute: (playerId: string) => void;
+  readonly onReportPlayer: (
+    input: ReportPlayerInput
+  ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
   const [draft, setDraft] = useState("");
+  const [reportingMessageId, setReportingMessageId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const visibleMessages = messages.filter((message) => !mutedPlayerIds.has(message.playerId));
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -3758,19 +3899,61 @@ function RoomChat({
           <MessageCircle className="size-3.5 text-[var(--gold)]" />
           Table Chat
         </span>
-        <span className="text-[10px] text-zinc-500">{messages.length} recent</span>
+        <span className="text-[10px] text-zinc-500">{visibleMessages.length} recent</span>
       </div>
 
       <div className="mt-2 max-h-28 overflow-y-auto pr-1">
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <p className="py-3 text-center text-xs text-zinc-500">No messages yet.</p>
         ) : (
-          messages.slice(-4).map((chatMessage) => (
+          visibleMessages.slice(-8).map((chatMessage) => (
             <div key={chatMessage.id} className="mb-2 last:mb-0">
-              <p className="truncate text-[11px] font-bold text-zinc-300">
-                {chatMessage.playerName}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-[11px] font-bold text-zinc-300">
+                  {chatMessage.playerName}
+                </p>
+                {chatMessage.playerId !== yourPlayerId ? (
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      className="rounded p-1 text-zinc-500 transition hover:bg-white/8 hover:text-white"
+                      type="button"
+                      aria-label={`Mute ${chatMessage.playerName}`}
+                      title={`Mute ${chatMessage.playerName}`}
+                      onClick={() => onToggleMute(chatMessage.playerId)}
+                    >
+                      <VolumeX className="size-3" />
+                    </button>
+                    <button
+                      className="rounded p-1 text-zinc-500 transition hover:bg-red-400/10 hover:text-red-200"
+                      type="button"
+                      aria-label={`Report message from ${chatMessage.playerName}`}
+                      title="Report message"
+                      onClick={() =>
+                        setReportingMessageId((current) =>
+                          current === chatMessage.id ? null : chatMessage.id
+                        )
+                      }
+                    >
+                      <ShieldAlert className="size-3" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               <p className="break-words text-xs text-zinc-400">{chatMessage.body}</p>
+              {reportingMessageId === chatMessage.id ? (
+                <PlayerReportForm
+                  targetPlayerId={chatMessage.playerId}
+                  messageId={chatMessage.id}
+                  onCancel={() => setReportingMessageId(null)}
+                  onSubmit={async (input) => {
+                    const result = await onReportPlayer(input);
+                    if (result.ok) {
+                      setReportingMessageId(null);
+                    }
+                    return result;
+                  }}
+                />
+              ) : null}
             </div>
           ))
         )}
@@ -3960,7 +4143,11 @@ function OnlineTable({
   dealAnimationKey,
   onCreateBotGame,
   onLeaveRoom,
-  onReviewDecisions
+  onReviewDecisions,
+  mutedPlayerIds,
+  onToggleMute,
+  onSetBlocked,
+  onReportPlayer
 }: {
   readonly room: PublicRoomState | null;
   readonly timerNow: number;
@@ -3968,6 +4155,12 @@ function OnlineTable({
   readonly onCreateBotGame: () => void;
   readonly onLeaveRoom: () => void;
   readonly onReviewDecisions: () => Promise<ServerAck<readonly PublicReplayDecisionReview[]>>;
+  readonly mutedPlayerIds: ReadonlySet<string>;
+  readonly onToggleMute: (playerId: string) => void;
+  readonly onSetBlocked: (playerId: string, blocked: boolean) => void;
+  readonly onReportPlayer: (
+    input: ReportPlayerInput
+  ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
   const players = room?.players ?? [];
   const yourPlayer = players.find((player) => player.id === room?.yourPlayerId) ?? players[0];
@@ -4064,6 +4257,14 @@ function OnlineTable({
           <PlayerStatsPopover
             key={selectedStatsPlayer.id}
             player={selectedStatsPlayer}
+            canModerate={
+              selectedStatsPlayer.kind === "human" && selectedStatsPlayer.id !== room?.yourPlayerId
+            }
+            muted={mutedPlayerIds.has(selectedStatsPlayer.id)}
+            blocked={room?.blockedPlayerIds.includes(selectedStatsPlayer.id) ?? false}
+            onToggleMute={() => onToggleMute(selectedStatsPlayer.id)}
+            onSetBlocked={(blocked) => onSetBlocked(selectedStatsPlayer.id, blocked)}
+            onReportPlayer={onReportPlayer}
             onClose={() => setSelectedStatsPlayerId(null)}
           />
         ) : null}
@@ -4130,6 +4331,10 @@ function OnlineTable({
               onCreateBotGame={onCreateBotGame}
               onLeaveRoom={onLeaveRoom}
               onReviewDecisions={onReviewDecisions}
+              mutedPlayerIds={mutedPlayerIds}
+              onToggleMute={onToggleMute}
+              onSetBlocked={onSetBlocked}
+              onReportPlayer={onReportPlayer}
             />
           ) : null}
         </div>
@@ -4142,12 +4347,22 @@ function MatchResultsPanel({
   room,
   onCreateBotGame,
   onLeaveRoom,
-  onReviewDecisions
+  onReviewDecisions,
+  mutedPlayerIds,
+  onToggleMute,
+  onSetBlocked,
+  onReportPlayer
 }: {
   readonly room: PublicRoomState;
   readonly onCreateBotGame: () => void;
   readonly onLeaveRoom: () => void;
   readonly onReviewDecisions: () => Promise<ServerAck<readonly PublicReplayDecisionReview[]>>;
+  readonly mutedPlayerIds: ReadonlySet<string>;
+  readonly onToggleMute: (playerId: string) => void;
+  readonly onSetBlocked: (playerId: string, blocked: boolean) => void;
+  readonly onReportPlayer: (
+    input: ReportPlayerInput
+  ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
   const rows = getPlacementRows(room);
   const [showReview, setShowReview] = useState(false);
@@ -4413,6 +4628,14 @@ function MatchResultsPanel({
           <PlayerStatsPopover
             key={selectedStatsPlayer.id}
             player={selectedStatsPlayer}
+            canModerate={
+              selectedStatsPlayer.kind === "human" && selectedStatsPlayer.id !== room.yourPlayerId
+            }
+            muted={mutedPlayerIds.has(selectedStatsPlayer.id)}
+            blocked={room.blockedPlayerIds.includes(selectedStatsPlayer.id)}
+            onToggleMute={() => onToggleMute(selectedStatsPlayer.id)}
+            onSetBlocked={(blocked) => onSetBlocked(selectedStatsPlayer.id, blocked)}
+            onReportPlayer={onReportPlayer}
             onClose={() => setSelectedStatsPlayerId(null)}
           />
         ) : null}
@@ -4552,12 +4775,27 @@ function OnlineSeat({
 
 function PlayerStatsPopover({
   player,
+  canModerate,
+  muted,
+  blocked,
+  onToggleMute,
+  onSetBlocked,
+  onReportPlayer,
   onClose
 }: {
   readonly player: PublicRoomPlayer;
+  readonly canModerate: boolean;
+  readonly muted: boolean;
+  readonly blocked: boolean;
+  readonly onToggleMute: () => void;
+  readonly onSetBlocked: (blocked: boolean) => void;
+  readonly onReportPlayer: (
+    input: ReportPlayerInput
+  ) => Promise<ServerAck<PublicModerationReceipt>>;
   readonly onClose: () => void;
 }) {
   const stats = player.stats;
+  const [showReport, setShowReport] = useState(false);
 
   return (
     <motion.aside
@@ -4590,7 +4828,108 @@ function PlayerStatsPopover({
           }
         />
       </div>
+
+      {canModerate ? (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <div className="grid grid-cols-3 gap-1.5">
+            <Button size="sm" variant="secondary" onClick={onToggleMute}>
+              {muted ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+              {muted ? "Unmute" : "Mute"}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => onSetBlocked(!blocked)}>
+              <Ban className="size-3.5" />
+              {blocked ? "Unblock" : "Block"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowReport((current) => !current)}
+            >
+              <ShieldAlert className="size-3.5" />
+              Report
+            </Button>
+          </div>
+          {showReport ? (
+            <PlayerReportForm
+              targetPlayerId={player.id}
+              onCancel={() => setShowReport(false)}
+              onSubmit={async (input) => {
+                const result = await onReportPlayer(input);
+                if (result.ok) {
+                  setShowReport(false);
+                }
+                return result;
+              }}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </motion.aside>
+  );
+}
+
+function PlayerReportForm({
+  targetPlayerId,
+  messageId,
+  onCancel,
+  onSubmit
+}: {
+  readonly targetPlayerId: string;
+  readonly messageId?: string;
+  readonly onCancel: () => void;
+  readonly onSubmit: (input: ReportPlayerInput) => Promise<ServerAck<PublicModerationReceipt>>;
+}) {
+  const [reason, setReason] = useState<PlayerReportReason>("HARASSMENT");
+  const [details, setDetails] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
+
+  async function submitReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("sending");
+    const result = await onSubmit({
+      targetPlayerId,
+      reason,
+      ...(details.trim() === "" ? {} : { details: details.trim() }),
+      ...(messageId === undefined ? {} : { messageId })
+    });
+    setStatus(result.ok ? "idle" : "error");
+  }
+
+  return (
+    <form
+      className="mt-2 grid gap-2 rounded-[0.8rem] border border-red-300/15 bg-red-400/5 p-2"
+      onSubmit={submitReport}
+    >
+      <select
+        className="h-8 rounded-md border border-white/10 bg-[#11171b] px-2 text-xs text-white outline-none focus:border-red-200/40"
+        value={reason}
+        onChange={(event) => setReason(event.target.value as PlayerReportReason)}
+      >
+        {REPORT_REASON_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <textarea
+        className="min-h-16 resize-none rounded-md border border-white/10 bg-black/24 px-2 py-1.5 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-red-200/40"
+        maxLength={500}
+        placeholder="Optional context for the moderator"
+        value={details}
+        onChange={(event) => setDetails(event.target.value)}
+      />
+      <div className="flex justify-end gap-1.5">
+        <Button size="sm" variant="secondary" type="button" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button size="sm" type="submit" disabled={status === "sending"}>
+          {status === "sending" ? "Sending..." : "Submit report"}
+        </Button>
+      </div>
+      {status === "error" ? (
+        <p className="text-[11px] font-bold text-red-200">The report could not be submitted.</p>
+      ) : null}
+    </form>
   );
 }
 

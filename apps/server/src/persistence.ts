@@ -11,12 +11,14 @@ import type * as DbModule from "@deuces-arena/db";
 import type {
   FeedbackKind,
   MatchMode,
+  PlayerReportReason,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
   PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLeaderboardEntry,
   PublicMatchHistoryItem,
+  PublicModerationReceipt,
   ProfileAvatarKey
 } from "@deuces-arena/shared";
 
@@ -935,6 +937,145 @@ export async function persistFeedbackReport(input: {
   }
 }
 
+export async function getPersistedBlockedGuestIds(
+  blockerGuestId: string
+): Promise<readonly string[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    const blocks = await db.prisma.userBlock.findMany({
+      where: {
+        blocker: {
+          guestId: blockerGuestId
+        }
+      },
+      select: {
+        blocked: {
+          select: {
+            guestId: true
+          }
+        }
+      }
+    });
+
+    return blocks.flatMap((block) =>
+      block.blocked.guestId === null ? [] : [block.blocked.guestId]
+    );
+  } catch (error) {
+    console.error("Unable to read player blocks.", error);
+    return null;
+  }
+}
+
+export async function setPersistedUserBlock(input: {
+  readonly blockerGuestId: string;
+  readonly blockedGuestId: string;
+  readonly blocked: boolean;
+}): Promise<boolean> {
+  const db = await getDb();
+
+  if (db === null) {
+    return false;
+  }
+
+  try {
+    const [blocker, blocked] = await Promise.all([
+      ensureModerationUser(db, input.blockerGuestId),
+      ensureModerationUser(db, input.blockedGuestId)
+    ]);
+
+    if (input.blocked) {
+      await db.prisma.userBlock.upsert({
+        where: {
+          blockerUserId_blockedUserId: {
+            blockerUserId: blocker.id,
+            blockedUserId: blocked.id
+          }
+        },
+        create: {
+          blockerUserId: blocker.id,
+          blockedUserId: blocked.id
+        },
+        update: {}
+      });
+    } else {
+      await db.prisma.userBlock.deleteMany({
+        where: {
+          blockerUserId: blocker.id,
+          blockedUserId: blocked.id
+        }
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Unable to update player block.", error);
+    return false;
+  }
+}
+
+export async function persistPlayerReport(input: {
+  readonly id: string;
+  readonly reporterGuestId: string;
+  readonly reportedGuestId: string;
+  readonly roomCode: string;
+  readonly messageId: string | null;
+  readonly messageBody: string | null;
+  readonly reason: PlayerReportReason;
+  readonly details: string | null;
+  readonly createdAt: Date;
+}): Promise<PublicModerationReceipt> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+
+  try {
+    const [reporter, reported] = await Promise.all([
+      ensureModerationUser(db, input.reporterGuestId),
+      ensureModerationUser(db, input.reportedGuestId)
+    ]);
+
+    await db.prisma.playerReport.create({
+      data: {
+        id: input.id,
+        reporterUserId: reporter.id,
+        reportedUserId: reported.id,
+        reporterGuestId: input.reporterGuestId,
+        reportedGuestId: input.reportedGuestId,
+        roomCode: input.roomCode,
+        messageId: input.messageId,
+        messageBody: input.messageBody,
+        reason: input.reason,
+        details: input.details,
+        createdAt: input.createdAt
+      }
+    });
+
+    return {
+      id: input.id,
+      stored: true,
+      createdAt: input.createdAt.toISOString()
+    };
+  } catch (error) {
+    console.error("Unable to persist player report.", error);
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+}
+
 export async function persistMoveEvent(
   persistedMatch: PersistedMatch | null,
   event: GameEvent,
@@ -1245,6 +1386,24 @@ async function getUsersByPlayerId(
   );
 
   return Object.fromEntries(entries);
+}
+
+async function ensureModerationUser(db: typeof DbModule, guestId: string) {
+  const authBacked = isAuthProfileId(guestId);
+
+  return db.prisma.user.upsert({
+    where: {
+      guestId
+    },
+    create: {
+      username: authBacked ? `auth:${guestId.slice(5)}` : `guest:${guestId}`,
+      guestId
+    },
+    update: {},
+    select: {
+      id: true
+    }
+  });
 }
 
 function isAuthProfileId(profileId: string): boolean {

@@ -45,31 +45,85 @@ enum CosmeticUnlockSource {
   ADMIN_GRANT
 }
 
+enum PlayerReportReason {
+  HARASSMENT
+  HATE_SPEECH
+  SPAM
+  CHEATING
+  INAPPROPRIATE_NAME
+  OTHER
+}
+
+enum PlayerReportStatus {
+  OPEN
+  REVIEWED
+  ACTIONED
+  DISMISSED
+}
+
 model User {
-  id              String        @id @default(cuid())
-  username        String        @unique
-  guestId         String?       @unique
-  email           String?       @unique
-  displayName     String?
-  avatarKey       String        @default("diamond")
-  imageUrl        String?
-  rating          Int           @default(1000)
-  gamesPlayed     Int           @default(0)
-  wins            Int           @default(0)
-  losses          Int           @default(0)
-  placementTotal  Int           @default(0)
-  arenaCoins      Int           @default(0)
-  supporterStatus String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  matchPlayers    MatchPlayer[]
-  cosmeticUnlocks UserCosmeticUnlock[]
+  id                String                 @id @default(cuid())
+  username          String                 @unique
+  guestId           String?                @unique
+  email             String?                @unique
+  displayName       String?
+  avatarKey         String                 @default("diamond")
+  imageUrl          String?
+  rating            Int                    @default(1000)
+  gamesPlayed       Int                    @default(0)
+  wins              Int                    @default(0)
+  losses            Int                    @default(0)
+  placementTotal    Int                    @default(0)
+  arenaCoins        Int                    @default(0)
+  supporterStatus   String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  matchPlayers      MatchPlayer[]
+  cosmeticUnlocks   UserCosmeticUnlock[]
   equippedCosmetics UserEquippedCosmetic[]
-  oauthAccounts   OAuthAccount[]
-  feedbackReports FeedbackReport[]
-  replayLabels    ReplayLabel[]
+  oauthAccounts     OAuthAccount[]
+  feedbackReports   FeedbackReport[]
+  replayLabels      ReplayLabel[]
+  blocksCreated     UserBlock[]            @relation("Blocker")
+  blocksReceived    UserBlock[]            @relation("Blocked")
+  reportsSubmitted  PlayerReport[]         @relation("Reporter")
+  reportsReceived   PlayerReport[]         @relation("Reported")
 
   @@index([rating])
+}
+
+model UserBlock {
+  id            String   @id @default(cuid())
+  blockerUserId String
+  blockedUserId String
+  createdAt     DateTime @default(now())
+  blocker       User     @relation("Blocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked       User     @relation("Blocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
+}
+
+model PlayerReport {
+  id              String             @id @default(cuid())
+  reporterUserId  String?
+  reportedUserId  String?
+  reporterGuestId String?
+  reportedGuestId String?
+  roomCode        String?
+  messageId       String?
+  messageBody     String?
+  reason          PlayerReportReason
+  details         String?
+  status          PlayerReportStatus @default(OPEN)
+  createdAt       DateTime           @default(now())
+  reporter        User?              @relation("Reporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  reported        User?              @relation("Reported", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([reportedUserId, status])
+  @@index([reportedGuestId, status])
+  @@index([roomCode])
 }
 
 model OAuthAccount {
@@ -90,26 +144,26 @@ model OAuthAccount {
 }
 
 model Match {
-  id          String        @id @default(cuid())
-  mode        MatchMode     @default(CASUAL)
-  status      MatchStatus   @default(IN_PROGRESS)
-  roomCode    String?
-  seed        String?
-  startedAt   DateTime      @default(now())
-  completedAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  players     MatchPlayer[]
-  moves       MoveEvent[]
+  id               String            @id @default(cuid())
+  mode             MatchMode         @default(CASUAL)
+  status           MatchStatus       @default(IN_PROGRESS)
+  roomCode         String?
+  seed             String?
+  startedAt        DateTime          @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  players          MatchPlayer[]
+  moves            MoveEvent[]
   coachEvaluations CoachEvaluation[]
-  replayLabels ReplayLabel[]
+  replayLabels     ReplayLabel[]
 
   @@index([mode, status])
   @@index([startedAt])
 }
 
 model MatchPlayer {
-  id               String      @id @default(cuid())
+  id               String            @id @default(cuid())
   matchId          String
   userId           String?
   playerSeat       Int
@@ -119,10 +173,10 @@ model MatchPlayer {
   ratingBefore     Int?
   ratingAfter      Int?
   cardsRemaining   Int?
-  bombsPlayed      Int         @default(0)
+  bombsPlayed      Int               @default(0)
   averageMoveCount Int?
-  match            Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  match            Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   moves            MoveEvent[]
   coachEvaluations CoachEvaluation[]
 
@@ -195,19 +249,19 @@ model ReplayLabel {
 }
 
 model Cosmetic {
-  id          String         @id @default(cuid())
-  slug        String         @unique
+  id          String                 @id @default(cuid())
+  slug        String                 @unique
   kind        CosmeticKind
   name        String
   description String?
-  rarity      String         @default("common")
-  isSupporter Boolean        @default(false)
+  rarity      String                 @default("common")
+  isSupporter Boolean                @default(false)
   coinPrice   Int?
-  isActive    Boolean        @default(true)
+  isActive    Boolean                @default(true)
   previewUrl  String?
   metadata    Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
   unlocks     UserCosmeticUnlock[]
   equippedBy  UserEquippedCosmetic[]
 
@@ -216,14 +270,14 @@ model Cosmetic {
 }
 
 model UserCosmeticUnlock {
-  id          String               @id @default(cuid())
-  userId      String
-  cosmeticId  String
-  source      CosmeticUnlockSource @default(EARNED)
-  earnedAt    DateTime             @default(now())
-  metadata    Json?
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cosmetic    Cosmetic             @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+  id         String               @id @default(cuid())
+  userId     String
+  cosmeticId String
+  source     CosmeticUnlockSource @default(EARNED)
+  earnedAt   DateTime             @default(now())
+  metadata   Json?
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic   Cosmetic             @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
 
   @@unique([userId, cosmeticId])
   @@index([cosmeticId])
@@ -231,13 +285,13 @@ model UserCosmeticUnlock {
 }
 
 model UserEquippedCosmetic {
-  id          String       @id @default(cuid())
-  userId      String
-  cosmeticId  String
-  kind        CosmeticKind
-  equippedAt  DateTime     @default(now())
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cosmetic    Cosmetic     @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
+  id         String       @id @default(cuid())
+  userId     String
+  cosmeticId String
+  kind       CosmeticKind
+  equippedAt DateTime     @default(now())
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cosmetic   Cosmetic     @relation(fields: [cosmeticId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind])
   @@index([cosmeticId])

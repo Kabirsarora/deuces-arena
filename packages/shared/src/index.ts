@@ -210,6 +210,20 @@ export type PublicTradePhaseState = {
 
 export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI";
 
+export type PlayerReportReason =
+  | "HARASSMENT"
+  | "HATE_SPEECH"
+  | "SPAM"
+  | "CHEATING"
+  | "INAPPROPRIATE_NAME"
+  | "OTHER";
+
+export type PublicModerationReceipt = {
+  readonly id: string;
+  readonly stored: boolean;
+  readonly createdAt: string;
+};
+
 export type PublicFeedbackReceipt = {
   readonly id: string;
   readonly stored: boolean;
@@ -230,6 +244,7 @@ export type PublicRoomState = {
   readonly placements: readonly string[];
   readonly recentEvents: readonly PublicGameEvent[];
   readonly recentChat: readonly PublicChatMessage[];
+  readonly blockedPlayerIds: readonly string[];
   readonly tradePhase: PublicTradePhaseState;
   readonly turnTimer: PublicTurnTimerState | null;
   readonly yourPlayerId: string | null;
@@ -410,6 +425,24 @@ export type ClientToServerEvents = {
   "chat:send": (
     payload: ChatPayload,
     callback: (ack: ServerAck<PublicChatMessage>) => void
+  ) => void;
+  "moderation:block": (
+    payload: {
+      readonly roomCode: string;
+      readonly targetPlayerId: string;
+      readonly blocked: boolean;
+    },
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "moderation:report": (
+    payload: {
+      readonly roomCode: string;
+      readonly targetPlayerId: string;
+      readonly messageId?: string;
+      readonly reason: PlayerReportReason;
+      readonly details?: string;
+    },
+    callback: (ack: ServerAck<PublicModerationReceipt>) => void
   ) => void;
   "coach:evaluate": (
     payload: { readonly roomCode: string; readonly rollouts?: number; readonly maxMoves?: number },
