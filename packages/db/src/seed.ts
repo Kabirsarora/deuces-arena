@@ -58,6 +58,16 @@ const starterCosmetics = [
     coinPrice: 650
   },
   {
+    slug: "arena-six-crest-card-back",
+    kind: "CARD_BACK" as const,
+    name: "Sixfold Crest",
+    description: "Original engraved card art made for the six-suit Arena 6 deck.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 900,
+    previewUrl: "/art/arena-six-card-back.jpg"
+  },
+  {
     slug: "aqua-pulse-avatar",
     kind: "AVATAR" as const,
     name: "Aqua Pulse",

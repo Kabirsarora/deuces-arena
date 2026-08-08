@@ -318,6 +318,17 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "arena-six-crest-card-back",
+    slug: "arena-six-crest-card-back",
+    kind: "CARD_BACK",
+    name: "Sixfold Crest",
+    description: "Original engraved card art made for the six-suit Arena 6 deck.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 900,
+    previewUrl: "/art/arena-six-card-back.jpg"
+  },
+  {
     id: "starter-aqua-pulse-avatar",
     slug: "aqua-pulse-avatar",
     kind: "AVATAR",

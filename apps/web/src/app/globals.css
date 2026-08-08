@@ -336,3 +336,9 @@ textarea {
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 9px),
     linear-gradient(145deg, #f97316, #7f1d1d 54%, #1c1917);
 }
+
+.card-back-arena-six {
+  background-image: url("/art/arena-six-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}

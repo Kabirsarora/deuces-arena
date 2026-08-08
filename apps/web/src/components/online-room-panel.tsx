@@ -43,6 +43,7 @@ import type {
   ServerToClientEvents
 } from "@deuces-arena/shared";
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -1951,17 +1952,19 @@ function HubModeButton({
 
   return (
     <button
+      aria-label={label}
       className={cn(
-        "flex min-h-14 items-center justify-center gap-3 rounded-full text-sm font-black transition sm:text-base",
+        "flex min-h-12 items-center justify-center gap-2 rounded-full text-sm font-black transition sm:min-h-14 sm:gap-3 sm:text-base",
         active
           ? "bg-[var(--table)] text-white shadow-lg"
           : "text-zinc-400 hover:bg-white/8 hover:text-white"
       )}
+      title={label}
       type="button"
       onClick={() => onSelect(mode)}
     >
       {icon}
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
@@ -2393,15 +2396,26 @@ function HubTournamentCard({
 
   return (
     <section className="online-panel p-5 sm:p-7">
-      <div className="flex items-center gap-4">
-        <div className="grid size-16 shrink-0 place-items-center rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/10 text-[var(--gold)]">
-          <Swords className="size-8" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-black">Arena Cup</h2>
-          <p className="mt-1 text-sm font-semibold text-zinc-400">
-            8 humans · two semifinals · top 2 advance
-          </p>
+      <div className="relative h-40 overflow-hidden rounded-lg border border-white/10">
+        <Image
+          fill
+          priority
+          alt="Original Deuces Arena tournament table with two semifinal brackets"
+          className="object-cover"
+          sizes="(max-width: 1024px) 94vw, 850px"
+          src="/art/arena-cup-table.jpg"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.82),rgba(0,0,0,0.2),rgba(0,0,0,0.5))]" />
+        <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-4">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full border border-[var(--gold)]/40 bg-black/55 text-[var(--gold)] backdrop-blur">
+            <Swords className="size-6" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black">Arena Cup</h2>
+            <p className="text-sm font-semibold text-zinc-200">
+              8 humans · two semifinals · top 2 advance
+            </p>
+          </div>
         </div>
       </div>
 
@@ -5287,6 +5301,10 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
 
   if (cosmetic?.slug === "ember-court-card-back") {
     return "card-back-ember-court";
+  }
+
+  if (cosmetic?.slug === "arena-six-crest-card-back") {
+    return "card-back-arena-six";
   }
 
   return "";
