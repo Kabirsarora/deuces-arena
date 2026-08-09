@@ -52,6 +52,19 @@ describe("cosmetic progression rules", () => {
       "ember-court-card-back",
       "arena-six-crest-card-back"
     ]);
+
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 200, wins: 200, rating: 1000 })).toEqual(
+      expect.arrayContaining([
+        "celestial-vault-card-back",
+        "celestial-observatory-table",
+        "ember-sovereign-card-back",
+        "voidglass-prism-card-back",
+        "ember-throne-table"
+      ])
+    );
+    expect(
+      getEarnedCosmeticUnlockSlugs({ gamesPlayed: 199, wins: 199, rating: 1000 })
+    ).not.toContain("ember-throne-table");
   });
 
   it("unlocks ranked borders at rating thresholds", () => {

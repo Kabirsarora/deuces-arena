@@ -302,6 +302,28 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "celestial-observatory-table",
+    slug: "celestial-observatory-table",
+    kind: "TABLE_THEME",
+    name: "Celestial Observatory",
+    description: "Moonlit felt set with a silver astrolabe and icy enamel stars.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 9000,
+    previewUrl: "/art/celestial-observatory-table.jpg"
+  },
+  {
+    id: "ember-throne-table",
+    slug: "ember-throne-table",
+    kind: "TABLE_THEME",
+    name: "Ember Throne",
+    description: "Black felt forged with oxblood leather and antique-gold inlays.",
+    rarity: "mythic",
+    isSupporter: false,
+    coinPrice: 16000,
+    previewUrl: "/art/ember-throne-table.jpg"
+  },
+  {
     id: "starter-neon-grid-card-back",
     slug: "neon-grid-card-back",
     kind: "CARD_BACK",
@@ -333,6 +355,39 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     isSupporter: false,
     coinPrice: 6000,
     previewUrl: "/art/arena-six-card-back.jpg"
+  },
+  {
+    id: "celestial-vault-card-back",
+    slug: "celestial-vault-card-back",
+    kind: "CARD_BACK",
+    name: "Celestial Vault",
+    description: "A moonlit astrolabe engraved in silver, black leather, and icy enamel.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 7500,
+    previewUrl: "/art/celestial-vault-card-back.jpg"
+  },
+  {
+    id: "ember-sovereign-card-back",
+    slug: "ember-sovereign-card-back",
+    kind: "CARD_BACK",
+    name: "Ember Sovereign",
+    description: "A forged sunburst of oxblood leather, antique gold, and ember enamel.",
+    rarity: "mythic",
+    isSupporter: false,
+    coinPrice: 10000,
+    previewUrl: "/art/ember-sovereign-card-back.jpg"
+  },
+  {
+    id: "voidglass-prism-card-back",
+    slug: "voidglass-prism-card-back",
+    kind: "CARD_BACK",
+    name: "Voidglass Prism",
+    description: "An angular obsidian prism edged with silver and electric cobalt glass.",
+    rarity: "mythic",
+    isSupporter: false,
+    coinPrice: 14000,
+    previewUrl: "/art/voidglass-prism-card-back.jpg"
   },
   {
     id: "starter-aqua-pulse-avatar",

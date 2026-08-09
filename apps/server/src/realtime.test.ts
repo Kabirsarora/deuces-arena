@@ -225,6 +225,17 @@ describe("realtime rooms", () => {
       socketCatalog.data.find((cosmetic) => cosmetic.slug === "arena-six-crest-card-back")
         ?.coinPrice
     ).toBe(6000);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "celestial-vault-card-back")
+        ?.coinPrice
+    ).toBe(7500);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "ember-throne-table")?.coinPrice
+    ).toBe(16000);
+    expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "voidglass-prism-card-back")
+        ?.previewUrl
+    ).toBe("/art/voidglass-prism-card-back.jpg");
 
     const restResponse = await fetch(`${serverUrl}/cosmetics`);
 

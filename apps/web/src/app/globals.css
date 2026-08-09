@@ -123,6 +123,21 @@ textarea {
     radial-gradient(circle at 50% 55%, #17211f 0%, #050607 78%);
 }
 
+.table-theme-celestial-observatory {
+  background-image:
+    linear-gradient(rgba(2, 13, 18, 0.16), rgba(2, 13, 18, 0.3)),
+    url("/art/celestial-observatory-table.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.table-theme-ember-throne {
+  background-image:
+    linear-gradient(rgba(8, 5, 4, 0.14), rgba(8, 5, 4, 0.3)), url("/art/ember-throne-table.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
 .table-oval {
   border-radius: 38% / 13%;
   box-shadow:
@@ -339,6 +354,24 @@ textarea {
 
 .card-back-arena-six {
   background-image: url("/art/arena-six-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.card-back-celestial-vault {
+  background-image: url("/art/celestial-vault-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.card-back-ember-sovereign {
+  background-image: url("/art/ember-sovereign-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.card-back-voidglass-prism {
+  background-image: url("/art/voidglass-prism-card-back.jpg");
   background-position: center;
   background-size: cover;
 }

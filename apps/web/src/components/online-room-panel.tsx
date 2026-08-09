@@ -3814,6 +3814,11 @@ function getCosmeticMilestone(slug: string): string | null {
     "obsidian-table": "win 50 matches",
     "ember-court-card-back": "finish 50 matches",
     "arena-six-crest-card-back": "win 75 matches",
+    "celestial-vault-card-back": "win 90 matches",
+    "celestial-observatory-table": "win 110 matches",
+    "ember-sovereign-card-back": "win 125 matches",
+    "voidglass-prism-card-back": "win 175 matches",
+    "ember-throne-table": "win 200 matches",
     "gold-division-border": "reach Gold (1100)",
     "platinum-division-border": "reach Platinum (1300)",
     "diamond-division-border": "reach Diamond (1500)",
@@ -5294,6 +5299,14 @@ function getTableThemeClass(cosmetic: PublicCosmetic | null): string {
     return "table-theme-obsidian";
   }
 
+  if (cosmetic?.slug === "celestial-observatory-table") {
+    return "table-theme-celestial-observatory";
+  }
+
+  if (cosmetic?.slug === "ember-throne-table") {
+    return "table-theme-ember-throne";
+  }
+
   return "";
 }
 
@@ -5312,6 +5325,18 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
 
   if (cosmetic?.slug === "arena-six-crest-card-back") {
     return "card-back-arena-six";
+  }
+
+  if (cosmetic?.slug === "celestial-vault-card-back") {
+    return "card-back-celestial-vault";
+  }
+
+  if (cosmetic?.slug === "ember-sovereign-card-back") {
+    return "card-back-ember-sovereign";
+  }
+
+  if (cosmetic?.slug === "voidglass-prism-card-back") {
+    return "card-back-voidglass-prism";
   }
 
   return "";

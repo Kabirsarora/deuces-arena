@@ -165,6 +165,31 @@ const COSMETIC_UNLOCK_RULES: readonly {
     isUnlocked: (stats) => stats.wins >= 75
   },
   {
+    slug: "celestial-vault-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 90
+  },
+  {
+    slug: "celestial-observatory-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 110
+  },
+  {
+    slug: "ember-sovereign-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 125
+  },
+  {
+    slug: "voidglass-prism-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 175
+  },
+  {
+    slug: "ember-throne-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 200
+  },
+  {
     slug: "gold-division-border",
     source: "EARNED",
     isUnlocked: (stats) => stats.rating >= 1100
