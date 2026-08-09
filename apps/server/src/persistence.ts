@@ -10,9 +10,11 @@ import {
 import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
+  AdminModerationQueue,
   FeedbackKind,
   MatchMode,
   PlayerReportReason,
+  PlayerReportStatus,
   PublicCoachEvaluationRecord,
   PublicCosmetic,
   PublicFeedbackReceipt,
@@ -1417,6 +1419,89 @@ export async function persistPlayerReport(input: {
   }
 }
 
+export async function getPersistedAdminModerationQueue(
+  requestedLimit: number
+): Promise<AdminModerationQueue | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  const limit = Math.max(1, Math.min(requestedLimit, 100));
+
+  try {
+    const [feedback, playerReports] = await Promise.all([
+      db.prisma.feedbackReport.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          kind: true,
+          body: true,
+          guestId: true,
+          roomCode: true,
+          contactEmail: true,
+          createdAt: true
+        }
+      }),
+      db.prisma.playerReport.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          reporterGuestId: true,
+          reportedGuestId: true,
+          roomCode: true,
+          messageId: true,
+          messageBody: true,
+          reason: true,
+          details: true,
+          status: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    return {
+      feedback: feedback.map((report) => ({
+        ...report,
+        kind: normalizeStoredFeedbackKind(report.kind),
+        createdAt: report.createdAt.toISOString()
+      })),
+      playerReports: playerReports.map((report) => ({
+        ...report,
+        createdAt: report.createdAt.toISOString()
+      }))
+    };
+  } catch (error) {
+    console.error("Unable to read moderation queue.", error);
+    return null;
+  }
+}
+
+export async function updatePersistedPlayerReportStatus(
+  reportId: string,
+  status: PlayerReportStatus
+): Promise<boolean> {
+  const db = await getDb();
+
+  if (db === null) {
+    return false;
+  }
+
+  try {
+    const result = await db.prisma.playerReport.updateMany({
+      where: { id: reportId },
+      data: { status }
+    });
+    return result.count === 1;
+  } catch (error) {
+    console.error("Unable to update player report status.", error);
+    return false;
+  }
+}
+
 export async function persistMoveEvent(
   persistedMatch: PersistedMatch | null,
   event: GameEvent,
@@ -1915,6 +2000,14 @@ function toProfileAvatarKey(value: string): ProfileAvatarKey {
   }
 
   return "diamond";
+}
+
+function normalizeStoredFeedbackKind(value: string): FeedbackKind {
+  if (value === "IDEA" || value === "BALANCE" || value === "UI") {
+    return value;
+  }
+
+  return "BUG";
 }
 
 function getMoveHandType(event: GameEvent): string | null {

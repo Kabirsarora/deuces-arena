@@ -19,6 +19,7 @@
     "@deuces-arena/db": "^0.1.0",
     "@deuces-arena/game-engine": "^0.1.0",
     "@deuces-arena/shared": "^0.1.0",
+    "bad-words": "^4.1.5",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "socket.io": "^4.8.3"

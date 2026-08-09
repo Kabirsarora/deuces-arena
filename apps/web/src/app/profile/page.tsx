@@ -80,6 +80,14 @@ export default async function ProfilePage() {
             <p className="mt-1 break-all text-xs text-zinc-400">{publicProfilePath}</p>
           </div>
           <div className="flex gap-2">
+            {profile?.isAdmin === true ? (
+              <Link
+                className="inline-flex h-9 items-center justify-center rounded-md bg-[var(--gold)] px-3 text-sm font-semibold text-black transition hover:brightness-105"
+                href="/admin"
+              >
+                Admin
+              </Link>
+            ) : null}
             <Link
               className="inline-flex h-9 items-center justify-center rounded-md border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
               href={publicProfilePath}

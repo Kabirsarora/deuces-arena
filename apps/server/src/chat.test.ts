@@ -21,4 +21,16 @@ describe("sanitizeChatMessage", () => {
       "That **** was wild, but classic is fine."
     );
   });
+
+  it("masks mixed-case and punctuation-separated profanity", () => {
+    expect(sanitizeChatMessage("F.U.C.K this and stop being a b!tch")).toBe(
+      "**** this and stop being a ****"
+    );
+  });
+
+  it("preserves ordinary words and emoji", () => {
+    expect(sanitizeChatMessage("Classic table, nice move! 🎉")).toBe(
+      "Classic table, nice move! 🎉"
+    );
+  });
 });

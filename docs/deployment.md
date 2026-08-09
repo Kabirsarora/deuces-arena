@@ -93,6 +93,11 @@ The app can run without `DATABASE_URL`, but match history, move persistence, dur
 
 `GET /health` returns safe deployment metadata such as allowed origins, uptime, room counts, whether PostgreSQL/Redis are configured, and the disconnected-player grace delay. It does not expose secret connection strings.
 
+Signed-in accounts listed in `ADMIN_EMAILS` can open the private `/admin` page on the web app. The
+page uses a short-lived server-to-server token to read persisted feedback and player reports from
+Render; the signing secret is never sent to the browser. Keep `ADMIN_EMAILS` limited to trusted
+creator accounts and keep `REALTIME_AUTH_SECRET` identical on Vercel and Render.
+
 Run the public production smoke test after each Vercel or Render deployment:
 
 ```bash
@@ -100,8 +105,9 @@ npm run smoke:production
 ```
 
 It verifies the homepage, sign-in disclosure, privacy and terms pages, install manifest, sitemap,
-app icons, social preview, Render health, PostgreSQL, the allowed Vercel origin, and signed realtime
-identity. Render's free instance may take up to about a minute to wake. To diagnose a deployment
+app icons, social preview, web/server security headers, protected admin access, Render health,
+PostgreSQL, the allowed Vercel origin, and signed realtime identity. Render's free instance may take
+up to about a minute to wake. To diagnose a deployment
 before the identity bridge is configured, temporarily run
 `SMOKE_REQUIRE_REALTIME_AUTH=false npm run smoke:production`; do not use that override as the
 public-launch acceptance check.

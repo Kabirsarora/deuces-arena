@@ -75,6 +75,9 @@ describe("realtime rooms", () => {
     const response = await fetch(`${serverUrl}/health`);
 
     expect(response.ok).toBe(true);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("x-powered-by")).toBeNull();
 
     const health = (await response.json()) as {
       readonly allowedOrigins: readonly string[];
@@ -99,6 +102,60 @@ describe("realtime rooms", () => {
       realtimeAuth: "configured",
       disconnectedAutoMoveDelayMs: 10
     });
+  });
+
+  it("protects the moderation queue with signed admin access", async () => {
+    const unauthenticatedResponse = await fetch(`${serverUrl}/admin/moderation`);
+
+    expect(unauthenticatedResponse.status).toBe(401);
+
+    const playerToken = createRealtimeAuthToken(
+      { profileId: "auth-11111111111111111111111111111111" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const playerResponse = await fetch(`${serverUrl}/admin/moderation`, {
+      headers: { authorization: `Bearer ${playerToken}` }
+    });
+
+    expect(playerResponse.status).toBe(403);
+
+    const adminToken = createRealtimeAuthToken(
+      { profileId: "auth-758f27d1f066779a62a65665242b8780" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const adminResponse = await fetch(`${serverUrl}/admin/moderation`, {
+      headers: { authorization: `Bearer ${adminToken}` }
+    });
+
+    expect(adminResponse.status).toBe(503);
+  });
+
+  it("validates moderation status updates before persistence", async () => {
+    const adminToken = createRealtimeAuthToken(
+      { profileId: "auth-758f27d1f066779a62a65665242b8780" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const response = await fetch(`${serverUrl}/admin/player-reports/report-1`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ status: "INVALID" })
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects oversized JSON request bodies", async () => {
+    const response = await fetch(`${serverUrl}/admin/player-reports/report-1`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "REVIEWED", padding: "x".repeat(40_000) })
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ error: "Request payload is too large." });
   });
 
   it("returns cosmetic ownership fields with guest profiles", async () => {

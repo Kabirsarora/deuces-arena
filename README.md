@@ -15,6 +15,7 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, distinct random, lowest-legal, and simulation-guided bot levels, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
 - Mobile-first Next.js table for human and bot play, with selected-card motion, trick display, turn state, uncluttered game-over summaries, move timelines, and on-demand simulation review.
 - Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, moderated table chat, player mute/block/report controls, realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
+- Private creator moderation console for reviewing player reports and product feedback, with signed admin authorization, report status tracking, stronger profanity filtering, request-size limits, and browser security headers.
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.
 - Guest profiles with searchable match history, leaderboard data, placement-based ratings, bombs played, moves played, and cards remaining at game end.
 - Signed-in and public profile pages with Google account photos, account stats, recent match summaries, copyable share text, Arena Coins, and cosmetic inventory.
@@ -89,6 +90,7 @@ Useful backend endpoints:
 - `GET /leaderboard`: persisted or in-memory guest leaderboard.
 - `GET /cosmetics`: active cosmetic catalog.
 - `GET /profiles/:guestId/tournaments`: persisted Arena Cup entries, advancement, and placements.
+- `GET /admin/moderation`: protected creator queue for recent reports and feedback.
 
 ## Database Setup
 
@@ -140,7 +142,7 @@ npm run test
 npm run build
 ```
 
-Current automated coverage includes engine rule tests, bot and rollout behavior tests, replay/rating/ranked-tier tests, chat sanitization and moderation tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, ranked matchmaking and account isolation, tournament seeding, card trading, feedback rate limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
+Current automated coverage includes engine rule tests, bot and rollout behavior tests, replay/rating/ranked-tier tests, chat sanitization and moderation tests, cosmetic progression tests, and Socket.IO integration tests for room creation, lobby visibility, ready/start flow, bot fill, chat broadcast, ranked matchmaking and account isolation, tournament seeding, card trading, feedback rate limits, admin authorization, request-size limits, Move Lab authorization, replay export, cosmetics catalog/profile fields, and equip validation.
 
 The server defaults to a 15-second disconnected-player grace delay before it makes a safe lowest-legal move for the abandoned active seat. Hosted environments can tune this with `DISCONNECTED_AUTO_MOVE_DELAY_MS`, and confirm the active value through `GET /health`.
 
@@ -168,7 +170,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Production Google auth depends on correctly configured OAuth credentials and callback URLs.
 - Database persistence is optional locally; without `DATABASE_URL`, stats and match history use safe in-memory fallbacks.
 - Ranked and tournament queues currently live in one server process and are lost if that process restarts; Redis-backed durability and multi-instance coordination are future work.
-- Anti-cheat hardening and payment flows are future work.
+- Advanced anti-cheat detection, automated moderation penalties, and payment flows are future work.
 
 ## Resume Targets
 

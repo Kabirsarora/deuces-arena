@@ -80,11 +80,33 @@ await checkAsset("/apple-icon", "image/png");
 await checkAsset("/opengraph-image", "image/png");
 
 try {
+  const response = await fetchWithWakeup(new URL("/", webUrl));
+  const protectedHeaders =
+    response.headers.get("x-content-type-options") === "nosniff" &&
+    response.headers.get("x-frame-options") === "DENY";
+
+  record(
+    "web security headers",
+    response.ok && protectedHeaders,
+    `HTTP ${response.status}; ${protectedHeaders ? "configured" : "missing"}`
+  );
+} catch (error) {
+  record("web security headers", false, error instanceof Error ? error.message : String(error));
+}
+
+try {
   const healthUrl = new URL("/health", serverUrl);
   const response = await fetchWithWakeup(healthUrl);
   const health = await response.json();
 
   record("realtime health", response.ok && health.ok === true, `HTTP ${response.status}`);
+  record(
+    "server security headers",
+    response.headers.get("x-content-type-options") === "nosniff" &&
+      response.headers.get("x-frame-options") === "DENY" &&
+      response.headers.get("x-powered-by") === null,
+    `HTTP ${response.status}`
+  );
   record("production environment", health.environment === "production", String(health.environment));
   record("PostgreSQL", health.config?.database === "configured", String(health.config?.database));
   record(
@@ -102,6 +124,21 @@ try {
   }
 } catch (error) {
   record("realtime health", false, error instanceof Error ? error.message : String(error));
+}
+
+try {
+  const response = await fetch(new URL("/admin/moderation", serverUrl), {
+    headers: { "user-agent": "deuces-arena-production-smoke/1.0" },
+    signal: AbortSignal.timeout(70_000)
+  });
+
+  record(
+    "admin route protection",
+    response.status === 401,
+    `HTTP ${response.status}; expected 401 without a signed admin token`
+  );
+} catch (error) {
+  record("admin route protection", false, error instanceof Error ? error.message : String(error));
 }
 
 const failures = checks.filter((check) => !check.passed);

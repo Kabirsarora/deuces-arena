@@ -45,6 +45,7 @@ npm run build --workspace @deuces-arena/web
 - Join Arena Cup from eight signed-in browser sessions, confirm two semifinals start, and inspect the live bracket and prize summary.
 - Open Shop & Locker, purchase an affordable cosmetic with earned coins, equip it, and confirm the table or profile preview changes.
 - Submit a short feedback report from the feedback panel.
+- Sign in with the configured creator account, open `/admin`, review the feedback, and update a player report status.
 - Open a profile page and confirm public stats render.
 - Visit the server `/health` endpoint and verify the allowed origin, persistence mode, Redis mode, and disconnected-player grace delay.
 
@@ -77,3 +78,12 @@ npm run build --workspace @deuces-arena/web
 - Move Lab uses heuristic-guided Monte Carlo rollouts with random exploration and uncertainty ranges, so present it as analysis infrastructure rather than perfect AI.
 - Google sign-in requires real OAuth credentials and callback URLs in the deployed environment.
 - Arena 6 suit names/icons and any super-bomb variant are still product decisions.
+
+## Public Launch Gate
+
+- Confirm `npm run smoke:production` passes after the latest Vercel and Render deployments.
+- Test a complete casual match with two real browsers and a ranked match with four signed-in browser sessions.
+- Confirm `/admin` opens only for an email listed in Render's `ADMIN_EMAILS` and rejects a normal account.
+- Keep Render at one instance until Redis-backed room and queue coordination is implemented.
+- Keep the Vercel and Render URLs registered while switching to a custom domain, then update Google OAuth, `NEXT_PUBLIC_APP_URL`, and `CLIENT_ORIGIN` together.
+- Publish the Google OAuth audience before inviting accounts that are not listed as test users.

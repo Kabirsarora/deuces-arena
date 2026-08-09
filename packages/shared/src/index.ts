@@ -272,6 +272,36 @@ export type PublicFeedbackReceipt = {
   readonly createdAt: string;
 };
 
+export type PlayerReportStatus = "OPEN" | "REVIEWED" | "ACTIONED" | "DISMISSED";
+
+export type AdminFeedbackReport = {
+  readonly id: string;
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly guestId: string | null;
+  readonly roomCode: string | null;
+  readonly contactEmail: string | null;
+  readonly createdAt: string;
+};
+
+export type AdminPlayerReport = {
+  readonly id: string;
+  readonly reporterGuestId: string | null;
+  readonly reportedGuestId: string | null;
+  readonly roomCode: string | null;
+  readonly messageId: string | null;
+  readonly messageBody: string | null;
+  readonly reason: PlayerReportReason;
+  readonly details: string | null;
+  readonly status: PlayerReportStatus;
+  readonly createdAt: string;
+};
+
+export type AdminModerationQueue = {
+  readonly feedback: readonly AdminFeedbackReport[];
+  readonly playerReports: readonly AdminPlayerReport[];
+};
+
 export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;

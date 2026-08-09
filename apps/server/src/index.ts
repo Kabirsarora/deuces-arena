@@ -31,6 +31,7 @@ import type {
   InterServerEvents,
   MatchMode,
   PlayerReportReason,
+  PlayerReportStatus,
   PublicBotDifficulty,
   PublicBotPace,
   PublicChatMessage,
@@ -64,7 +65,7 @@ import type {
 } from "@deuces-arena/shared";
 import { verifyRealtimeAuthToken } from "@deuces-arena/shared";
 import cors from "cors";
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { Server } from "socket.io";
 
 import { sanitizeChatMessage } from "./chat.js";
@@ -78,6 +79,7 @@ import {
   getPersistedCosmetics,
   getPersistedBlockedGuestIds,
   getPersistedGuestProfile,
+  getPersistedAdminModerationQueue,
   getPersistedLeaderboard,
   grantPersistedTournamentRewards,
   getPersistedMatchHistory,
@@ -91,6 +93,7 @@ import {
   savePersistedReplayLabel,
   setPersistedUserBlock,
   updatePersistedGuestProfile,
+  updatePersistedPlayerReportStatus,
   type PersistedMatch
 } from "./persistence.js";
 
@@ -558,8 +561,16 @@ let tournamentQueue: TournamentParticipant[] = [];
 const tournaments = new Map<string, Tournament>();
 
 const app = express();
+app.disable("x-powered-by");
+app.use((_request, response, next) => {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  next();
+});
 app.use(cors({ origin: CLIENT_ORIGINS }));
-app.use(express.json());
+app.use(express.json({ limit: "32kb" }));
 
 app.get("/health", (_request, response) => {
   response.json({
@@ -633,10 +644,60 @@ app.get("/profiles/:guestId/tournaments", async (request, response) => {
   );
 });
 
+app.get("/admin/moderation", async (request, response) => {
+  if (requireAdminRequest(request, response) === null) {
+    return;
+  }
+
+  const requestedLimit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : 50;
+  const queue = await getPersistedAdminModerationQueue(
+    Number.isNaN(requestedLimit) ? 50 : requestedLimit
+  );
+
+  if (queue === null) {
+    response.status(503).json({ error: "Moderation data is temporarily unavailable." });
+    return;
+  }
+
+  response.json(queue);
+});
+
+app.patch("/admin/player-reports/:reportId", async (request, response) => {
+  if (requireAdminRequest(request, response) === null) {
+    return;
+  }
+
+  const reportId = normalizeAdminRecordId(request.params.reportId);
+  const status = normalizePlayerReportStatus(request.body?.status);
+
+  if (reportId === null || status === null) {
+    response.status(400).json({ error: "Choose a valid report and moderation status." });
+    return;
+  }
+
+  if (!(await updatePersistedPlayerReportStatus(reportId, status))) {
+    response.status(404).json({ error: "Player report not found." });
+    return;
+  }
+
+  response.json({ ok: true });
+});
+
+app.use((error: unknown, _request: Request, response: Response, next: NextFunction) => {
+  if (isPayloadTooLargeError(error)) {
+    response.status(413).json({ error: "Request payload is too large." });
+    return;
+  }
+
+  next(error);
+});
+
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(
   httpServer,
   {
+    maxHttpBufferSize: 64 * 1024,
     cors: {
       origin: CLIENT_ORIGINS
     }
@@ -3084,6 +3145,56 @@ function resolveSocketProfileId(
 
 function isAdminGuestId(guestId: string): boolean {
   return ADMIN_GUEST_IDS.includes(guestId);
+}
+
+function requireAdminRequest(request: Request, response: Response): string | null {
+  if (REALTIME_AUTH_SECRET === null) {
+    response.status(503).json({ error: "Administrative access is not configured." });
+    return null;
+  }
+
+  const authorization = request.get("authorization")?.trim() ?? "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+
+  if (token === "" || token.length > 4096) {
+    response.status(401).json({ error: "Authentication is required." });
+    return null;
+  }
+
+  const identity = verifyRealtimeAuthToken(token, REALTIME_AUTH_SECRET);
+
+  if (identity === null) {
+    response.status(401).json({ error: "The administrative session is invalid or expired." });
+    return null;
+  }
+
+  if (!isAdminGuestId(identity.profileId)) {
+    response.status(403).json({ error: "Administrator access is required." });
+    return null;
+  }
+
+  return identity.profileId;
+}
+
+function normalizeAdminRecordId(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return /^[a-z0-9-]{1,128}$/i.test(normalized) ? normalized : null;
+}
+
+function normalizePlayerReportStatus(value: unknown): PlayerReportStatus | null {
+  if (value === "OPEN" || value === "REVIEWED" || value === "ACTIONED" || value === "DISMISSED") {
+    return value;
+  }
+
+  return null;
+}
+
+function isPayloadTooLargeError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 413;
 }
 
 function createAuthProfileId(identifier: string): string {
