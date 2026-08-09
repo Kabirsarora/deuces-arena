@@ -123,6 +123,20 @@ textarea {
     radial-gradient(circle at 50% 55%, #17211f 0%, #050607 78%);
 }
 
+.table-theme-koi-garden {
+  background-image:
+    linear-gradient(rgba(3, 18, 36, 0.08), rgba(3, 18, 36, 0.2)), url("/art/koi-garden-table.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.table-theme-jungle-club {
+  background-image:
+    linear-gradient(rgba(5, 30, 16, 0.08), rgba(5, 30, 16, 0.2)), url("/art/jungle-club-table.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
 .table-theme-celestial-observatory {
   background-image:
     linear-gradient(rgba(2, 13, 18, 0.16), rgba(2, 13, 18, 0.3)),
@@ -350,6 +364,24 @@ textarea {
     radial-gradient(circle at 50% 24%, rgba(251, 191, 36, 0.34), transparent 25%),
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 9px),
     linear-gradient(145deg, #f97316, #7f1d1d 54%, #1c1917);
+}
+
+.card-back-pool-shark {
+  background-image: url("/art/pool-shark-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.card-back-koi-current {
+  background-image: url("/art/koi-current-card-back.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.card-back-bengal-bloom {
+  background-image: url("/art/bengal-bloom-card-back.jpg");
+  background-position: center;
+  background-size: cover;
 }
 
 .card-back-arena-six {

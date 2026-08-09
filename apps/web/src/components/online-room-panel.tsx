@@ -3813,6 +3813,11 @@ function getCosmeticMilestone(slug: string): string | null {
     "crown-chip-avatar": "win 25 matches",
     "obsidian-table": "win 50 matches",
     "ember-court-card-back": "finish 50 matches",
+    "pool-shark-card-back": "finish 30 matches",
+    "koi-current-card-back": "win 40 matches",
+    "koi-garden-table": "win 55 matches",
+    "bengal-bloom-card-back": "win 70 matches",
+    "jungle-club-table": "win 80 matches",
     "arena-six-crest-card-back": "win 75 matches",
     "celestial-vault-card-back": "win 90 matches",
     "celestial-observatory-table": "win 110 matches",
@@ -5299,6 +5304,14 @@ function getTableThemeClass(cosmetic: PublicCosmetic | null): string {
     return "table-theme-obsidian";
   }
 
+  if (cosmetic?.slug === "koi-garden-table") {
+    return "table-theme-koi-garden";
+  }
+
+  if (cosmetic?.slug === "jungle-club-table") {
+    return "table-theme-jungle-club";
+  }
+
   if (cosmetic?.slug === "celestial-observatory-table") {
     return "table-theme-celestial-observatory";
   }
@@ -5321,6 +5334,18 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
 
   if (cosmetic?.slug === "ember-court-card-back") {
     return "card-back-ember-court";
+  }
+
+  if (cosmetic?.slug === "pool-shark-card-back") {
+    return "card-back-pool-shark";
+  }
+
+  if (cosmetic?.slug === "koi-current-card-back") {
+    return "card-back-koi-current";
+  }
+
+  if (cosmetic?.slug === "bengal-bloom-card-back") {
+    return "card-back-bengal-bloom";
   }
 
   if (cosmetic?.slug === "arena-six-crest-card-back") {

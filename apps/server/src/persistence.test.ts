@@ -37,7 +37,8 @@ describe("cosmetic progression rules", () => {
       "neon-grid-card-back",
       "aqua-profile-border",
       "crown-chip-avatar",
-      "ember-court-card-back"
+      "ember-court-card-back",
+      "pool-shark-card-back"
     ]);
 
     expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 75, wins: 75, rating: 1000 })).toEqual([
@@ -50,6 +51,10 @@ describe("cosmetic progression rules", () => {
       "crown-chip-avatar",
       "obsidian-table",
       "ember-court-card-back",
+      "pool-shark-card-back",
+      "koi-current-card-back",
+      "koi-garden-table",
+      "bengal-bloom-card-back",
       "arena-six-crest-card-back"
     ]);
 
@@ -59,7 +64,8 @@ describe("cosmetic progression rules", () => {
         "celestial-observatory-table",
         "ember-sovereign-card-back",
         "voidglass-prism-card-back",
-        "ember-throne-table"
+        "ember-throne-table",
+        "jungle-club-table"
       ])
     );
     expect(

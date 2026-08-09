@@ -302,6 +302,28 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "koi-garden-table",
+    slug: "koi-garden-table",
+    kind: "TABLE_THEME",
+    name: "Koi Garden",
+    description: "Hand-painted indigo water with coral koi and jade lily leaves.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 4500,
+    previewUrl: "/art/koi-garden-table.jpg"
+  },
+  {
+    id: "jungle-club-table",
+    slug: "jungle-club-table",
+    kind: "TABLE_THEME",
+    name: "Jungle Club",
+    description: "Forest felt framed by tropical blooms and bold tiger stripes.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 7200,
+    previewUrl: "/art/jungle-club-table.jpg"
+  },
+  {
     id: "celestial-observatory-table",
     slug: "celestial-observatory-table",
     kind: "TABLE_THEME",
@@ -344,6 +366,39 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     isSupporter: false,
     coinPrice: 2500,
     previewUrl: null
+  },
+  {
+    id: "pool-shark-card-back",
+    slug: "pool-shark-card-back",
+    kind: "CARD_BACK",
+    name: "Pool Shark",
+    description: "A sunny screen-print shark cruising in shades beneath a beach umbrella.",
+    rarity: "rare",
+    isSupporter: false,
+    coinPrice: 1800,
+    previewUrl: "/art/pool-shark-card-back.jpg"
+  },
+  {
+    id: "koi-current-card-back",
+    slug: "koi-current-card-back",
+    kind: "CARD_BACK",
+    name: "Koi Current",
+    description: "Two hand-painted koi circle through indigo water and jade lilies.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 3200,
+    previewUrl: "/art/koi-current-card-back.jpg"
+  },
+  {
+    id: "bengal-bloom-card-back",
+    slug: "bengal-bloom-card-back",
+    kind: "CARD_BACK",
+    name: "Bengal Bloom",
+    description: "A fearless screen-print tiger framed by forest leaves and red flowers.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 6500,
+    previewUrl: "/art/bengal-bloom-card-back.jpg"
   },
   {
     id: "arena-six-crest-card-back",

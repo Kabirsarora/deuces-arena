@@ -160,6 +160,31 @@ const COSMETIC_UNLOCK_RULES: readonly {
     isUnlocked: (stats) => stats.gamesPlayed >= 50
   },
   {
+    slug: "pool-shark-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.gamesPlayed >= 30
+  },
+  {
+    slug: "koi-current-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 40
+  },
+  {
+    slug: "koi-garden-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 55
+  },
+  {
+    slug: "bengal-bloom-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 70
+  },
+  {
+    slug: "jungle-club-table",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 80
+  },
+  {
     slug: "arena-six-crest-card-back",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 75
