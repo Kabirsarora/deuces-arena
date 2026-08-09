@@ -77,7 +77,7 @@ npm run build --workspace @deuces-arena/web
 - Ranked and tournament queues are held in that single backend process and reset if the free host restarts.
 - Move Lab uses heuristic-guided Monte Carlo rollouts with random exploration and uncertainty ranges, so present it as analysis infrastructure rather than perfect AI.
 - Google sign-in requires real OAuth credentials and callback URLs in the deployed environment.
-- Arena 6 suit names/icons and any super-bomb variant are still product decisions.
+- Arena 6 is a casual variant and will still need balance data from real public matches.
 
 ## Public Launch Gate
 

@@ -93,6 +93,32 @@ describe("simulation", () => {
     expect(decision?.rolloutPolicy).toBe("heuristic-mixed");
   });
 
+  it("includes strategic combination plays in a bounded candidate set", () => {
+    const state: GameState = {
+      ...oneCardWinState(),
+      players: [
+        {
+          id: "player-1",
+          hand: [createCard("3", "diamonds"), createCard("3", "clubs"), createCard("8", "diamonds")]
+        },
+        ...oneCardWinState().players.slice(1)
+      ]
+    };
+    const evaluations = evaluateLegalMovesByRandomRollouts({
+      state,
+      playerId: "player-1",
+      rolloutsPerMove: 1,
+      maxMoves: 2,
+      random: () => 0
+    });
+
+    expect(
+      evaluations.some((evaluation) =>
+        evaluation.move.type === "play" ? evaluation.move.cards.length === 2 : false
+      )
+    ).toBe(true);
+  });
+
   it("rejects legal move ranking for inactive players", () => {
     expect(() =>
       evaluateLegalMovesByRandomRollouts({

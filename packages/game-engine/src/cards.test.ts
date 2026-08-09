@@ -30,7 +30,7 @@ describe("card ranking", () => {
     expect(compareSuits("hearts", "spades")).toBeLessThan(0);
   });
 
-  it("orders arena placeholder suits above spades", () => {
+  it("orders Arena 6 suits above spades", () => {
     expect(compareSuits("spades", "stars")).toBeLessThan(0);
     expect(compareSuits("stars", "crowns")).toBeLessThan(0);
     expect(compareCards(ARENA_HIGHEST_CARD, createCard("2", "spades"))).toBeGreaterThan(0);

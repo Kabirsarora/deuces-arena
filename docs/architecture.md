@@ -71,6 +71,6 @@ Current progression rules:
 - Default rooms allow an active bomb to be beaten only by a stronger bomb.
 - Room settings can instead enable the `bombEndsTrick` variant, where any bomb immediately wins the trick and starts a new one.
 - Casual rooms can use the experimental `arena-six` deck, which adds Stars and Crowns above spades for up to six players.
-- Arena 6 still uses four-of-a-kind bombs; five- and six-of-a-kind super-bomb rules are deferred until the ruleset is more settled.
+- Arena 6 uses the finalized four-of-a-kind plus off-rank kicker bomb. Five- and six-of-a-kind super bombs are intentionally not part of the variant.
 - Straights must be at least five cards and must match exact length when answered.
 - The default straight rules do not allow `2` inside a straight. This is documented as a variant point for later.

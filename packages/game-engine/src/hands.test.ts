@@ -112,6 +112,46 @@ describe("hand detection", () => {
     });
   });
 
+  it("supports Arena 6 quads using any four suits", () => {
+    expect(
+      detectHand([
+        createCard("8", "clubs"),
+        createCard("8", "hearts"),
+        createCard("8", "stars"),
+        createCard("8", "crowns")
+      ])
+    ).toMatchObject({
+      type: "quad",
+      primaryRank: "8",
+      highestCard: createCard("8", "crowns")
+    });
+  });
+
+  it("keeps Arena 6 bombs at four matching cards plus an off-rank kicker", () => {
+    expect(
+      detectHand([
+        createCard("9", "diamonds"),
+        createCard("9", "spades"),
+        createCard("9", "stars"),
+        createCard("9", "crowns"),
+        createCard("A", "hearts")
+      ])
+    ).toMatchObject({
+      type: "bomb",
+      quadRank: "9",
+      kicker: createCard("A", "hearts")
+    });
+    expect(
+      isValidHand([
+        createCard("9", "diamonds"),
+        createCard("9", "clubs"),
+        createCard("9", "hearts"),
+        createCard("9", "spades"),
+        createCard("9", "stars")
+      ])
+    ).toBe(false);
+  });
+
   it("rejects duplicate cards", () => {
     expect(isValidHand([createCard("3", "diamonds"), createCard("3", "diamonds")])).toBe(false);
   });

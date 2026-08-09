@@ -80,6 +80,7 @@
 - Done: add saved replay labels.
 - Done: keep monetization non-pay-to-win by modeling cosmetics as presentation-only data.
 - Done: add a Shop and Locker flow with earned coins, secure purchases, original Arena Cup artwork, and an original Arena 6 card back.
+- Done: finalize Arena 6 as a 78-card Stars/Crowns ruleset with six-suit sets, structured legal move generation, and classic four-card bombs.
 - Later: add Stripe support for optional supporter features.
 
 ## Phase 8: Tournaments

@@ -1193,6 +1193,7 @@ describe("realtime rooms", () => {
     const startedRoom = await startRoom(host, {
       roomCode: createdRoom.data.roomCode,
       botCount: 5,
+      botDifficulty: "hard",
       rules: {
         bombEndsTrick: false,
         deckType: "arena-six",
@@ -1211,6 +1212,7 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(5);
     expect(startedRoom.data.yourHand).toHaveLength(13);
     expect(startedRoom.data.rules.deckType).toBe("arena-six");
+    expect(startedRoom.data.botDifficulty).toBe("hard");
   });
 
   it("closes a started bot room when its only human explicitly leaves", async () => {

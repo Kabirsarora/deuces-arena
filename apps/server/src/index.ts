@@ -2242,7 +2242,7 @@ function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy)
       ? chooseSimulationGuidedMove({
           state: room.game,
           playerId,
-          rolloutsPerMove: 2,
+          rolloutsPerMove: 3,
           maxMoves: 8,
           maxTurnsPerRollout: 180,
           rolloutPolicy: "heuristic-mixed",

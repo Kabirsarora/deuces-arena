@@ -135,7 +135,8 @@ describe("baseline bots", () => {
         createCard("7", "clubs"),
         createCard("7", "hearts"),
         createCard("7", "spades"),
-        createCard("9", "diamonds")
+        createCard("9", "diamonds"),
+        createCard("J", "clubs")
       ],
       context: {
         isFirstMove: false,
@@ -157,5 +158,68 @@ describe("baseline bots", () => {
     expect(decision.move).toEqual({
       type: "pass"
     });
+  });
+
+  it("uses the normal baseline to save a bomb when passing is legal", () => {
+    const decision = chooseBotMove({
+      hand: [
+        createCard("7", "diamonds"),
+        createCard("7", "clubs"),
+        createCard("7", "hearts"),
+        createCard("7", "spades"),
+        createCard("9", "diamonds")
+      ],
+      context: {
+        isFirstMove: false,
+        currentTrick: {
+          leadingPlayerId: "player-1",
+          lastPlayedByPlayerId: "player-1",
+          hand: {
+            type: "single",
+            cards: [createCard("2", "spades")],
+            primaryRank: "2",
+            highestCard: createCard("2", "spades")
+          },
+          passedPlayerIds: []
+        }
+      },
+      strategy: "lowest-legal"
+    });
+
+    expect(decision.move).toEqual({ type: "pass" });
+  });
+
+  it("uses the hard baseline to preserve pairs when answering singles", () => {
+    const decision = chooseBotMove({
+      hand: [createCard("5", "diamonds"), createCard("5", "clubs"), createCard("6", "diamonds")],
+      context: {
+        isFirstMove: false,
+        currentTrick: {
+          leadingPlayerId: "player-1",
+          lastPlayedByPlayerId: "player-1",
+          hand: {
+            type: "single",
+            cards: [createCard("4", "diamonds")],
+            primaryRank: "4",
+            highestCard: createCard("4", "diamonds")
+          },
+          passedPlayerIds: []
+        }
+      },
+      strategy: "simple-heuristic"
+    });
+
+    expect(decision.move).toEqual({ type: "play", cards: [createCard("6", "diamonds")] });
+  });
+
+  it("uses the hard baseline to finish immediately when the whole hand is legal", () => {
+    const pair = [createCard("Q", "diamonds"), createCard("Q", "crowns")];
+    const decision = chooseBotMove({
+      hand: pair,
+      context: openTrick,
+      strategy: "simple-heuristic"
+    });
+
+    expect(decision.move).toEqual({ type: "play", cards: pair });
   });
 });

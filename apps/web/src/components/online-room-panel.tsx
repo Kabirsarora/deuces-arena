@@ -150,7 +150,7 @@ const DEUCES_RULES: readonly string[] = [
   "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
   "Straights must match the exact length that opened the trick.",
   "Players may pass even when they have a legal higher play.",
-  "A bomb is four of a kind plus one kicker and can beat normal hands.",
+  "A bomb is four of a kind plus one off-rank kicker and can beat normal hands.",
   "When everyone else passes, the last player to make a valid play leads the next trick."
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
@@ -347,8 +347,8 @@ export function OnlineRoomPanel({
     setDealAnimationKey(dealAnimationTriggerKey);
     setHandDealtVisible(false);
 
-    const revealHandTimeout = window.setTimeout(() => setHandDealtVisible(true), 850);
-    const clearDealTimeout = window.setTimeout(() => setDealAnimationKey(null), 2400);
+    const revealHandTimeout = window.setTimeout(() => setHandDealtVisible(true), 1100);
+    const clearDealTimeout = window.setTimeout(() => setDealAnimationKey(null), 2200);
 
     return () => {
       window.clearTimeout(revealHandTimeout);
@@ -533,8 +533,12 @@ export function OnlineRoomPanel({
   }, [activeTablePanel, room?.recentChat, room?.roomCode]);
 
   useEffect(() => {
+    if (room?.status === "in-progress" || room?.status === "complete") {
+      return;
+    }
+
     setBotSeats((current) => Math.min(current, availableBotSeats));
-  }, [availableBotSeats]);
+  }, [availableBotSeats, room?.status]);
 
   useEffect(() => {
     setCardsPerPlayer((current) => Math.min(current, getMaxCardsPerPlayer(deckType, playerCount)));
@@ -575,6 +579,21 @@ export function OnlineRoomPanel({
       },
       handleRoomAck("Room created.")
     );
+  }
+
+  function changeDeckType(nextDeckType: DeckType) {
+    const seatedPlayers = room?.players.length ?? 0;
+    const maximumPlayers = getMaxPlayersForSetup(nextDeckType, cardsPerPlayer);
+
+    if (seatedPlayers > maximumPlayers) {
+      setMessage(
+        `The ${nextDeckType === "classic" ? "Classic" : "Arena 6"} deck cannot seat ${seatedPlayers} players with ${cardsPerPlayer} cards each.`
+      );
+      return;
+    }
+
+    setDeckType(nextDeckType);
+    setPlayerCount((current) => Math.min(current, maximumPlayers));
   }
 
   function createBotGame() {
@@ -1234,7 +1253,7 @@ export function OnlineRoomPanel({
         onJoinTournament={joinTournamentQueue}
         onLeaveTournament={leaveTournamentQueue}
         onBotSeatsChange={setBotSeats}
-        onDeckTypeChange={setDeckType}
+        onDeckTypeChange={changeDeckType}
         onPlayerCountChange={setPlayerCount}
         onCardsPerPlayerChange={setCardsPerPlayer}
         onTimerEnabledChange={setLobbyTimerEnabled}
@@ -1282,7 +1301,7 @@ export function OnlineRoomPanel({
         onStart={startRoom}
         onLeave={leaveRoom}
         onBotSeatsChange={setBotSeats}
-        onDeckTypeChange={setDeckType}
+        onDeckTypeChange={changeDeckType}
         onPlayerCountChange={setPlayerCount}
         onCardsPerPlayerChange={setCardsPerPlayer}
         onTimerEnabledChange={setLobbyTimerEnabled}
@@ -1497,6 +1516,7 @@ export function OnlineRoomPanel({
                     <motion.button
                       key={getCardId(card)}
                       layout
+                      layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
                       type="button"
                       className="relative -ml-3 shrink-0 rounded-md first:ml-0 disabled:cursor-default sm:-ml-4"
                       aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
@@ -1548,11 +1568,11 @@ export function OnlineRoomPanel({
                         ...(shouldReduceMotion
                           ? { duration: 0 }
                           : {
-                              delay: dealAnimationKey === null ? 0 : Math.min(0.5, index * 0.035),
+                              delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.05),
                               type: "spring",
-                              stiffness: 260,
-                              damping: 30,
-                              mass: 0.9
+                              stiffness: 230,
+                              damping: 27,
+                              mass: 0.82
                             })
                       }}
                       drag="x"
@@ -1699,6 +1719,7 @@ function OnlineLobbyHub({
   const activity = lobby?.activity;
   const openRooms = lobby?.openRooms ?? [];
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
+  const maximumPlayerCount = getMaxPlayersForSetup(deckType, cardsPerPlayer);
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
@@ -1783,7 +1804,7 @@ function OnlineLobbyHub({
                       label="Table seats"
                       value={playerCount}
                       min={2}
-                      max={MAX_CASUAL_PLAYERS_PER_ROOM}
+                      max={maximumPlayerCount}
                       disabled={!connected}
                       onChange={onPlayerCountChange}
                     />
@@ -2105,10 +2126,10 @@ function CompactBotDifficulty({
       </div>
       <p className="mt-2 text-xs font-semibold text-zinc-400">
         {value === "easy"
-          ? "Explores random legal moves."
+          ? "Random legal choices, including optional passes."
           : value === "normal"
-            ? "Conserves strength with low legal plays."
-            : "Compares a bounded set of moves with simulated playouts."}
+            ? "Plays cheaply and saves bombs when passing is safe."
+            : "Preserves combinations, spots immediate wins, and compares bounded playouts."}
       </p>
     </div>
   );
@@ -2179,7 +2200,9 @@ function CompactDeckControl({
         ))}
       </div>
       <p className="mt-2 text-xs font-semibold text-zinc-400">
-        Arena 6 adds ★ Stars and ♛ Crowns above spades.
+        {value === "arena-six"
+          ? "78 cards: Stars rank above spades; Crowns are highest."
+          : "52 cards: diamonds, clubs, hearts, then spades."}
       </p>
     </div>
   );
@@ -2916,6 +2939,7 @@ function OnlineWaitingRoom({
   const seatedHumans = room.players.filter((player) => player.kind === "human").length;
   const seatsNeeded = Math.max(0, playerCount - room.players.length - botSeats);
   const inviteUrl = getRoomInviteUrl(room.roomCode);
+  const maximumPlayerCount = getMaxPlayersForSetup(deckType, cardsPerPlayer);
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
@@ -2982,7 +3006,7 @@ function OnlineWaitingRoom({
             label="Table seats"
             value={playerCount}
             min={Math.max(2, room.players.length)}
-            max={MAX_CASUAL_PLAYERS_PER_ROOM}
+            max={maximumPlayerCount}
             disabled={!connected}
             onChange={onPlayerCountChange}
           />
@@ -4117,9 +4141,16 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
       : "After a bomb, only a stronger bomb can answer.";
   const suitOrder =
     room?.rules.deckType === "arena-six"
-      ? "Diamonds, clubs, hearts, spades, stars, crowns from low to high. Stars and crowns are placeholder Arena 6 suits."
+      ? "Diamonds, clubs, hearts, spades, stars, crowns from low to high."
       : "Diamonds, clubs, hearts, spades from low to high.";
   const highestCard = room?.rules.deckType === "arena-six" ? "2 of crowns" : "2 of spades";
+  const arenaRules =
+    room?.rules.deckType === "arena-six"
+      ? [
+          "Arena 6 uses a 78-card deck. Pairs, trips, and quads may use any combination of its six suits.",
+          "Five or six cards of one rank are not a separate hand. Arena 6 bombs remain exactly four matching cards plus one off-rank kicker."
+        ]
+      : [];
   const tradeRule =
     room?.tradePhase.status === "disabled"
       ? []
@@ -4138,7 +4169,7 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
       </div>
 
       <ol className="grid gap-2">
-        {[...DEUCES_RULES, bombRule, ...tradeRule].map((rule, index) => (
+        {[...DEUCES_RULES, ...arenaRules, bombRule, ...tradeRule].map((rule, index) => (
           <li
             key={rule}
             className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
@@ -4498,7 +4529,7 @@ function OnlineTable({
     }
 
     setVisiblePassKey(latestPass.eventKey);
-    const timeout = window.setTimeout(() => setVisiblePassKey(null), 1400);
+    const timeout = window.setTimeout(() => setVisiblePassKey(null), 1800);
 
     return () => window.clearTimeout(timeout);
   }, [latestPass?.eventKey]);
@@ -4516,7 +4547,9 @@ function OnlineTable({
       </div>
 
       <AnimatePresence>
-        {dealAnimationKey !== null ? <DealAnimationOverlay key={dealAnimationKey} /> : null}
+        {dealAnimationKey !== null ? (
+          <DealAnimationOverlay key={dealAnimationKey} seatCount={seatedPlayers.length} />
+        ) : null}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -4600,6 +4633,7 @@ function OnlineTable({
                   <motion.div
                     key={`${room.turnNumber}-${getCardId(card)}`}
                     layout
+                    layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
                     initial={{
                       opacity: 0,
                       x: trickEntryOffset.x,
@@ -4612,9 +4646,9 @@ function OnlineTable({
                     transition={{
                       delay: Math.min(0.28, index * 0.055),
                       type: "spring",
-                      stiffness: 280,
-                      damping: 30,
-                      mass: 0.9
+                      stiffness: 240,
+                      damping: 27,
+                      mass: 0.82
                     }}
                   >
                     <OnlineCard card={card} compact />
@@ -4962,21 +4996,23 @@ function MatchResultsPanel({
   );
 }
 
-function DealAnimationOverlay() {
+function DealAnimationOverlay({ seatCount }: { readonly seatCount: number }) {
+  const visibleSeatCount = Math.max(2, Math.min(seatCount, MAX_CASUAL_PLAYERS_PER_ROOM));
+
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/18 backdrop-blur-[1px]"
+      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/20 backdrop-blur-[1px]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="relative h-44 w-64">
         <motion.div
           className="absolute left-1/2 top-1/2 h-24 w-16 -translate-x-1/2 -translate-y-1/2 rounded-md border border-[var(--gold)]/60 bg-[#142a4f] shadow-2xl"
           initial={{ rotate: -8, scale: 0.92 }}
-          animate={{ rotate: [0, -12, 10, -5, 0], scale: [0.92, 1.02, 0.98, 1] }}
-          transition={{ duration: 1.1, ease: "easeInOut" }}
+          animate={{ rotate: [0, -10, 8, -4, 0], scale: [0.92, 1.02, 0.98, 1] }}
+          transition={{ duration: 0.95, ease: "easeInOut" }}
         />
         {Array.from({ length: 9 }).map((_, index) => (
           <motion.div
@@ -4990,28 +5026,63 @@ function DealAnimationOverlay() {
               scale: 0.96
             }}
             animate={{
-              x: `calc(-50% + ${(index - 4) * 22}px)`,
-              y: `calc(-50% + ${Math.abs(index - 4) * 5}px)`,
-              rotate: (index - 4) * 7,
+              x: `calc(-50% + ${(index - 4) * 18}px)`,
+              y: `calc(-50% + ${Math.abs(index - 4) * 4}px)`,
+              rotate: (index - 4) * 6,
               opacity: [0, 1, 1, 0],
               scale: [0.96, 1, 1, 0.9]
             }}
             transition={{
-              delay: 0.14 + index * 0.055,
-              duration: 1.65,
+              delay: 0.08 + index * 0.045,
+              duration: 1.05,
               ease: "easeInOut"
             }}
           >
             <div className="m-2 h-[calc(100%-1rem)] rounded border border-white/12 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.18),transparent_34%),linear-gradient(135deg,rgba(242,193,78,0.22),transparent_45%)]" />
           </motion.div>
         ))}
+
+        {Array.from({ length: visibleSeatCount * 2 }).map((_, index) => {
+          const seatIndex = index % visibleSeatCount;
+          const dealRound = Math.floor(index / visibleSeatCount);
+          const destination = getTrickEntryOffset(seatIndex, visibleSeatCount);
+
+          return (
+            <motion.div
+              key={`deal-${index}`}
+              className="absolute left-1/2 top-1/2 h-16 w-11 rounded border border-white/20 bg-[linear-gradient(135deg,#1a386b,#0a1630)] shadow-xl"
+              initial={{ x: "-50%", y: "-50%", opacity: 0, scale: 0.82, rotate: 0 }}
+              animate={{
+                x: [`-50%`, `calc(-50% + ${destination.x}px)`],
+                y: [`-50%`, `calc(-50% + ${destination.y}px)`],
+                opacity: [0, 1, 1, 0],
+                scale: [0.82, 0.92, 0.88],
+                rotate: [0, destination.rotate]
+              }}
+              transition={{
+                delay: 0.9 + dealRound * 0.28 + seatIndex * 0.07,
+                duration: 0.58,
+                ease: [0.22, 1, 0.36, 1]
+              }}
+            />
+          );
+        })}
+
         <motion.p
           className="absolute inset-x-0 bottom-0 text-center text-xs font-black uppercase tracking-[0.18em] text-[var(--gold)]"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: [0, 1, 1, 0], y: [6, 0, 0, -4] }}
-          transition={{ duration: 1.7, delay: 0.24 }}
+          transition={{ duration: 1.05, delay: 0.12 }}
         >
           Shuffling
+        </motion.p>
+        <motion.p
+          className="absolute inset-x-0 bottom-0 text-center text-xs font-black uppercase tracking-[0.18em] text-[var(--aqua)]"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: [0, 1, 1, 0], y: [6, 0, 0, -4] }}
+          transition={{ duration: 1.05, delay: 1.02 }}
+        >
+          Dealing
         </motion.p>
       </div>
     </motion.div>
@@ -5749,8 +5820,7 @@ function OnlineCard({
   readonly playable?: boolean;
   readonly compact?: boolean;
 }) {
-  const red = card.suit === "diamonds" || card.suit === "hearts";
-  const special = card.suit === "stars" || card.suit === "crowns";
+  const suitColorClass = getCardSuitColorClass(card.suit);
 
   return (
     <motion.div
@@ -5766,21 +5836,11 @@ function OnlineCard({
         !compact && !playable && !selected ? "opacity-72 saturate-75" : ""
       )}
     >
-      <div
-        className={cn(
-          "text-left font-black leading-none",
-          red ? "text-red-600" : special ? "text-amber-600" : "text-zinc-950"
-        )}
-      >
+      <div className={cn("text-left font-black leading-none", suitColorClass)}>
         <div className={compact ? "text-base" : "text-lg"}>{card.rank}</div>
         <div className={compact ? "text-sm" : "text-base"}>{suitSymbol(card.suit)}</div>
       </div>
-      <div
-        className={cn(
-          "self-center text-center text-3xl font-black",
-          red ? "text-red-600" : special ? "text-amber-600" : "text-zinc-950"
-        )}
-      >
+      <div className={cn("self-center text-center text-3xl font-black", suitColorClass)}>
         {suitSymbol(card.suit)}
       </div>
     </motion.div>
@@ -6025,8 +6085,16 @@ function formatRatingDelta(delta: number | null): string {
 }
 
 function getMaxCardsPerPlayer(deckType: DeckType, playerCount: number): number {
-  const deckSize = deckType === "arena-six" ? 78 : 52;
+  const deckSize = getDeckSize(deckType);
   return Math.max(DEFAULT_CARDS_PER_PLAYER, Math.floor(deckSize / playerCount));
+}
+
+function getMaxPlayersForSetup(deckType: DeckType, cardsPerPlayer: number): number {
+  return Math.min(MAX_CASUAL_PLAYERS_PER_ROOM, Math.floor(getDeckSize(deckType) / cardsPerPlayer));
+}
+
+function getDeckSize(deckType: DeckType): number {
+  return deckType === "arena-six" ? 78 : 52;
 }
 
 function ordinal(value: number): string {
@@ -6061,4 +6129,20 @@ function suitSymbol(suit: Card["suit"]): string {
     case "crowns":
       return "♛";
   }
+}
+
+function getCardSuitColorClass(suit: Card["suit"]): string {
+  if (suit === "diamonds" || suit === "hearts") {
+    return "text-red-600";
+  }
+
+  if (suit === "stars") {
+    return "text-amber-600";
+  }
+
+  if (suit === "crowns") {
+    return "text-violet-700";
+  }
+
+  return "text-zinc-950";
 }

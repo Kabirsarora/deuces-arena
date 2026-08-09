@@ -42,12 +42,12 @@ The engine is deliberately independent from React and the server. A future Expo 
 
 ## Game Rules
 
-Deuces Arena currently implements classic 4-player Deuces / Big Two plus an experimental casual Arena 6 table variant:
+Deuces Arena implements classic 4-player Deuces / Big Two plus a casual Arena 6 table variant:
 
 - Each player receives 13 cards.
 - Card rank order is `3 4 5 6 7 8 9 10 J Q K A 2`.
 - Classic suit order is diamonds, clubs, hearts, spades.
-- Arena 6 adds placeholder Stars and Crowns suits above spades, so the full order is diamonds, clubs, hearts, spades, stars, crowns.
+- Arena 6 uses a 78-card deck and adds Stars and Crowns above spades, so the full order is diamonds, clubs, hearts, spades, stars, crowns.
 - Casual rooms can choose 2-6 seats and custom cards per player when the selected deck has enough cards.
 - The player holding 3 of diamonds starts, and the first play must include it.
 - The lead player chooses the trick type: single, pair, trips, quad, full house, straight, longer straight, or bomb.
@@ -63,7 +63,8 @@ Bomb variants:
 - Bomb strength is determined by the rank of the four of a kind; the kicker is ignored.
 - Default room rule: once a bomb is active, only a stronger bomb can beat it.
 - Optional room rule: a bomb immediately wins the trick, so no stronger bomb response is allowed.
-- Arena 6 keeps bombs as four of a kind plus one kicker for now; five- or six-of-a-kind "super bomb" rules are intentionally deferred.
+- Arena 6 pairs, trips, and quads may use any of its six suits.
+- Arena 6 bombs remain exactly four matching cards plus one off-rank kicker. Five or six cards of one rank are not a separate hand type.
 - These are intentionally documented as variant choices so more house rules can be added later.
 
 ## Local Setup
@@ -156,7 +157,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Finish production OAuth verification and continue polishing mobile layout, animations, and accessibility.
 - Add Redis-backed room and matchmaking durability for backend restarts and future multi-instance hosting.
 - Expand ranked and tournament matchmaking with rating bands, durable queue health, rating history, reconnect recovery, and additional anti-abuse checks.
-- Decide final Arena 6 suit art/names and whether expanded decks should add any super-bomb variant.
+- Tune Arena 6 balance from public match data while keeping its finalized six-suit rules backward compatible.
 - Benchmark and tune the current mixed-policy Monte Carlo evaluator with larger self-play datasets.
 - Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
 - Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.

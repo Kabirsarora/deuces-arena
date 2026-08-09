@@ -1,5 +1,6 @@
 import { chooseBotMove } from "./bots.js";
 import { applyMove, type GameState } from "./game.js";
+import { detectHand, type HandType } from "./hands.js";
 import { generateLegalMoves } from "./legal-moves.js";
 import type { Move } from "./moves.js";
 
@@ -183,8 +184,15 @@ export function evaluateLegalMovesByRandomRollouts(
     isFirstMove: input.state.turnNumber === 0,
     currentTrick: input.state.currentTrick
   });
-  const movesToEvaluate =
-    input.maxMoves === undefined ? legalMoves : legalMoves.slice(0, Math.max(0, input.maxMoves));
+  const movesToEvaluate = selectMovesForEvaluation(
+    legalMoves,
+    player.hand,
+    {
+      isFirstMove: input.state.turnNumber === 0,
+      currentTrick: input.state.currentTrick
+    },
+    input.maxMoves
+  );
 
   return movesToEvaluate
     .map((move) =>
@@ -208,6 +216,68 @@ export function evaluateLegalMovesByRandomRollouts(
       })
     )
     .sort(compareMoveEvaluations);
+}
+
+function selectMovesForEvaluation(
+  legalMoves: readonly Move[],
+  hand: GameState["players"][number]["hand"],
+  context: Parameters<typeof chooseBotMove>[0]["context"],
+  maxMoves: number | undefined
+): readonly Move[] {
+  if (maxMoves === undefined || legalMoves.length <= maxMoves) {
+    return legalMoves;
+  }
+
+  const limit = Math.max(0, maxMoves);
+  const selected: Move[] = [];
+  const addMove = (move: Move | undefined) => {
+    if (move !== undefined && !selected.some((candidate) => moveKey(candidate) === moveKey(move))) {
+      selected.push(move);
+    }
+  };
+  const heuristicMove = chooseBotMove({ hand, context, strategy: "simple-heuristic" }).move;
+  const playMoves = legalMoves.filter((move) => move.type === "play");
+  const movesByType = new Map<HandType, Move[]>();
+
+  addMove(heuristicMove);
+  addMove(playMoves.find((move) => move.cards.length === hand.length));
+  addMove(legalMoves.find((move) => move.type === "pass"));
+
+  for (const move of playMoves) {
+    const handAnalysis = detectHand(move.cards);
+
+    if (handAnalysis.type !== "invalid") {
+      movesByType.set(handAnalysis.type, [...(movesByType.get(handAnalysis.type) ?? []), move]);
+    }
+  }
+
+  for (const moves of movesByType.values()) {
+    addMove(moves[0]);
+    addMove(moves.at(-1));
+  }
+
+  if (selected.length < limit) {
+    const remainingMoves = legalMoves.filter(
+      (move) => !selected.some((candidate) => moveKey(candidate) === moveKey(move))
+    );
+    const remainingSlots = limit - selected.length;
+
+    for (let index = 0; index < remainingSlots; index += 1) {
+      const moveIndex = Math.floor((index * remainingMoves.length) / Math.max(1, remainingSlots));
+      addMove(remainingMoves[moveIndex]);
+    }
+  }
+
+  return selected.slice(0, limit);
+}
+
+function moveKey(move: Move): string {
+  return move.type === "pass"
+    ? "pass"
+    : move.cards
+        .map((card) => `${card.rank}-${card.suit}`)
+        .sort()
+        .join("|");
 }
 
 export function chooseSimulationGuidedMove(

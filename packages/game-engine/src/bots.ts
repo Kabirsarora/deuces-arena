@@ -42,7 +42,7 @@ export function chooseBotMove(input: BotDecisionInput): BotDecision {
 
   if (strategy === "simple-heuristic") {
     return {
-      move: chooseSimpleHeuristicMove(legalMoves, input.context),
+      move: chooseSimpleHeuristicMove(legalMoves, input.context, input.hand),
       legalMoveCount: legalMoves.length,
       strategy
     };
@@ -66,6 +66,7 @@ function chooseRandomMove(moves: readonly Move[], random: () => number): Move {
 
 function chooseLowestLegalMove(moves: readonly Move[]): Move {
   const playMoves = moves.filter((move): move is PlayMove => move.type === "play");
+  const passMove = moves.find((move) => move.type === "pass");
 
   if (playMoves.length === 0) {
     return {
@@ -73,14 +74,24 @@ function chooseLowestLegalMove(moves: readonly Move[]): Move {
     };
   }
 
+  const nonBombMoves = playMoves.filter((move) => detectPlayableHand(move)?.type !== "bomb");
+
+  if (nonBombMoves.length === 0 && passMove !== undefined) {
+    return passMove;
+  }
+
   return (
-    [...playMoves].sort(comparePlayMoves)[0] ?? {
+    [...(nonBombMoves.length > 0 ? nonBombMoves : playMoves)].sort(comparePlayMoves)[0] ?? {
       type: "pass"
     }
   );
 }
 
-function chooseSimpleHeuristicMove(moves: readonly Move[], context: MoveValidationContext): Move {
+function chooseSimpleHeuristicMove(
+  moves: readonly Move[],
+  context: MoveValidationContext,
+  hand: readonly Card[]
+): Move {
   const playMoves = moves.filter((move): move is PlayMove => move.type === "play");
   const passMove = moves.find((move) => move.type === "pass");
 
@@ -92,9 +103,18 @@ function chooseSimpleHeuristicMove(moves: readonly Move[], context: MoveValidati
     );
   }
 
+  const finishingMoves = playMoves.filter((move) => move.cards.length === hand.length);
+
+  if (finishingMoves.length > 0) {
+    return [...finishingMoves].sort(comparePlayMoves)[0] ?? finishingMoves[0] ?? { type: "pass" };
+  }
+
   if (context.currentTrick === null) {
+    const nonBombLeads = playMoves.filter((move) => detectPlayableHand(move)?.type !== "bomb");
     return (
-      [...playMoves].sort(compareLeadHeuristicMoves)[0] ?? {
+      [...(nonBombLeads.length > 0 ? nonBombLeads : playMoves)].sort(
+        compareLeadHeuristicMoves
+      )[0] ?? {
         type: "pass"
       }
     );
@@ -108,10 +128,46 @@ function chooseSimpleHeuristicMove(moves: readonly Move[], context: MoveValidati
   }
 
   return (
-    [...(nonBombResponses.length > 0 ? nonBombResponses : playMoves)].sort(comparePlayMoves)[0] ?? {
-      type: "pass"
-    }
+    [...(nonBombResponses.length > 0 ? nonBombResponses : playMoves)].sort((left, right) =>
+      compareConservingResponses(left, right, hand)
+    )[0] ?? { type: "pass" }
   );
+}
+
+function compareConservingResponses(
+  left: PlayMove,
+  right: PlayMove,
+  hand: readonly Card[]
+): number {
+  const splitComparison = getGroupSplitPenalty(left, hand) - getGroupSplitPenalty(right, hand);
+
+  return splitComparison !== 0 ? splitComparison : comparePlayMoves(left, right);
+}
+
+function getGroupSplitPenalty(move: PlayMove, hand: readonly Card[]): number {
+  const handCounts = countCardsByRank(hand);
+  const moveCounts = countCardsByRank(move.cards);
+  let penalty = 0;
+
+  for (const [rank, selectedCount] of moveCounts) {
+    const remainingCount = (handCounts.get(rank) ?? 0) - selectedCount;
+
+    if (remainingCount > 0) {
+      penalty += remainingCount;
+    }
+  }
+
+  return penalty;
+}
+
+function countCardsByRank(cards: readonly Card[]): Map<Card["rank"], number> {
+  const counts = new Map<Card["rank"], number>();
+
+  for (const card of cards) {
+    counts.set(card.rank, (counts.get(card.rank) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 function compareLeadHeuristicMoves(left: PlayMove, right: PlayMove): number {
