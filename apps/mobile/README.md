@@ -14,6 +14,8 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
 - Shared web/mobile ratings, coins, cosmetics, history, admin access, ranked matchmaking, and
   tournament queue entry.
 - Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
+- A single immersive table surface for seats, tricks, controls, and the player hand, with exact
+  opponent card counts and saved card-back/table cosmetics shared across web and mobile.
 
 ## Start Locally
 

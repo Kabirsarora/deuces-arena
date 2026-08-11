@@ -68,6 +68,7 @@ export type MobileAccountSession = {
 type ArenaContextValue = {
   readonly connectionStatus: ConnectionStatus;
   readonly serverUrl: string;
+  readonly webUrl: string;
   readonly account: MobileAccountSession | null;
   readonly accountWorking: boolean;
   readonly guestId: string | null;
@@ -697,6 +698,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     () => ({
       connectionStatus,
       serverUrl: SERVER_URL,
+      webUrl: WEB_URL,
       account,
       accountWorking,
       guestId,
