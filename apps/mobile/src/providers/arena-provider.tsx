@@ -2,11 +2,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { DeckType, Move } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  FeedbackKind,
   ProfileAvatarKey,
   PublicBotDifficulty,
   PublicBotPace,
+  PublicChatMessage,
+  PublicCosmetic,
+  PublicFeedbackReceipt,
   PublicGuestProfile,
   PublicLobbyState,
+  PublicMatchHistoryItem,
   PublicRankedQueueState,
   PublicRoomState,
   PublicTournamentQueueState,
@@ -28,6 +33,7 @@ import { io, type Socket } from "socket.io-client";
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "https://api.deucesarena.com";
 const GUEST_ID_KEY = "deuces-arena-mobile-guest-id";
 const PLAYER_NAME_KEY = "deuces-arena-mobile-player-name";
+const ROOM_SESSION_KEY = "deuces-arena-mobile-room-session";
 
 type ConnectionStatus = "waking" | "online" | "offline";
 
@@ -40,12 +46,20 @@ type BotGameOptions = {
   readonly pace: PublicBotPace;
 };
 
+type StoredRoomSession = {
+  readonly roomCode: string;
+  readonly playerId: string;
+  readonly guestId: string;
+};
+
 type ArenaContextValue = {
   readonly connectionStatus: ConnectionStatus;
   readonly serverUrl: string;
   readonly guestId: string | null;
   readonly playerName: string;
   readonly profile: PublicGuestProfile | null;
+  readonly cosmetics: readonly PublicCosmetic[];
+  readonly matchHistory: readonly PublicMatchHistoryItem[];
   readonly lobby: PublicLobbyState | null;
   readonly rankedQueue: PublicRankedQueueState | null;
   readonly tournamentQueue: PublicTournamentQueueState | null;
@@ -57,7 +71,12 @@ type ArenaContextValue = {
   readonly joinRoom: (roomCode: string) => Promise<boolean>;
   readonly leaveRoom: () => Promise<void>;
   readonly submitMove: (move: Move) => Promise<boolean>;
+  readonly sendChat: (body: string) => Promise<boolean>;
+  readonly equipCosmetic: (cosmeticId: string) => Promise<boolean>;
+  readonly purchaseCosmetic: (cosmeticId: string) => Promise<boolean>;
+  readonly submitFeedback: (kind: FeedbackKind, body: string) => Promise<boolean>;
   readonly updateProfile: (displayName: string, avatarKey: ProfileAvatarKey) => Promise<boolean>;
+  readonly refreshProfileData: () => void;
   readonly refreshLobby: () => void;
 };
 
@@ -67,10 +86,13 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
   const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
   const guestIdRef = useRef<string | null>(null);
   const playerNameRef = useRef("Player");
+  const completedRoomRef = useRef<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("waking");
   const [guestId, setGuestId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("Player");
   const [profile, setProfile] = useState<PublicGuestProfile | null>(null);
+  const [cosmetics, setCosmetics] = useState<readonly PublicCosmetic[]>([]);
+  const [matchHistory, setMatchHistory] = useState<readonly PublicMatchHistoryItem[]>([]);
   const [lobby, setLobby] = useState<PublicLobbyState | null>(null);
   const [rankedQueue, setRankedQueue] = useState<PublicRankedQueueState | null>(null);
   const [tournamentQueue, setTournamentQueue] = useState<PublicTournamentQueueState | null>(null);
@@ -92,8 +114,11 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     });
   }, []);
 
-  const refreshProfile = useCallback((activeGuestId: string) => {
-    socketRef.current?.emit("profile:get", { guestId: activeGuestId }, (ack) => {
+  const refreshProfileDataForGuest = useCallback((activeGuestId: string) => {
+    const socket = socketRef.current;
+    if (socket === null || !socket.connected) return;
+
+    socket.emit("profile:get", { guestId: activeGuestId }, (ack) => {
       if (!ack.ok) return;
       setProfile(ack.data);
       if (ack.data.displayName !== null) {
@@ -101,7 +126,17 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
         setPlayerName(ack.data.displayName);
       }
     });
+    socket.emit("cosmetics:list", (ack) => {
+      if (ack.ok) setCosmetics(ack.data);
+    });
+    socket.emit("profile:history", { guestId: activeGuestId, limit: 12 }, (ack) => {
+      if (ack.ok) setMatchHistory(ack.data);
+    });
   }, []);
+
+  const refreshProfileData = useCallback(() => {
+    if (guestIdRef.current !== null) refreshProfileDataForGuest(guestIdRef.current);
+  }, [refreshProfileDataForGuest]);
 
   useEffect(() => {
     let disposed = false;
@@ -128,11 +163,32 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       });
       socketRef.current = socket;
 
-      socket.on("connect", () => {
+      socket.on("connect", async () => {
         setConnectionStatus("online");
         setNotice("Connected to Deuces Arena.");
         refreshLobby();
-        refreshProfile(activeGuestId);
+        refreshProfileDataForGuest(activeGuestId);
+
+        const storedRoom = await readStoredRoomSession();
+        if (storedRoom === null || storedRoom.guestId !== activeGuestId || !socket?.connected)
+          return;
+
+        socket.emit(
+          "room:reconnect",
+          {
+            roomCode: storedRoom.roomCode,
+            playerId: storedRoom.playerId,
+            guestId: activeGuestId
+          },
+          (ack) => {
+            if (ack.ok) {
+              setRoom(ack.data);
+              setNotice(`Rejoined table ${ack.data.roomCode}.`);
+              return;
+            }
+            void AsyncStorage.removeItem(ROOM_SESSION_KEY);
+          }
+        );
       });
       socket.on("disconnect", () => {
         setConnectionStatus("offline");
@@ -146,6 +202,14 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       socket.on("lobby:state", setLobby);
       socket.on("ranked:state", setRankedQueue);
       socket.on("tournament:state", setTournamentQueue);
+      socket.on("chat:message", (message: PublicChatMessage) => {
+        setRoom((current) => {
+          if (current === null || current.recentChat.some((item) => item.id === message.id)) {
+            return current;
+          }
+          return { ...current, recentChat: [...current.recentChat, message].slice(-50) };
+        });
+      });
       socket.on("game:error", ({ message }) => setNotice(message));
     }
 
@@ -155,7 +219,24 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       socket?.disconnect();
       socketRef.current = null;
     };
-  }, [refreshLobby, refreshProfile]);
+  }, [refreshLobby, refreshProfileDataForGuest]);
+
+  useEffect(() => {
+    if (room?.yourPlayerId === null || room?.yourPlayerId === undefined || guestId === null) return;
+
+    const session: StoredRoomSession = {
+      roomCode: room.roomCode,
+      playerId: room.yourPlayerId,
+      guestId
+    };
+    void AsyncStorage.setItem(ROOM_SESSION_KEY, JSON.stringify(session));
+  }, [guestId, room?.roomCode, room?.yourPlayerId]);
+
+  useEffect(() => {
+    if (room?.status !== "complete" || completedRoomRef.current === room.roomCode) return;
+    completedRoomRef.current = room.roomCode;
+    refreshProfileData();
+  }, [refreshProfileData, room?.roomCode, room?.status]);
 
   const createCasualRoom = useCallback(async () => {
     const identity = activeIdentity(socketRef.current, guestIdRef.current);
@@ -274,6 +355,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       return;
     }
     setRoom(null);
+    await AsyncStorage.removeItem(ROOM_SESSION_KEY);
     setNotice("Left the table.");
     refreshLobby();
   }, [refreshLobby, room]);
@@ -287,6 +369,87 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
         socket.emit("game:move", { roomCode: room.roomCode, move }, callback)
       );
       return handleRoomAck(ack, setRoom, setNotice);
+    },
+    [room]
+  );
+
+  const sendChat = useCallback(
+    async (body: string) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null || body.trim() === "") return false;
+
+      const ack = await emitWithAck<PublicChatMessage>((callback) =>
+        socket.emit("chat:send", { roomCode: room.roomCode, body }, callback)
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      return true;
+    },
+    [room]
+  );
+
+  const equipCosmetic = useCallback(async (cosmeticId: string) => {
+    const identity = activeIdentity(socketRef.current, guestIdRef.current);
+    if (identity === null) return false;
+
+    const ack = await emitWithAck<PublicGuestProfile>((callback) =>
+      identity.socket.emit("cosmetics:equip", { guestId: identity.guestId, cosmeticId }, callback)
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setProfile(ack.data);
+    setNotice("Cosmetic equipped.");
+    return true;
+  }, []);
+
+  const purchaseCosmetic = useCallback(async (cosmeticId: string) => {
+    const identity = activeIdentity(socketRef.current, guestIdRef.current);
+    if (identity === null) return false;
+
+    const ack = await emitWithAck<PublicGuestProfile>((callback) =>
+      identity.socket.emit(
+        "cosmetics:purchase",
+        { guestId: identity.guestId, cosmeticId },
+        callback
+      )
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setProfile(ack.data);
+    setNotice("Cosmetic unlocked.");
+    return true;
+  }, []);
+
+  const submitFeedback = useCallback(
+    async (kind: FeedbackKind, body: string) => {
+      const socket = socketRef.current;
+      const activeGuestId = guestIdRef.current;
+      if (socket === null || !socket.connected || activeGuestId === null) return false;
+
+      const ack = await emitWithAck<PublicFeedbackReceipt>((callback) =>
+        socket.emit(
+          "feedback:submit",
+          {
+            kind,
+            body,
+            guestId: activeGuestId,
+            ...(room === null ? {} : { roomCode: room.roomCode })
+          },
+          callback
+        )
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      setNotice("Thanks. Your feedback was received.");
+      return true;
     },
     [room]
   );
@@ -322,6 +485,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       guestId,
       playerName,
       profile,
+      cosmetics,
+      matchHistory,
       lobby,
       rankedQueue,
       tournamentQueue,
@@ -333,27 +498,39 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       joinRoom,
       leaveRoom,
       submitMove,
+      sendChat,
+      equipCosmetic,
+      purchaseCosmetic,
+      submitFeedback,
       updateProfile,
+      refreshProfileData,
       refreshLobby
     }),
     [
       connectionStatus,
+      cosmetics,
       createBotGame,
       createCasualRoom,
       guestId,
+      equipCosmetic,
       joinRoom,
       leaveRoom,
       lobby,
+      matchHistory,
       notice,
       playerName,
       profile,
+      purchaseCosmetic,
       rankedQueue,
       refreshLobby,
       room,
+      sendChat,
+      submitFeedback,
       submitMove,
       startCurrentRoom,
       tournamentQueue,
-      updateProfile
+      updateProfile,
+      refreshProfileData
     ]
   );
 
@@ -368,6 +545,22 @@ export function useArena(): ArenaContextValue {
 
 function createGuestId(): string {
   return `guest-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function readStoredRoomSession(): Promise<StoredRoomSession | null> {
+  const stored = await AsyncStorage.getItem(ROOM_SESSION_KEY);
+  if (stored === null) return null;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<StoredRoomSession>;
+    return typeof parsed.roomCode === "string" &&
+      typeof parsed.playerId === "string" &&
+      typeof parsed.guestId === "string"
+      ? { roomCode: parsed.roomCode, playerId: parsed.playerId, guestId: parsed.guestId }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function activeIdentity(

@@ -18,7 +18,7 @@ import { palette, radius, spacing } from "@/constants/theme";
 import { useArena } from "@/providers/arena-provider";
 
 export default function PlayScreen() {
-  const { connectionStatus, createBotGame, notice } = useArena();
+  const { connectionStatus, createBotGame, notice, room } = useArena();
   const [playerCount, setPlayerCount] = useState(4);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(13);
   const [deckType, setDeckType] = useState<DeckType>("classic");
@@ -48,6 +48,15 @@ export default function PlayScreen() {
   return (
     <ArenaScreen>
       <ScreenHeader eyebrow="Deuces Arena" title="Play" description={notice} />
+
+      {room === null ? null : (
+        <ActionButton
+          label={
+            room.status === "complete" ? "View match results" : `Resume table ${room.roomCode}`
+          }
+          onPress={() => router.push("/table")}
+        />
+      )}
 
       <ImageBackground
         source={jungleClubTable}
@@ -144,7 +153,7 @@ export default function PlayScreen() {
       <ActionButton
         label="Deal cards"
         loading={starting}
-        disabled={connectionStatus !== "online"}
+        disabled={connectionStatus !== "online" || room !== null}
         onPress={() => void startGame()}
       />
     </ArenaScreen>

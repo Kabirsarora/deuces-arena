@@ -6,9 +6,30 @@ import {
   type Move
 } from "@deuces-arena/game-engine";
 import { router } from "expo-router";
-import { ArrowLeft, CircleDot, Copy, Play, RotateCcw, SkipForward } from "lucide-react-native";
+import {
+  ArrowLeft,
+  CircleDot,
+  Copy,
+  MessageCircle,
+  Play,
+  RotateCcw,
+  Send,
+  SkipForward,
+  X
+} from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ActionButton } from "@/components/arena-ui";
@@ -17,10 +38,14 @@ import { palette, radius, spacing } from "@/constants/theme";
 import { useArena } from "@/providers/arena-provider";
 
 export default function TableScreen() {
-  const { leaveRoom, notice, room, startCurrentRoom, submitMove } = useArena();
+  const { leaveRoom, notice, room, sendChat, startCurrentRoom, submitMove } = useArena();
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [dealing, setDealing] = useState(false);
   const [working, setWorking] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatBody, setChatBody] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+  const [lastReadChatCount, setLastReadChatCount] = useState(0);
   const trickAnimation = useRef(new Animated.Value(1)).current;
 
   const selectedCards = useMemo(
@@ -57,6 +82,7 @@ export default function TableScreen() {
   const opponents = room?.players.filter((player) => player.id !== room.yourPlayerId) ?? [];
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const latestEvent = room?.recentEvents.at(-1) ?? null;
+  const unreadChat = Math.max(0, (room?.recentChat.length ?? 0) - lastReadChatCount);
 
   useEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0)
@@ -98,6 +124,19 @@ export default function TableScreen() {
     setWorking(false);
   }
 
+  function openChat() {
+    setLastReadChatCount(room?.recentChat.length ?? 0);
+    setChatOpen(true);
+  }
+
+  async function sendMessage() {
+    if (chatBody.trim() === "") return;
+    setSendingChat(true);
+    const sent = await sendChat(chatBody);
+    if (sent) setChatBody("");
+    setSendingChat(false);
+  }
+
   function toggleCard(card: Card) {
     const id = getCardId(card);
     setSelectedIds((current) =>
@@ -109,9 +148,12 @@ export default function TableScreen() {
     const emptySeats = Math.max(0, room.rules.playerCount - room.players.length);
     return (
       <SafeAreaView style={styles.waiting}>
-        <Pressable onPress={() => void leave()} style={styles.backButton}>
-          <ArrowLeft color={palette.text} size={22} />
-        </Pressable>
+        <View style={styles.waitingHeader}>
+          <Pressable onPress={() => void leave()} style={styles.backButton}>
+            <ArrowLeft color={palette.text} size={22} />
+          </Pressable>
+          <ChatButton unread={unreadChat} onPress={openChat} />
+        </View>
         <View style={styles.waitingCenter}>
           <View style={styles.waitingTable}>
             <Text style={styles.waitingEyebrow}>Casual table</Text>
@@ -141,6 +183,17 @@ export default function TableScreen() {
           />
           <ActionButton label="Leave room" variant="secondary" onPress={() => void leave()} />
         </View>
+        <ChatSheet
+          visible={chatOpen}
+          messages={room.recentChat}
+          yourPlayerId={room.yourPlayerId}
+          body={chatBody}
+          sending={sendingChat}
+          notice={notice}
+          onBodyChange={setChatBody}
+          onClose={() => setChatOpen(false)}
+          onSend={() => void sendMessage()}
+        />
       </SafeAreaView>
     );
   }
@@ -164,9 +217,12 @@ export default function TableScreen() {
           <Text style={styles.tableMode}>{room.mode}</Text>
           <Text style={styles.tableCode}>{room.roomCode}</Text>
         </View>
-        <View style={styles.turnPill}>
-          <CircleDot color={palette.mint} size={13} />
-          <Text style={styles.turnText}>{activePlayer?.name ?? "Table"}</Text>
+        <View style={styles.headerActions}>
+          <ChatButton unread={unreadChat} onPress={openChat} />
+          <View style={styles.turnPill}>
+            <CircleDot color={palette.mint} size={13} />
+            <Text style={styles.turnText}>{activePlayer?.name ?? "Table"}</Text>
+          </View>
         </View>
       </View>
 
@@ -237,7 +293,7 @@ export default function TableScreen() {
                 </View>
               );
             })}
-            <ActionButton label="Play again" onPress={() => router.replace("/(tabs)")} />
+            <ActionButton label="Back to lobby" onPress={() => void leave()} />
           </View>
         ) : null}
       </View>
@@ -312,7 +368,141 @@ export default function TableScreen() {
           </View>
         </View>
       ) : null}
+      <ChatSheet
+        visible={chatOpen}
+        messages={room.recentChat}
+        yourPlayerId={room.yourPlayerId}
+        body={chatBody}
+        sending={sendingChat}
+        notice={notice}
+        onBodyChange={setChatBody}
+        onClose={() => setChatOpen(false)}
+        onSend={() => void sendMessage()}
+      />
     </SafeAreaView>
+  );
+}
+
+function ChatButton({
+  unread,
+  onPress
+}: {
+  readonly unread: number;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityLabel="Open table chat" onPress={onPress} style={styles.roundButton}>
+      <MessageCircle color={palette.text} size={19} />
+      {unread > 0 ? (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadText}>{Math.min(unread, 9)}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function ChatSheet({
+  visible,
+  messages,
+  yourPlayerId,
+  body,
+  sending,
+  notice,
+  onBodyChange,
+  onClose,
+  onSend
+}: {
+  readonly visible: boolean;
+  readonly messages: readonly {
+    readonly id: string;
+    readonly playerId: string;
+    readonly playerName: string;
+    readonly body: string;
+    readonly createdAt: string;
+  }[];
+  readonly yourPlayerId: string | null;
+  readonly body: string;
+  readonly sending: boolean;
+  readonly notice: string;
+  readonly onBodyChange: (body: string) => void;
+  readonly onClose: () => void;
+  readonly onSend: () => void;
+}) {
+  const messageScroll = useRef<ScrollView | null>(null);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.modalRoot}
+      >
+        <Pressable accessibilityLabel="Close table chat" onPress={onClose} style={styles.scrim} />
+        <View style={styles.chatSheet}>
+          <View style={styles.chatHeader}>
+            <View>
+              <Text style={styles.chatTitle}>Table chat</Text>
+              <Text style={styles.chatSubtitle}>{messages.length} recent messages</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Close table chat"
+              onPress={onClose}
+              style={styles.roundButton}
+            >
+              <X color={palette.text} size={19} />
+            </Pressable>
+          </View>
+          <ScrollView
+            ref={messageScroll}
+            contentContainerStyle={styles.messages}
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => messageScroll.current?.scrollToEnd({ animated: true })}
+          >
+            {messages.length === 0 ? (
+              <View style={styles.emptyChat}>
+                <MessageCircle color={palette.muted} size={24} />
+                <Text style={styles.emptyChatText}>No messages yet.</Text>
+              </View>
+            ) : (
+              messages.map((message) => {
+                const own = message.playerId === yourPlayerId;
+                return (
+                  <View key={message.id} style={[styles.message, own && styles.ownMessage]}>
+                    <Text style={[styles.messageName, own && styles.ownMessageName]}>
+                      {own ? "You" : message.playerName}
+                    </Text>
+                    <Text style={styles.messageBody}>{message.body}</Text>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+          <View style={styles.composer}>
+            <TextInput
+              value={body}
+              onChangeText={onBodyChange}
+              onSubmitEditing={onSend}
+              maxLength={240}
+              returnKeyType="send"
+              placeholder="Message the table..."
+              placeholderTextColor={palette.muted}
+              style={styles.chatInput}
+            />
+            <Pressable
+              accessibilityLabel="Send message"
+              disabled={body.trim() === "" || sending}
+              onPress={onSend}
+              style={[styles.sendButton, (body.trim() === "" || sending) && styles.disabled]}
+            >
+              <Send color={palette.ink} size={18} />
+            </Pressable>
+          </View>
+          {notice.toLowerCase().includes("message") ? (
+            <Text style={styles.chatNotice}>{notice}</Text>
+          ) : null}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -357,6 +547,19 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface
   },
   turnText: { flexShrink: 1, color: palette.text, fontSize: 11, fontWeight: "800" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 7 },
+  unreadBadge: {
+    position: "absolute",
+    right: -3,
+    top: -3,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.coral
+  },
+  unreadText: { color: palette.white, fontSize: 9, fontWeight: "900" },
   felt: {
     flex: 1,
     minHeight: 310,
@@ -510,6 +713,7 @@ const styles = StyleSheet.create({
   },
   missingTitle: { color: palette.text, fontSize: 26, fontWeight: "900", textAlign: "center" },
   waiting: { flex: 1, backgroundColor: palette.ink, padding: spacing.lg },
+  waitingHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   backButton: {
     width: 42,
     height: 42,
@@ -540,5 +744,68 @@ const styles = StyleSheet.create({
   copyText: { color: palette.gold, fontSize: 12, fontWeight: "700" },
   seatStatus: { color: palette.text, fontSize: 16, fontWeight: "800" },
   waitingNotice: { color: palette.muted, fontSize: 12, textAlign: "center" },
-  waitingActions: { gap: spacing.sm }
+  waitingActions: { gap: spacing.sm },
+  modalRoot: { flex: 1, justifyContent: "flex-end" },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.58)" },
+  chatSheet: {
+    height: "68%",
+    minHeight: 430,
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: palette.line,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl
+  },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md
+  },
+  chatTitle: { color: palette.text, fontSize: 20, fontWeight: "900" },
+  chatSubtitle: { color: palette.muted, fontSize: 10, marginTop: 2 },
+  messages: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm
+  },
+  emptyChat: { flex: 1, minHeight: 220, alignItems: "center", justifyContent: "center", gap: 8 },
+  emptyChatText: { color: palette.muted, fontSize: 12 },
+  message: {
+    alignSelf: "flex-start",
+    maxWidth: "82%",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: palette.surfaceRaised
+  },
+  ownMessage: { alignSelf: "flex-end", backgroundColor: palette.felt },
+  messageName: { color: palette.mint, fontSize: 9, fontWeight: "900", marginBottom: 3 },
+  ownMessageName: { color: palette.gold },
+  messageBody: { color: palette.text, fontSize: 13, lineHeight: 18 },
+  composer: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
+  chatInput: {
+    flex: 1,
+    height: 48,
+    color: palette.text,
+    backgroundColor: palette.ink,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: 14
+  },
+  sendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.gold
+  },
+  chatNotice: { color: palette.coral, fontSize: 10, textAlign: "center", marginTop: spacing.sm }
 });
