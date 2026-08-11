@@ -23,6 +23,7 @@
 - Done: use random and lowest-legal bots as honest baselines, plus a bounded simulation-guided hard bot that is not presented as trained AI.
 - Done: add accessible card selection labels and pressed states for the hand controls.
 - Done: respect reduced-motion preferences for deal and card-selection motion.
+- Done: carry equipped deck artwork onto card faces and render each opponent's exact remaining hand as a responsive face-down fan around the table.
 - In progress: continue polishing table layout, card motion, and visual identity so the UI feels less generic.
 
 ## Phase 4: Online Multiplayer
