@@ -84,6 +84,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode
 } from "react";
@@ -3988,6 +3989,8 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
             getCardFaceClass(cosmetic)
           )}
         >
+          <span className="card-face-theme-art" aria-hidden="true" />
+          <span className="card-face-theme-rail" aria-hidden="true" />
           <span className="card-face-corner relative z-10 pl-1 pt-1 text-[10px] font-black leading-none text-red-600">
             A<br />♦
           </span>
@@ -5158,7 +5161,7 @@ function OnlineSeat({
   return (
     <div
       className={cn(
-        "absolute z-20 flex gap-2",
+        "absolute z-20 flex gap-1 sm:gap-2",
         handOrientation === "top"
           ? "flex-col items-center"
           : handOrientation === "left"
@@ -5389,40 +5392,64 @@ function OnlineOpponentHand({
   readonly orientation: "top" | "left" | "right";
 }) {
   const vertical = orientation !== "top";
-  const cardWidth = 28;
-  const cardHeight = 42;
-  const cardStep = count <= 6 ? 10 : 6;
+  const cardWidth = 36;
+  const cardHeight = 54;
+  const cardStep = count <= 6 ? 12 : count <= 10 ? 9 : 7;
+  const compactCardWidth = 20;
+  const compactCardHeight = 30;
+  const compactCardStep = count <= 6 ? 6 : 3.5;
   const handLength = Math.max(
     vertical ? cardHeight : cardWidth,
     (vertical ? cardHeight : cardWidth) + Math.max(0, count - 1) * cardStep
   );
+  const compactHandLength = Math.max(
+    vertical ? compactCardHeight : compactCardWidth,
+    (vertical ? compactCardHeight : compactCardWidth) + Math.max(0, count - 1) * compactCardStep
+  );
 
   return (
     <div
-      className="relative shrink-0"
+      className="opponent-hand relative shrink-0"
       style={
-        vertical
-          ? { width: cardWidth, height: handLength }
-          : { width: handLength, height: cardHeight }
+        {
+          "--opponent-hand-width": `${vertical ? cardWidth : handLength}px`,
+          "--opponent-hand-height": `${vertical ? handLength : cardHeight}px`,
+          "--opponent-hand-compact-width": `${vertical ? compactCardWidth : compactHandLength}px`,
+          "--opponent-hand-compact-height": `${vertical ? compactHandLength : compactCardHeight}px`
+        } as CSSProperties
       }
       aria-label={`${count} face-down cards remaining`}
     >
-      {Array.from({ length: count }).map((_, index) => (
-        <div
-          aria-hidden="true"
-          key={`online-opponent-card-back-${index}`}
-          className={cn(
-            "card-back absolute h-[42px] w-7 rounded-[4px] border border-white/30 shadow-lg",
-            getCardBackClass(cardBack)
-          )}
-          style={{
-            left: vertical ? 0 : index * cardStep,
-            top: vertical ? index * cardStep : Math.abs(index - (count - 1) / 2) * 0.7,
-            transform: `rotate(${(index - (count - 1) / 2) * (vertical ? 0.35 : 1.05)}deg)`,
-            transformOrigin: vertical ? "120% 50%" : "50% 115%"
-          }}
-        />
-      ))}
+      {Array.from({ length: count }).map((_, index) => {
+        const centerDistance = Math.abs(index - (count - 1) / 2);
+        const rotationOffset = index - (count - 1) / 2;
+
+        return (
+          <div
+            aria-hidden="true"
+            key={`online-opponent-card-back-${index}`}
+            className={cn(
+              "card-back opponent-card-back absolute rounded-[5px] border border-white/30 shadow-lg",
+              getCardBackClass(cardBack)
+            )}
+            style={
+              {
+                "--opponent-card-left": `${vertical ? centerDistance * 0.55 : index * cardStep}px`,
+                "--opponent-card-top": `${vertical ? index * cardStep : centerDistance * 0.9}px`,
+                "--opponent-card-rotation": `${rotationOffset * (vertical ? 0.55 : 1.15)}deg`,
+                "--opponent-card-compact-left": `${vertical ? centerDistance * 0.25 : index * compactCardStep}px`,
+                "--opponent-card-compact-top": `${vertical ? index * compactCardStep : centerDistance * 0.45}px`,
+                "--opponent-card-compact-rotation": `${rotationOffset * (vertical ? 0.3 : 0.72)}deg`,
+                transformOrigin: vertical
+                  ? orientation === "left"
+                    ? "125% 50%"
+                    : "-25% 50%"
+                  : "50% 120%"
+              } as CSSProperties
+            }
+          />
+        );
+      })}
     </div>
   );
 }
@@ -5927,6 +5954,8 @@ function OnlineCard({
             : "border-black/20"
       )}
     >
+      <span className="card-face-theme-art" aria-hidden="true" />
+      <span className="card-face-theme-rail" aria-hidden="true" />
       <div
         className={cn(
           "card-face-corner absolute left-1.5 top-1.5 z-10 text-left font-black leading-none",
