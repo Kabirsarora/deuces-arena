@@ -287,6 +287,7 @@ export function OnlineRoomPanel({
   const isYourTurn =
     room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
   const yourPlayer = room?.players.find((candidate) => candidate.id === room.yourPlayerId) ?? null;
+  const yourCardTheme = yourPlayer === null ? null : getEquippedCosmetic(yourPlayer, "CARD_BACK");
   const connectedHumans =
     room?.players.filter((player) => player.kind === "human" && player.connected) ?? [];
   const availableBotSeats =
@@ -1588,7 +1589,12 @@ export function OnlineRoomPanel({
                           : {})}
                         onClick={() => toggleCard(card)}
                       >
-                        <OnlineCard card={card} selected={selected} playable={playable} />
+                        <OnlineCard
+                          card={card}
+                          cardTheme={yourCardTheme}
+                          selected={selected}
+                          playable={playable}
+                        />
                       </motion.button>
                     );
                   })}
@@ -3967,13 +3973,29 @@ function getCosmeticOwnershipLabel(
 function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
   if (cosmetic.kind === "CARD_BACK") {
     return (
-      <div
-        className={cn(
-          "card-back grid h-12 w-9 shrink-0 place-items-center rounded-md border border-white/20 shadow-lg",
-          getCardBackClass(cosmetic)
-        )}
-      >
-        <div className="h-7 w-4 rounded-sm border border-white/45" />
+      <div className="relative h-14 w-14 shrink-0" aria-label={`${cosmetic.name} deck preview`}>
+        <div
+          className={cn(
+            "card-back absolute left-0 top-1 grid h-12 w-9 -rotate-6 place-items-center rounded-md border border-white/20 shadow-lg",
+            getCardBackClass(cosmetic)
+          )}
+        >
+          <div className="h-7 w-4 rounded-sm border border-white/45" />
+        </div>
+        <div
+          data-suit-symbol="♦"
+          className={cn(
+            "card-face absolute bottom-0 right-0 grid h-12 w-9 rotate-6 overflow-hidden rounded-md border shadow-lg",
+            getCardFaceClass(cosmetic)
+          )}
+        >
+          <span className="card-face-corner relative z-10 pl-1 pt-1 text-[10px] font-black leading-none text-red-600">
+            A<br />♦
+          </span>
+          <span className="relative z-10 self-end justify-self-center pb-1 text-lg leading-none text-red-600">
+            ♦
+          </span>
+        </div>
       </div>
     );
   }
@@ -4023,6 +4045,10 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
 }
 
 function formatCosmeticKind(kind: PublicCosmetic["kind"]): string {
+  if (kind === "CARD_BACK") {
+    return "Full deck";
+  }
+
   return kind
     .toLowerCase()
     .split("_")
@@ -4334,6 +4360,8 @@ function TradePhaseOverlay({
   const outgoingRequest = room.tradePhase.requests.find(
     (request) => request.fromPlayerId === yourPlayerId
   );
+  const incomingPlayer = room.players.find((player) => player.id === incomingRequest?.fromPlayerId);
+  const yourPlayer = room.players.find((player) => player.id === yourPlayerId);
   const targets = room.players.filter(
     (player) => player.id !== yourPlayerId && player.kind === "human" && player.connected
   );
@@ -4369,7 +4397,15 @@ function TradePhaseOverlay({
             <span className="text-[var(--gold)]">{incomingRequest.requestedRank}s</span>.
           </p>
           <div className="my-4 flex justify-center">
-            <OnlineCard card={incomingRequest.offeredCard} compact />
+            <OnlineCard
+              card={incomingRequest.offeredCard}
+              cardTheme={
+                incomingPlayer === undefined
+                  ? null
+                  : getEquippedCosmetic(incomingPlayer, "CARD_BACK")
+              }
+              compact
+            />
           </div>
           <p className="mb-3 text-center text-xs font-semibold text-zinc-400">
             Select one matching card from your hand to accept.
@@ -4396,7 +4432,13 @@ function TradePhaseOverlay({
             Waiting for {getRoomPlayerName(room, outgoingRequest.toPlayerId)} to respond.
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <OnlineCard card={outgoingRequest.offeredCard} compact />
+            <OnlineCard
+              card={outgoingRequest.offeredCard}
+              cardTheme={
+                yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "CARD_BACK")
+              }
+              compact
+            />
             <ArrowRight className="size-5 text-zinc-500" />
             <span className="grid size-16 place-items-center rounded-full border border-white/12 bg-black/28 text-2xl font-black text-[var(--gold)]">
               {outgoingRequest.requestedRank}
@@ -4496,6 +4538,11 @@ function OnlineTable({
   const seatedPlayers = getClockwiseSeatedPlayers(players, room?.yourPlayerId ?? null);
   const tableTheme =
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
+  const trickPlayer = players.find(
+    (player) => player.id === room?.currentTrick?.lastPlayedByPlayerId
+  );
+  const trickCardTheme =
+    trickPlayer === undefined ? null : getEquippedCosmetic(trickPlayer, "CARD_BACK");
   const timerLabel = formatTurnTimer(room, timerNow);
   const currentLeadName =
     room?.currentTrick === null || room === null
@@ -4652,7 +4699,7 @@ function OnlineTable({
                       mass: 0.82
                     }}
                   >
-                    <OnlineCard card={card} compact />
+                    <OnlineCard card={card} cardTheme={trickCardTheme} compact />
                   </motion.div>
                 ))
               )}
@@ -5464,6 +5511,23 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
   return "";
 }
 
+function getCardFaceClass(cosmetic: PublicCosmetic | null): string {
+  const faceClasses: Readonly<Record<string, string>> = {
+    "classic-red-card-back": "card-face-classic-red",
+    "neon-grid-card-back": "card-face-neon-grid",
+    "ember-court-card-back": "card-face-ember-court",
+    "pool-shark-card-back": "card-face-pool-shark",
+    "koi-current-card-back": "card-face-koi-current",
+    "bengal-bloom-card-back": "card-face-bengal-bloom",
+    "arena-six-crest-card-back": "card-face-arena-six",
+    "celestial-vault-card-back": "card-face-celestial-vault",
+    "ember-sovereign-card-back": "card-face-ember-sovereign",
+    "voidglass-prism-card-back": "card-face-voidglass-prism"
+  };
+
+  return cosmetic === null ? "" : (faceClasses[cosmetic.slug] ?? "");
+}
+
 function getProfileBorderClass(cosmetic: PublicCosmetic | null): string {
   if (cosmetic?.slug === "aqua-profile-border") {
     return "profile-border-aqua";
@@ -5837,11 +5901,13 @@ function getConnectionBadgeClass(status: RealtimeConnectionStatus): string {
 
 function OnlineCard({
   card,
+  cardTheme = null,
   selected = false,
   playable = false,
   compact = false
 }: {
   readonly card: Card;
+  readonly cardTheme?: PublicCosmetic | null;
   readonly selected?: boolean;
   readonly playable?: boolean;
   readonly compact?: boolean;
@@ -5853,6 +5919,7 @@ function OnlineCard({
       data-suit-symbol={suitSymbol(card.suit)}
       className={cn(
         "card-face relative grid overflow-hidden rounded-md border shadow-xl transition",
+        getCardFaceClass(cardTheme),
         compact ? "h-20 w-14" : "h-24 w-16 sm:h-28 sm:w-20",
         selected
           ? "border-[var(--gold)] ring-2 ring-[var(--gold)]"
