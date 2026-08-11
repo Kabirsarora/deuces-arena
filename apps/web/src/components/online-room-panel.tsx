@@ -1515,10 +1515,9 @@ export function OnlineRoomPanel({
                   return (
                     <motion.button
                       key={getCardId(card)}
-                      layout
-                      layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
+                      layout="position"
                       type="button"
-                      className="relative -ml-3 shrink-0 rounded-md first:ml-0 disabled:cursor-default sm:-ml-4"
+                      className="relative -ml-3 h-24 w-16 shrink-0 rounded-md first:ml-0 disabled:cursor-default sm:-ml-4 sm:h-28 sm:w-20"
                       aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
                         playable ? ", legal option" : ""
                       }`}
@@ -5823,8 +5822,7 @@ function OnlineCard({
   const suitColorClass = getCardSuitColorClass(card.suit);
 
   return (
-    <motion.div
-      layout
+    <div
       className={cn(
         "card-face grid rounded-md border p-2 shadow-xl transition",
         compact ? "h-20 w-14" : "h-24 w-16 sm:h-28 sm:w-20",
@@ -5843,7 +5841,7 @@ function OnlineCard({
       <div className={cn("self-center text-center text-3xl font-black", suitColorClass)}>
         {suitSymbol(card.suit)}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

@@ -1040,14 +1040,12 @@ io.on("connection", (socket) => {
     inMemoryProfile.displayName = displayName;
     inMemoryProfile.avatarKey = avatarKey;
 
-    const persistedProfile = await updatePersistedGuestProfile({
+    await updatePersistedGuestProfile({
       guestId,
       displayName,
       avatarKey
     });
-    const profile = persistedProfile.ok
-      ? persistedProfile.profile
-      : await publicGuestProfile(guestId);
+    const profile = await publicGuestProfile(guestId);
 
     callback(ok(profile));
     emitRoomStatesForGuest(guestId);
@@ -1080,15 +1078,13 @@ io.on("connection", (socket) => {
     const inMemoryProfile = getOrCreateGuestProfile(guestId);
     inMemoryProfile.displayName = displayName;
     inMemoryProfile.imageUrl = imageUrl;
-    const persistedProfile = await updatePersistedGuestProfile({
+    await updatePersistedGuestProfile({
       guestId,
       displayName,
       avatarKey: currentProfile.avatarKey,
       imageUrl
     });
-    const profile = persistedProfile.ok
-      ? persistedProfile.profile
-      : await publicGuestProfile(guestId);
+    const profile = await publicGuestProfile(guestId);
 
     callback(ok(profile));
     emitRoomStatesForGuest(guestId);

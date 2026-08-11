@@ -476,6 +476,22 @@ describe("realtime rooms", () => {
       supporterCosmetic.id
     );
     expect(profile.data.isAdmin).toBe(true);
+    expect(profile.data.arenaCoins).toBe(Number.MAX_SAFE_INTEGER);
+
+    const syncedProfile = await syncAccountProfile(socket, {
+      displayName: "Creator",
+      imageUrl: "https://example.com/creator.png"
+    });
+
+    expect(syncedProfile.ok).toBe(true);
+
+    if (!syncedProfile.ok) {
+      return;
+    }
+
+    expect(syncedProfile.data.isAdmin).toBe(true);
+    expect(syncedProfile.data.arenaCoins).toBe(Number.MAX_SAFE_INTEGER);
+    expect(syncedProfile.data.unlocks).toHaveLength(catalog.data.length);
   });
 
   it("creates rooms and exposes them through lobby activity", async () => {
@@ -2021,6 +2037,15 @@ function getProfile(socket: TestSocket, guestId: string): Promise<ServerAck<Publ
     socket.emit("profile:get", { guestId }, (ack) => {
       resolve(ack);
     });
+  });
+}
+
+function syncAccountProfile(
+  socket: TestSocket,
+  payload: { readonly displayName: string | null; readonly imageUrl: string | null }
+): Promise<ServerAck<PublicGuestProfile>> {
+  return new Promise((resolve) => {
+    socket.emit("profile:sync-account", payload, resolve);
   });
 }
 
