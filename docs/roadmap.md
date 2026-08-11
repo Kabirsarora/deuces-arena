@@ -93,6 +93,7 @@
 
 ## Phase 9: Mobile and Messages
 
-- Next: build an Expo / React Native client that reuses the game engine, shared contracts, backend, persistence model, and simulation tooling.
-- Later: add universal room invitation links and native sharing from the mobile app.
+- Done: build an Expo / React Native client that reuses the game engine, shared contracts, backend, persistence model, and simulation tooling.
+- Done: add native room sharing, app deep-link joins, a browser fallback page, and universal/app-link configuration endpoints.
+- Next: link EAS, install development builds on physical devices, and finish Apple/Android domain verification with the generated signing identifiers.
 - Later: build a native iMessage extension with Apple's Messages framework so group conversations can send and join Deuces Arena games without claiming integration with GamePigeon.

@@ -4,7 +4,7 @@
 
 Real-time multiplayer Big Two / Deuces platform with bot opponents, replay analysis, and ML-ready strategy coaching.
 
-**Live demo:** [deuces-arena.vercel.app](https://deuces-arena.vercel.app)
+**Live demo:** [deucesarena.com](https://deucesarena.com)
 
 Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -14,7 +14,7 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, distinct random, lowest-legal, and simulation-guided bot levels, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
 - Mobile-first Next.js table for human and bot play, with selected-card motion, trick display, turn state, uncluttered game-over summaries, move timelines, and on-demand simulation review.
-- Expo / React Native mobile foundation with native Play, Rooms, Ranked, and Profile tabs; configurable bot matches already reuse the production Socket.IO server, shared contracts, and pure TypeScript game engine.
+- Expo / React Native mobile foundation with native Play, Rooms, Ranked, and Profile tabs; configurable bot matches, system share sheets, and safe room-invitation deep links reuse the production Socket.IO server, shared contracts, and pure TypeScript game engine.
 - Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, moderated table chat, player mute/block/report controls, realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
 - Private creator moderation console for reviewing player reports and product feedback, with signed admin authorization, report status tracking, stronger profanity filtering, request-size limits, and browser security headers.
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.

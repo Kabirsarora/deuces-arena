@@ -16,6 +16,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="join/[roomCode]" />
         <Stack.Screen name="table" options={{ gestureEnabled: false }} />
       </Stack>
     </ArenaProvider>

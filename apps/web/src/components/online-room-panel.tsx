@@ -16,6 +16,7 @@ import {
   type Move,
   type Rank
 } from "@deuces-arena/game-engine";
+import { createRoomInviteUrl } from "@deuces-arena/shared";
 import type {
   ClientToServerEvents,
   CosmeticKind,
@@ -3194,9 +3195,7 @@ function getRoomCodeFromUrl(): string | null {
 }
 
 function getRoomInviteUrl(roomCode: string): string {
-  const url = new URL(window.location.href);
-  url.searchParams.set("room", roomCode);
-  return url.toString();
+  return createRoomInviteUrl(window.location.origin, roomCode);
 }
 
 function syncRoomCodeToUrl(roomCode: string): void {

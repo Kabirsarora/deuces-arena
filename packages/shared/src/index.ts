@@ -17,6 +17,8 @@ export {
   type RealtimeAuthIdentity
 } from "./realtime-auth.js";
 
+export { createRoomInviteUrl, isValidRoomCode, normalizeRoomCode } from "./room-links.js";
+
 export type PlayerKind = "human" | "bot" | "guest";
 export type RoomStatus = "waiting" | "in-progress" | "complete";
 export type MatchMode = "CASUAL" | "RANKED" | "TOURNAMENT" | "LOCAL_DEMO";

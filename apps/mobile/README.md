@@ -14,6 +14,7 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
 - Shared web/mobile ratings, coins, cosmetics, history, admin access, ranked matchmaking, and
   tournament queue entry.
 - Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
+- Native system sharing and `/join/ROOMCODE` deep links with a safe browser fallback.
 - A single immersive table surface for seats, tricks, controls, and the player hand, with exact
   opponent card counts and saved card-back/table cosmetics shared across web and mobile.
 
@@ -72,8 +73,8 @@ cd apps/mobile && npx expo-doctor
 
 ## Next Milestones
 
-1. Link the EAS project, create development builds, and test account handoff on physical devices.
-2. Push notifications for table invitations and matchmaking.
-3. App Store and Google Play screenshots, privacy declarations, and submission.
-4. Universal links to replace the custom-scheme account callback before broad distribution.
+1. Link the EAS project, create development builds, and test account handoff and room links on physical devices.
+2. Add the EAS Apple Team ID and Android signing-certificate fingerprint to Vercel for verified universal links.
+3. Push notifications for table invitations and matchmaking.
+4. App Store and Google Play screenshots, privacy declarations, and submission.
 5. A separate iOS Messages extension for sharing and opening room invitations.
