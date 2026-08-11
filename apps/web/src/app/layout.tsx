@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   },
   description:
     "Mobile-first Deuces / Big Two platform with online rooms, bot opponents, replays, cosmetics, and ML-ready move analysis.",
+  alternates: {
+    canonical: appUrl
+  },
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: "Deuces Arena",
