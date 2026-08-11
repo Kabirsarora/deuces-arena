@@ -92,6 +92,10 @@ export default function TableScreen() {
   const latestEvent = room?.recentEvents.at(-1) ?? null;
   const unreadChat = Math.max(0, (room?.recentChat.length ?? 0) - lastReadChatCount);
   const yourCardBackUrl = cosmeticPreviewUrl(yourPlayer, "CARD_BACK", webUrl);
+  const yourCardThemeSlug = cosmeticSlug(yourPlayer, "CARD_BACK");
+  const trickPlayer =
+    room?.players.find((player) => player.id === room.currentTrick?.lastPlayedByPlayerId) ?? null;
+  const trickCardThemeSlug = cosmeticSlug(trickPlayer, "CARD_BACK");
   const tableThemeUrl = cosmeticPreviewUrl(yourPlayer, "TABLE_THEME", webUrl);
 
   useEffect(() => {
@@ -299,7 +303,12 @@ export default function TableScreen() {
               </View>
             ) : (
               room.currentTrick.hand.cards.map((card) => (
-                <PlayingCard key={getCardId(card)} card={card} compact />
+                <PlayingCard
+                  key={getCardId(card)}
+                  card={card}
+                  themeSlug={trickCardThemeSlug}
+                  compact
+                />
               ))
             )}
           </Animated.View>
@@ -344,6 +353,7 @@ export default function TableScreen() {
                   <PlayingCard
                     key={getCardId(card)}
                     card={card}
+                    themeSlug={yourCardThemeSlug}
                     selected={selectedIds.includes(getCardId(card))}
                     disabled={!playableIds.has(getCardId(card))}
                     onPress={() => toggleCard(card)}
@@ -523,6 +533,10 @@ function cosmeticPreviewUrl(
   if (previewUrl === null || previewUrl === undefined) return null;
   if (/^https?:\/\//.test(previewUrl)) return previewUrl;
   return `${webUrl.replace(/\/$/, "")}${previewUrl.startsWith("/") ? "" : "/"}${previewUrl}`;
+}
+
+function cosmeticSlug(player: PublicRoomPlayer | null, kind: CosmeticKind): string | null {
+  return player?.equippedCosmetics.find((item) => item.kind === kind)?.cosmetic.slug ?? null;
 }
 
 function ChatButton({

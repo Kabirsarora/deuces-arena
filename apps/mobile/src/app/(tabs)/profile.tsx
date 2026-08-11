@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ActionButton, ArenaScreen, ScreenHeader, SegmentedControl } from "@/components/arena-ui";
+import { PlayingCard } from "@/components/playing-card";
 import { palette, radius, spacing } from "@/constants/theme";
 import { useArena } from "@/providers/arena-provider";
 
@@ -301,6 +302,7 @@ function Locker({
                 <Text style={styles.rarity}>{cosmetic.rarity}</Text>
               </View>
               <Text numberOfLines={2} style={styles.cosmeticDescription}>
+                {cosmetic.kind === "CARD_BACK" ? "Full deck theme · " : ""}
                 {cosmetic.description ?? kindLabel(cosmetic.kind)}
               </Text>
               <Pressable
@@ -342,6 +344,36 @@ function Locker({
 }
 
 function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
+  if (cosmetic.kind === "CARD_BACK") {
+    return (
+      <View
+        accessibilityLabel={`${cosmetic.name} deck preview showing the card back and face`}
+        style={styles.deckPreview}
+      >
+        {cosmetic.previewUrl === null ? (
+          <View style={[styles.deckBackPreview, styles.previewFallback]}>
+            <Palette color={palette.mint} size={20} />
+          </View>
+        ) : (
+          <Image
+            source={{ uri: `${WEB_URL}${cosmetic.previewUrl}` }}
+            contentFit="cover"
+            transition={180}
+            style={styles.deckBackPreview}
+          />
+        )}
+        <View pointerEvents="none" style={styles.deckFacePreview}>
+          <PlayingCard
+            card={{ rank: "A", suit: "diamonds" }}
+            themeSlug={cosmetic.slug}
+            compact
+            accessible={false}
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (cosmetic.previewUrl !== null) {
     return (
       <Image
@@ -507,6 +539,23 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: radius.sm,
     backgroundColor: palette.felt
+  },
+  deckPreview: { width: 82, height: 96 },
+  deckBackPreview: {
+    position: "absolute",
+    left: 1,
+    top: 5,
+    width: 55,
+    height: 82,
+    borderRadius: radius.sm,
+    backgroundColor: palette.felt,
+    transform: [{ rotate: "-5deg" }]
+  },
+  deckFacePreview: {
+    position: "absolute",
+    right: 0,
+    bottom: 2,
+    transform: [{ rotate: "6deg" }]
   },
   previewFallback: { alignItems: "center", justifyContent: "center" },
   cosmeticCopy: { flex: 1, justifyContent: "center", gap: 6 },
