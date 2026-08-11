@@ -1346,7 +1346,7 @@ export function OnlineRoomPanel({
           onLeaveRoom={leaveRoom}
         />
 
-        <section className="relative min-w-0 min-h-[44rem] sm:min-h-[48rem] lg:min-h-0">
+        <section className="table-stage relative min-w-0 min-h-[44rem] sm:min-h-[48rem] lg:min-h-0">
           <OnlineTable
             room={room}
             timerNow={timerNow}
@@ -1384,11 +1384,11 @@ export function OnlineRoomPanel({
 
           <section
             className={cn(
-              "hand-dock-on-table absolute inset-x-2 bottom-2 z-30 min-w-0 px-2 pb-2 pt-3 sm:inset-x-5 sm:bottom-4 sm:px-3",
+              "hand-dock-on-table absolute inset-x-2 bottom-3 z-30 min-w-0 px-2 pb-1 pt-3 sm:inset-x-8 sm:bottom-6 sm:px-3",
               room.status === "complete" && "hidden"
             )}
           >
-            <div className="hud-glass mx-auto mb-2 flex w-fit max-w-full flex-col items-start gap-2 rounded-xl border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-3">
+            <div className="hand-control-rail mx-auto mb-1.5 flex w-fit max-w-full flex-col items-start gap-2 rounded-full border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-3">
               <div>
                 <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
                 <p className="max-w-56 truncate text-[10px] text-zinc-400">
@@ -1504,7 +1504,7 @@ export function OnlineRoomPanel({
             </div>
 
             <div className="table-hand-scroll flex min-h-28 items-end overflow-x-auto px-1 pb-1 pt-5 sm:min-h-32">
-              <div className="mx-auto flex min-w-max items-end gap-1.5 px-3 sm:gap-2 sm:px-4">
+              <div className="player-hand-fan mx-auto flex min-w-max items-end px-3 sm:px-4">
                 <AnimatePresence initial={false} mode="popLayout">
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
                     const selected = selectedCardIds.includes(getCardId(card));
@@ -1516,7 +1516,7 @@ export function OnlineRoomPanel({
                         key={getCardId(card)}
                         layout="position"
                         type="button"
-                        className="relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
+                        className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
                         aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
                           playable ? ", legal option" : ""
                         }`}
@@ -4536,7 +4536,7 @@ function OnlineTable({
   return (
     <section
       className={cn(
-        "table-felt table-oval relative h-full min-h-[44rem] overflow-hidden border border-white/10 p-3 sm:min-h-[48rem] lg:min-h-0 lg:p-5",
+        "table-felt table-oval absolute inset-0 overflow-hidden border border-white/10 p-3 lg:p-5",
         getTableThemeClass(tableTheme)
       )}
     >
@@ -5326,11 +5326,11 @@ function OnlineMiniCardStack({
   readonly count: number;
   readonly cardBack: PublicCosmetic | null;
 }) {
-  const cardWidth = 14;
-  const cardStep = count <= 6 ? 7 : 4.5;
+  const cardWidth = 18;
+  const cardStep = count <= 6 ? 8 : 5;
   const fanWidth = Math.max(cardWidth, cardWidth + Math.max(0, count - 1) * cardStep);
-  const mobileCardStep = count <= 6 ? 4 : 2.3;
-  const mobileFanWidth = Math.max(10, 10 + Math.max(0, count - 1) * mobileCardStep);
+  const mobileCardStep = count <= 6 ? 5 : 2.8;
+  const mobileFanWidth = Math.max(12, 12 + Math.max(0, count - 1) * mobileCardStep);
 
   return (
     <>
@@ -5343,7 +5343,7 @@ function OnlineMiniCardStack({
           <div
             key={`mobile-online-card-back-${index}`}
             className={cn(
-              "card-back absolute h-5 w-2.5 rounded-[2px] border border-white/20 shadow-md",
+              "card-back absolute h-6 w-3 rounded-[2px] border border-white/25 shadow-md",
               getCardBackClass(cardBack)
             )}
             style={{
@@ -5363,7 +5363,7 @@ function OnlineMiniCardStack({
           <div
             key={`online-card-back-${index}`}
             className={cn(
-              "card-back absolute h-7 w-3.5 rounded-[2px] border border-white/20 shadow-lg",
+              "card-back absolute h-8 w-[1.125rem] rounded-[3px] border border-white/25 shadow-lg",
               getCardBackClass(cardBack)
             )}
             style={{

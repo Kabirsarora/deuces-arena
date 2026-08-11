@@ -769,11 +769,13 @@ io.on("connection", (socket) => {
     removeRankedQueueEntry(socket.id);
     removeTournamentQueueEntry(socket.id);
     leaveCurrentRoomForSocket();
-    const room = createRoom(
-      payload.playerName,
-      socket.id,
-      profileIdForSocket(payload.guestId) ?? undefined
-    );
+    const profileId = profileIdForSocket(payload.guestId) ?? undefined;
+
+    if (profileId !== undefined) {
+      await publicGuestProfile(profileId);
+    }
+
+    const room = createRoom(payload.playerName, socket.id, profileId);
     const player = room.players[0];
 
     if (player === undefined) {
@@ -824,12 +826,13 @@ io.on("connection", (socket) => {
     }
 
     leaveCurrentRoomForSocket();
-    const player = addHumanPlayer(
-      room,
-      payload.playerName,
-      socket.id,
-      profileIdForSocket(payload.guestId) ?? undefined
-    );
+    const profileId = profileIdForSocket(payload.guestId) ?? undefined;
+
+    if (profileId !== undefined) {
+      await publicGuestProfile(profileId);
+    }
+
+    const player = addHumanPlayer(room, payload.playerName, socket.id, profileId);
     socket.data = {
       ...socket.data,
       playerId: player.id,
@@ -865,6 +868,8 @@ io.on("connection", (socket) => {
       callback(fail("Seat not found."));
       return;
     }
+
+    await publicGuestProfile(profileId);
 
     room.players = room.players.map((candidate) =>
       candidate.id === player.id

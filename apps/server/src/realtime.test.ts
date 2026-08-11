@@ -473,6 +473,19 @@ describe("realtime rooms", () => {
     expect(equipAck.data.equippedCosmetics.map((equipped) => equipped.cosmetic.id)).toContain(
       supporterCosmetic.id
     );
+
+    const createdRoom = await createRoom(socket, {
+      playerName: "Creator",
+      guestId: "guest-admin-cosmetics"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (createdRoom.ok) {
+      expect(
+        createdRoom.data.players[0]?.equippedCosmetics.map((equipped) => equipped.cosmetic.id)
+      ).toContain(supporterCosmetic.id);
+    }
   });
 
   it("allows configured admin emails to equip any cosmetic", async () => {
