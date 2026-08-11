@@ -5,17 +5,18 @@ import {
   type Card,
   type Move
 } from "@deuces-arena/game-engine";
+import { createRoomInviteUrl } from "@deuces-arena/shared";
 import type { CosmeticKind, PublicRoomPlayer } from "@deuces-arena/shared";
 import { ImageBackground } from "expo-image";
 import { router } from "expo-router";
 import {
   ArrowLeft,
   CircleDot,
-  Copy,
   MessageCircle,
   Play,
   RotateCcw,
   Send,
+  Share2,
   SkipForward,
   X
 } from "lucide-react-native";
@@ -27,6 +28,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share as NativeShare,
   StyleSheet,
   Text,
   TextInput,
@@ -151,6 +153,15 @@ export default function TableScreen() {
     setSendingChat(false);
   }
 
+  async function shareRoomInvite(roomCode: string) {
+    const inviteUrl = createRoomInviteUrl(webUrl, roomCode);
+    await NativeShare.share({
+      title: "Join my Deuces Arena table",
+      message: `Join table ${roomCode} in Deuces Arena: ${inviteUrl}`,
+      url: inviteUrl
+    });
+  }
+
   function toggleCard(card: Card) {
     const id = getCardId(card);
     setSelectedIds((current) =>
@@ -172,10 +183,15 @@ export default function TableScreen() {
           <View style={styles.waitingTable}>
             <Text style={styles.waitingEyebrow}>Casual table</Text>
             <Text style={styles.waitingCode}>{room.roomCode}</Text>
-            <View style={styles.copyLine}>
-              <Copy color={palette.gold} size={16} />
-              <Text style={styles.copyText}>Share this code with friends</Text>
-            </View>
+            <Pressable
+              accessibilityLabel={`Share invite for table ${room.roomCode}`}
+              accessibilityRole="button"
+              onPress={() => void shareRoomInvite(room.roomCode)}
+              style={({ pressed }) => [styles.copyLine, pressed && styles.pressed]}
+            >
+              <Share2 color={palette.gold} size={16} />
+              <Text style={styles.copyText}>Invite friends</Text>
+            </Pressable>
           </View>
           <Text style={styles.seatStatus}>
             {room.players.length}/{room.rules.playerCount} seats filled
@@ -232,6 +248,14 @@ export default function TableScreen() {
           <Text style={styles.tableCode}>{room.roomCode}</Text>
         </View>
         <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Share table invite"
+            accessibilityRole="button"
+            onPress={() => void shareRoomInvite(room.roomCode)}
+            style={styles.roundButton}
+          >
+            <Share2 color={palette.text} size={18} />
+          </Pressable>
           <ChatButton unread={unreadChat} onPress={openChat} />
           <View style={styles.turnPill}>
             <CircleDot color={palette.mint} size={13} />

@@ -36,6 +36,8 @@ AUTH_SECRET="generated-secret"
 AUTH_GOOGLE_ID="google-oauth-client-id"
 AUTH_GOOGLE_SECRET="google-oauth-client-secret"
 REALTIME_AUTH_SECRET="shared-realtime-secret"
+APPLE_TEAM_ID="production-apple-team-id"
+ANDROID_SHA256_CERT_FINGERPRINTS="production-sha256-certificate-fingerprint"
 ```
 
 For Google OAuth, add the deployed callback URL in Google Cloud:
@@ -76,6 +78,12 @@ two-minute handoff that only `/auth/mobile/exchange` on the realtime server can 
 returns a 30-day app session, which Expo SecureStore keeps in the device Keychain or Keystore. This
 reuses the existing Google OAuth configuration and `REALTIME_AUTH_SECRET`; no Google secret or
 additional paid authentication service is added to the mobile bundle.
+
+Room invitations use `https://deucesarena.com/join/ROOMCODE`. The page remains usable in a browser
+and opens the native Expo route when the installed app owns the domain. After EAS creates signing
+credentials, set `APPLE_TEAM_ID` and `ANDROID_SHA256_CERT_FINGERPRINTS` on Vercel, redeploy, and
+verify `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`. Multiple Android
+fingerprints may be supplied as a comma-separated list during certificate rotation.
 
 Generate `REALTIME_AUTH_SECRET` once and paste the exact same value into Vercel and the realtime
 server host:

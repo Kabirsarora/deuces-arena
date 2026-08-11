@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { isValidRoomCode, normalizeRoomCode } from "@deuces-arena/shared";
 import { DoorOpen, RefreshCw, UsersRound } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -44,7 +45,7 @@ export default function RoomsScreen() {
           autoCapitalize="characters"
           autoCorrect={false}
           maxLength={6}
-          onChangeText={setRoomCode}
+          onChangeText={(value) => setRoomCode(normalizeRoomCode(value).slice(0, 6))}
           placeholder="ROOM CODE"
           placeholderTextColor={palette.muted}
           style={styles.input}
@@ -53,7 +54,7 @@ export default function RoomsScreen() {
         <ActionButton
           label="Join"
           loading={working}
-          disabled={roomCode.trim().length < 4 || connectionStatus !== "online"}
+          disabled={!isValidRoomCode(roomCode) || connectionStatus !== "online"}
           onPress={() => void enter(() => joinRoom(roomCode))}
           style={styles.joinButton}
         />
