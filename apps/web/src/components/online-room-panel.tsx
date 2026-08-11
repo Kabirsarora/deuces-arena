@@ -1316,7 +1316,7 @@ export function OnlineRoomPanel({
 
   return (
     <main className="min-h-screen overflow-x-hidden px-3 py-3 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)_auto]">
+      <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)]">
         <ActiveRoomBar
           room={room}
           connectionStatus={connectionStatus}
@@ -1346,7 +1346,7 @@ export function OnlineRoomPanel({
           onLeaveRoom={leaveRoom}
         />
 
-        <section className="relative min-w-0 min-h-[28rem] lg:min-h-0">
+        <section className="relative min-w-0 min-h-[44rem] sm:min-h-[48rem] lg:min-h-0">
           <OnlineTable
             room={room}
             timerNow={timerNow}
@@ -1381,221 +1381,221 @@ export function OnlineRoomPanel({
             onToggleMute={toggleMutePlayer}
             onReportPlayer={reportPlayer}
           />
-        </section>
 
-        <section
-          className={cn(
-            "hand-dock min-w-0 border border-white/10 p-3 shadow-2xl backdrop-blur",
-            room.status === "complete" && "hidden"
-          )}
-        >
-          <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-bold">Your Hand</p>
-              <p className="text-xs text-zinc-400">
-                {room.tradePhase.status === "open"
-                  ? getTradeHandPrompt(room, selectedCards)
-                  : isYourTurn
-                    ? playableCardCount === 0 && canPass
-                      ? "No legal play available · pass to continue"
-                      : `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                    : turnStatus}
-              </p>
-            </div>
-            <div className="flex w-full flex-wrap justify-start gap-2 sm:w-auto sm:justify-end">
-              <div className="flex rounded-full border border-white/10 bg-black/24 p-1">
-                {HAND_SORT_OPTIONS.map((option) => (
-                  <button
-                    key={option.mode}
-                    className={cn(
-                      "rounded-full px-3 py-1.5 text-xs font-black transition",
-                      handSortMode === option.mode
-                        ? "bg-[var(--gold)] text-black"
-                        : "text-zinc-400 hover:bg-white/8 hover:text-white"
-                    )}
-                    type="button"
-                    aria-pressed={handSortMode === option.mode}
-                    onClick={() => setHandSortMode(option.mode)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+          <section
+            className={cn(
+              "hand-dock-on-table absolute inset-x-2 bottom-2 z-30 min-w-0 px-2 pb-2 pt-3 sm:inset-x-5 sm:bottom-4 sm:px-3",
+              room.status === "complete" && "hidden"
+            )}
+          >
+            <div className="hud-glass mx-auto mb-2 flex w-fit max-w-full flex-col items-start gap-2 rounded-xl border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-3">
+              <div>
+                <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
+                <p className="max-w-56 truncate text-[10px] text-zinc-400">
+                  {room.tradePhase.status === "open"
+                    ? getTradeHandPrompt(room, selectedCards)
+                    : isYourTurn
+                      ? playableCardCount === 0 && canPass
+                        ? "No legal play available · pass to continue"
+                        : `${selectedCards.length} selected · ${legalMoves.length} legal options`
+                      : turnStatus}
+                </p>
               </div>
-              {selectedCards.length > 0 ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-9 px-0"
-                  aria-label="Clear selected cards"
-                  title="Clear selected cards"
-                  onClick={() => setSelectedCardIds([])}
-                >
-                  <X className="size-4" />
-                </Button>
-              ) : null}
-              {handSortMode === "manual" ? (
-                <div className="flex rounded-md border border-white/10 bg-black/24 p-0.5">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
-                    aria-label="Move selected card to start"
-                    title="Move selected card to start"
-                    onClick={() => moveSelectedCardToEdge("start")}
-                    disabled={!canMoveManualCardToEdge || selectedManualCardIndex === 0}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
-                    aria-label="Move selected card left"
-                    title="Move selected card left"
-                    onClick={() => moveSelectedCardInHand(-1)}
-                    disabled={!canMoveManualCardLeft}
-                  >
-                    <ArrowLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
-                    aria-label="Move selected card right"
-                    title="Move selected card right"
-                    onClick={() => moveSelectedCardInHand(1)}
-                    disabled={!canMoveManualCardRight}
-                  >
-                    <ArrowRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
-                    aria-label="Move selected card to end"
-                    title="Move selected card to end"
-                    onClick={() => moveSelectedCardToEdge("end")}
-                    disabled={
-                      !canMoveManualCardToEdge ||
-                      selectedManualCardIndex === displayedHand.length - 1
-                    }
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
-                    aria-label="Reset hand order"
-                    title="Reset hand order"
-                    onClick={resetManualHandOrder}
-                  >
-                    <RotateCcw className="size-4" />
-                  </Button>
-                </div>
-              ) : null}
-              <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
-                Pass
-              </Button>
-              <Button onClick={playSelected} disabled={!isYourTurn || !canPlaySelected}>
-                <Send className="size-4" />
-                Play
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex min-h-28 items-end overflow-x-auto px-1 pb-2 pt-5 sm:min-h-32">
-            <div className="mx-auto flex min-w-max items-end px-3 sm:px-4">
-              <AnimatePresence initial={false} mode="popLayout">
-                {(handDealtVisible ? displayedHand : []).map((card, index) => {
-                  const selected = selectedCardIds.includes(getCardId(card));
-                  const playable = isYourTurn && playableCardIds.has(getCardId(card));
-                  const cardName = formatCardName(card);
-
-                  return (
-                    <motion.button
-                      key={getCardId(card)}
-                      layout="position"
+              <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:justify-end">
+                <div className="flex rounded-full border border-white/10 bg-black/24 p-1">
+                  {HAND_SORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.mode}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-xs font-black transition",
+                        handSortMode === option.mode
+                          ? "bg-[var(--gold)] text-black"
+                          : "text-zinc-400 hover:bg-white/8 hover:text-white"
+                      )}
                       type="button"
-                      className="relative -ml-3 h-24 w-16 shrink-0 rounded-md first:ml-0 disabled:cursor-default sm:-ml-4 sm:h-28 sm:w-20"
-                      aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
-                        playable ? ", legal option" : ""
-                      }`}
-                      aria-pressed={selected}
-                      title={cardName}
-                      initial={
-                        shouldReduceMotion
-                          ? false
-                          : dealAnimationKey === null
-                            ? { opacity: 0, y: 42, scale: 0.96 }
+                      aria-pressed={handSortMode === option.mode}
+                      onClick={() => setHandSortMode(option.mode)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {selectedCards.length > 0 ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-9 px-0"
+                    aria-label="Clear selected cards"
+                    title="Clear selected cards"
+                    onClick={() => setSelectedCardIds([])}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                ) : null}
+                {handSortMode === "manual" ? (
+                  <div className="flex rounded-md border border-white/10 bg-black/24 p-0.5">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                      aria-label="Move selected card to start"
+                      title="Move selected card to start"
+                      onClick={() => moveSelectedCardToEdge("start")}
+                      disabled={!canMoveManualCardToEdge || selectedManualCardIndex === 0}
+                    >
+                      <ChevronsLeft className="size-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                      aria-label="Move selected card left"
+                      title="Move selected card left"
+                      onClick={() => moveSelectedCardInHand(-1)}
+                      disabled={!canMoveManualCardLeft}
+                    >
+                      <ArrowLeft className="size-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                      aria-label="Move selected card right"
+                      title="Move selected card right"
+                      onClick={() => moveSelectedCardInHand(1)}
+                      disabled={!canMoveManualCardRight}
+                    >
+                      <ArrowRight className="size-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                      aria-label="Move selected card to end"
+                      title="Move selected card to end"
+                      onClick={() => moveSelectedCardToEdge("end")}
+                      disabled={
+                        !canMoveManualCardToEdge ||
+                        selectedManualCardIndex === displayedHand.length - 1
+                      }
+                    >
+                      <ChevronsRight className="size-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 w-8 border-0 bg-transparent px-0 hover:bg-white/10"
+                      aria-label="Reset hand order"
+                      title="Reset hand order"
+                      onClick={resetManualHandOrder}
+                    >
+                      <RotateCcw className="size-4" />
+                    </Button>
+                  </div>
+                ) : null}
+                <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
+                  Pass
+                </Button>
+                <Button onClick={playSelected} disabled={!isYourTurn || !canPlaySelected}>
+                  <Send className="size-4" />
+                  Play
+                </Button>
+              </div>
+            </div>
+
+            <div className="table-hand-scroll flex min-h-28 items-end overflow-x-auto px-1 pb-1 pt-5 sm:min-h-32">
+              <div className="mx-auto flex min-w-max items-end gap-1.5 px-3 sm:gap-2 sm:px-4">
+                <AnimatePresence initial={false} mode="popLayout">
+                  {(handDealtVisible ? displayedHand : []).map((card, index) => {
+                    const selected = selectedCardIds.includes(getCardId(card));
+                    const playable = isYourTurn && playableCardIds.has(getCardId(card));
+                    const cardName = formatCardName(card);
+
+                    return (
+                      <motion.button
+                        key={getCardId(card)}
+                        layout="position"
+                        type="button"
+                        className="relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
+                        aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
+                          playable ? ", legal option" : ""
+                        }`}
+                        aria-pressed={selected}
+                        title={cardName}
+                        initial={
+                          shouldReduceMotion
+                            ? false
+                            : dealAnimationKey === null
+                              ? { opacity: 0, y: 42, scale: 0.96 }
+                              : {
+                                  opacity: 0,
+                                  x: Math.max(
+                                    -180,
+                                    Math.min(180, ((displayedHand.length - 1) / 2 - index) * 30)
+                                  ),
+                                  y: -190,
+                                  scale: 0.78,
+                                  rotate: Math.max(
+                                    -4,
+                                    Math.min(4, (index - (displayedHand.length - 1) / 2) * 0.8)
+                                  )
+                                }
+                        }
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                          y: shouldReduceMotion ? 0 : selected ? -18 : 0,
+                          scale: shouldReduceMotion ? 1 : selected ? 1.03 : 1,
+                          rotate: 0
+                        }}
+                        exit={
+                          shouldReduceMotion
+                            ? { opacity: 0 }
                             : {
                                 opacity: 0,
                                 x: Math.max(
-                                  -180,
-                                  Math.min(180, ((displayedHand.length - 1) / 2 - index) * 30)
+                                  -140,
+                                  Math.min(140, (index - displayedHand.length / 2) * 18)
                                 ),
-                                y: -190,
-                                scale: 0.78,
-                                rotate: Math.max(
-                                  -4,
-                                  Math.min(4, (index - (displayedHand.length - 1) / 2) * 0.8)
-                                )
+                                y: -280,
+                                scale: 0.72,
+                                rotate: index % 2 === 0 ? -10 : 10
                               }
-                      }
-                      animate={{
-                        opacity: 1,
-                        x: 0,
-                        y: shouldReduceMotion ? 0 : selected ? -18 : 0,
-                        scale: shouldReduceMotion ? 1 : selected ? 1.03 : 1,
-                        rotate: 0
-                      }}
-                      exit={
-                        shouldReduceMotion
-                          ? { opacity: 0 }
-                          : {
-                              opacity: 0,
-                              x: Math.max(
-                                -140,
-                                Math.min(140, (index - displayedHand.length / 2) * 18)
-                              ),
-                              y: -280,
-                              scale: 0.72,
-                              rotate: index % 2 === 0 ? -10 : 10
+                        }
+                        transition={{
+                          ...(shouldReduceMotion
+                            ? { duration: 0 }
+                            : {
+                                delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.05),
+                                type: "spring",
+                                stiffness: 230,
+                                damping: 27,
+                                mass: 0.82
+                              })
+                        }}
+                        drag="x"
+                        dragSnapToOrigin
+                        dragElastic={0.18}
+                        dragMomentum={false}
+                        onDragStart={() => setHandSortMode("manual")}
+                        onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
+                        {...(isYourTurn && !shouldReduceMotion
+                          ? {
+                              whileHover: {
+                                y: selected ? -20 : -8
+                              }
                             }
-                      }
-                      transition={{
-                        ...(shouldReduceMotion
-                          ? { duration: 0 }
-                          : {
-                              delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.05),
-                              type: "spring",
-                              stiffness: 230,
-                              damping: 27,
-                              mass: 0.82
-                            })
-                      }}
-                      drag="x"
-                      dragSnapToOrigin
-                      dragElastic={0.18}
-                      dragMomentum={false}
-                      onDragStart={() => setHandSortMode("manual")}
-                      onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
-                      {...(isYourTurn && !shouldReduceMotion
-                        ? {
-                            whileHover: {
-                              y: selected ? -20 : -8
-                            }
-                          }
-                        : {})}
-                      onClick={() => toggleCard(card)}
-                    >
-                      <OnlineCard card={card} selected={selected} playable={playable} />
-                    </motion.button>
-                  );
-                })}
-              </AnimatePresence>
+                          : {})}
+                        onClick={() => toggleCard(card)}
+                      >
+                        <OnlineCard card={card} selected={selected} playable={playable} />
+                      </motion.button>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
+          </section>
         </section>
       </section>
     </main>
@@ -4536,7 +4536,7 @@ function OnlineTable({
   return (
     <section
       className={cn(
-        "table-felt table-oval relative h-full min-h-[28rem] overflow-hidden border border-white/10 p-3 sm:min-h-[34rem] lg:min-h-0 lg:p-5",
+        "table-felt table-oval relative h-full min-h-[44rem] overflow-hidden border border-white/10 p-3 sm:min-h-[48rem] lg:min-h-0 lg:p-5",
         getTableThemeClass(tableTheme)
       )}
     >
@@ -4571,16 +4571,18 @@ function OnlineTable({
           Create or join a room to take a seat.
         </div>
       ) : room?.status !== "complete" ? (
-        seatedPlayers.map((player, index) => (
-          <OnlineSeat
-            key={player.id}
-            player={player}
-            active={room?.activePlayerId === player.id}
-            position={index}
-            seatCount={seatedPlayers.length}
-            onOpenStats={() => setSelectedStatsPlayerId(player.id)}
-          />
-        ))
+        seatedPlayers.map((player, index) =>
+          player.id === room?.yourPlayerId ? null : (
+            <OnlineSeat
+              key={player.id}
+              player={player}
+              active={room?.activePlayerId === player.id}
+              position={index}
+              seatCount={seatedPlayers.length}
+              onOpenStats={() => setSelectedStatsPlayerId(player.id)}
+            />
+          )
+        )
       ) : null}
 
       <AnimatePresence>
@@ -4601,7 +4603,7 @@ function OnlineTable({
         ) : null}
       </AnimatePresence>
 
-      <div className="relative z-10 grid h-full min-h-[26rem] place-items-center text-center sm:min-h-[30rem] lg:min-h-0">
+      <div className="relative z-10 grid h-full min-h-[42rem] place-items-center pb-44 text-center sm:min-h-[46rem] sm:pb-48 lg:min-h-0">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
           <p className="text-xs font-semibold uppercase text-zinc-400">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
@@ -5110,8 +5112,8 @@ function OnlineSeat({
   return (
     <div
       className={cn(
-        "seat-panel absolute z-20 flex items-center justify-between gap-2 border px-2.5 py-2 sm:w-56",
-        centeredSeat ? "w-[min(13.5rem,calc(100%-2rem))]" : "w-36",
+        "seat-panel absolute z-20 flex items-center justify-between gap-2 border px-2.5 py-2 sm:w-60",
+        centeredSeat ? "w-[min(14rem,calc(100%-2rem))]" : "w-40",
         seatPosition,
         active
           ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
@@ -5149,21 +5151,10 @@ function OnlineSeat({
         >
           {player.name}
         </button>
-        <p className="text-xs text-zinc-400">
-          {player.cardsRemaining} cards · {player.connected ? "online" : "away"}
-        </p>
+        <p className="text-xs text-zinc-400">{player.cardsRemaining} cards</p>
+        <span className="sr-only">{player.connected ? "online" : "away"}</span>
       </div>
-      <div className="flex shrink-0 items-center">
-        <OnlineMiniCardStack count={Math.min(player.cardsRemaining, 3)} cardBack={cardBack} />
-        <span
-          className={cn(
-            "hidden rounded-full px-2 py-1 text-[10px] font-black sm:block",
-            player.ready ? "bg-emerald-400/15 text-emerald-200" : "bg-white/7 text-zinc-300"
-          )}
-        >
-          {player.ready ? "Ready" : player.kind}
-        </span>
-      </div>
+      <OnlineMiniCardStack count={player.cardsRemaining} cardBack={cardBack} />
     </div>
   );
 }
@@ -5335,22 +5326,55 @@ function OnlineMiniCardStack({
   readonly count: number;
   readonly cardBack: PublicCosmetic | null;
 }) {
+  const cardWidth = 14;
+  const cardStep = count <= 6 ? 7 : 4.5;
+  const fanWidth = Math.max(cardWidth, cardWidth + Math.max(0, count - 1) * cardStep);
+  const mobileCardStep = count <= 6 ? 4 : 2.3;
+  const mobileFanWidth = Math.max(10, 10 + Math.max(0, count - 1) * mobileCardStep);
+
   return (
-    <div className="relative hidden h-8 w-10 sm:block">
-      {Array.from({ length: count }).map((_, index) => (
-        <div
-          key={`online-card-back-${index}`}
-          className={cn(
-            "card-back absolute h-8 w-5 rounded-sm border border-white/15 shadow-lg",
-            getCardBackClass(cardBack)
-          )}
-          style={{
-            left: index * 7,
-            transform: `rotate(${(index - 1) * 5}deg)`
-          }}
-        />
-      ))}
-    </div>
+    <>
+      <div
+        className="relative h-6 shrink-0 sm:hidden"
+        style={{ width: mobileFanWidth }}
+        aria-label={`${count} cards remaining`}
+      >
+        {Array.from({ length: count }).map((_, index) => (
+          <div
+            key={`mobile-online-card-back-${index}`}
+            className={cn(
+              "card-back absolute h-5 w-2.5 rounded-[2px] border border-white/20 shadow-md",
+              getCardBackClass(cardBack)
+            )}
+            style={{
+              left: index * mobileCardStep,
+              transform: `rotate(${(index - (count - 1) / 2) * 0.8}deg)`,
+              transformOrigin: "50% 115%"
+            }}
+          />
+        ))}
+      </div>
+      <div
+        className="relative hidden h-8 shrink-0 sm:block"
+        style={{ width: fanWidth }}
+        aria-label={`${count} cards remaining`}
+      >
+        {Array.from({ length: count }).map((_, index) => (
+          <div
+            key={`online-card-back-${index}`}
+            className={cn(
+              "card-back absolute h-7 w-3.5 rounded-[2px] border border-white/20 shadow-lg",
+              getCardBackClass(cardBack)
+            )}
+            style={{
+              left: index * cardStep,
+              transform: `rotate(${(index - (count - 1) / 2) * 1.3}deg)`,
+              transformOrigin: "50% 115%"
+            }}
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -5823,23 +5847,52 @@ function OnlineCard({
 
   return (
     <div
+      data-suit-symbol={suitSymbol(card.suit)}
       className={cn(
-        "card-face grid rounded-md border p-2 shadow-xl transition",
+        "card-face relative grid overflow-hidden rounded-md border shadow-xl transition",
         compact ? "h-20 w-14" : "h-24 w-16 sm:h-28 sm:w-20",
         selected
           ? "border-[var(--gold)] ring-2 ring-[var(--gold)]"
           : playable
-            ? "border-[var(--aqua)]/70 shadow-[0_0_24px_rgba(61,214,208,0.18)]"
-            : "border-black/12",
-        !compact && !playable && !selected ? "opacity-72 saturate-75" : ""
+            ? "border-[var(--aqua)]/70 shadow-[0_0_20px_rgba(61,214,208,0.16)]"
+            : "border-black/20"
       )}
     >
-      <div className={cn("text-left font-black leading-none", suitColorClass)}>
-        <div className={compact ? "text-base" : "text-lg"}>{card.rank}</div>
-        <div className={compact ? "text-sm" : "text-base"}>{suitSymbol(card.suit)}</div>
+      <div
+        className={cn(
+          "card-face-corner absolute left-1.5 top-1.5 z-10 text-left font-black leading-none",
+          suitColorClass
+        )}
+      >
+        <div className={compact ? "text-sm" : "text-base sm:text-lg"}>{card.rank}</div>
+        <div className={compact ? "text-xs" : "text-sm sm:text-base"}>{suitSymbol(card.suit)}</div>
       </div>
-      <div className={cn("self-center text-center text-3xl font-black", suitColorClass)}>
-        {suitSymbol(card.suit)}
+      <div
+        className={cn(
+          "card-face-emblem relative z-10 self-center justify-self-center text-center",
+          suitColorClass
+        )}
+      >
+        <span className={cn("block leading-none", compact ? "text-2xl" : "text-4xl sm:text-5xl")}>
+          {suitSymbol(card.suit)}
+        </span>
+        <span
+          className={cn(
+            "mt-1 block font-black leading-none tracking-normal",
+            compact ? "text-[9px]" : "text-[10px] sm:text-xs"
+          )}
+        >
+          {formatRankName(card.rank)}
+        </span>
+      </div>
+      <div
+        className={cn(
+          "card-face-corner absolute bottom-1.5 right-1.5 z-10 rotate-180 text-left font-black leading-none",
+          suitColorClass
+        )}
+      >
+        <div className={compact ? "text-sm" : "text-base sm:text-lg"}>{card.rank}</div>
+        <div className={compact ? "text-xs" : "text-sm sm:text-base"}>{suitSymbol(card.suit)}</div>
       </div>
     </div>
   );
