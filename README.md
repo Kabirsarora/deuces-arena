@@ -14,6 +14,7 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 
 - Pure TypeScript game engine with card models, hand detection, comparison rules, legal move generation, server-safe state transitions, distinct random, lowest-legal, and simulation-guided bot levels, replays, ratings, move evaluation, and replay state reconstruction for simulation-based decision comparison.
 - Mobile-first Next.js table for human and bot play, with selected-card motion, trick display, turn state, uncluttered game-over summaries, move timelines, and on-demand simulation review.
+- Expo / React Native mobile foundation with native Play, Rooms, Ranked, and Profile tabs; configurable bot matches already reuse the production Socket.IO server, shared contracts, and pure TypeScript game engine.
 - Socket.IO rooms with server-authoritative move validation, reconnect support, disconnect grace auto-moves, ready states, leave-room flow, invite links, bot fill, moderated table chat, player mute/block/report controls, realtime rate limits, live lobby discovery, open-room counts, human activity counts, and replay export.
 - Private creator moderation console for reviewing player reports and product feedback, with signed admin authorization, report status tracking, stronger profanity filtering, request-size limits, and browser security headers.
 - Optional casual-only card trading with a timed pregame window, private one-for-one requests, atomic engine validation, one completed trade per player, and replay history; ranked mode never permits trading.
@@ -31,6 +32,7 @@ Licensed under the [MIT License](LICENSE). Development guidelines are in [CONTRI
 
 ```text
 apps/web             Next.js, React, Tailwind, Framer Motion UI
+apps/mobile          Expo, React Native, Expo Router native client
 apps/server          Express + Socket.IO realtime authority
 packages/game-engine Pure TypeScript rules, bots, replay, ratings, simulations
 packages/shared      Socket contracts and public DTOs
@@ -38,7 +40,7 @@ packages/db          Prisma schema, migrations, seeds
 packages/ml          Self-play and coach-evaluation data export scripts
 ```
 
-The engine is deliberately independent from React and the server. A future Expo / React Native app should be able to reuse the rules, shared contracts, replay format, persistence model, and AI/simulation tooling while replacing the web UI.
+The engine is deliberately independent from React and the server. The Expo client already reuses the rules and shared Socket.IO contracts while replacing the web UI with native screens. The replay format, persistence model, and AI/simulation tooling remain reusable across both clients.
 
 ## Game Rules
 
@@ -73,9 +75,10 @@ Bomb variants:
 npm install
 npm run dev --workspace @deuces-arena/web
 npm run dev --workspace @deuces-arena/server
+npm run dev:mobile
 ```
 
-The web app defaults to `http://localhost:3000`; the realtime server defaults to `http://localhost:4000`.
+The web app defaults to `http://localhost:3000`; the realtime server defaults to `http://localhost:4000`. The mobile client starts Expo and uses `https://api.deucesarena.com` unless `EXPO_PUBLIC_SERVER_URL` is set in `apps/mobile/.env.local`.
 
 Google sign-in is optional for local development. Without auth credentials, the app still works with
 guest profiles stored by browser. To test Google sign-in, create a `.env.local` for `apps/web` with
@@ -162,7 +165,9 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
 - Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.
 - Expand the current non-pay-to-win cosmetic catalog and supporter presentation options.
-- Build a reusable mobile client, then add a native iMessage extension that sends Deuces Arena room invitations and game state inside group conversations.
+- Add native Google sign-in, ranked/tournament queue entry, chat, cosmetics, match history, and reconnect persistence to the Expo client.
+- Prepare development builds, push notifications, device accessibility testing, store artwork, and App Store / Google Play submissions.
+- Add a separate native iOS Messages extension that sends Deuces Arena room invitations and game state inside group conversations.
 
 ## Known Limitations
 
