@@ -1,4 +1,4 @@
-const webUrl = process.env.SMOKE_WEB_URL ?? "https://deuces-arena.vercel.app";
+const webUrl = process.env.SMOKE_WEB_URL ?? "https://deucesarena.com";
 const serverUrl = process.env.SMOKE_SERVER_URL ?? "https://deuces-arena.onrender.com";
 const requireRealtimeAuth = process.env.SMOKE_REQUIRE_REALTIME_AUTH !== "false";
 
