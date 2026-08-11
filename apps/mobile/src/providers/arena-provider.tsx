@@ -18,6 +18,9 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
+import * as Linking from "expo-linking";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
 import {
   createContext,
   useCallback,
@@ -31,9 +34,11 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "https://api.deucesarena.com";
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://deucesarena.com";
 const GUEST_ID_KEY = "deuces-arena-mobile-guest-id";
 const PLAYER_NAME_KEY = "deuces-arena-mobile-player-name";
 const ROOM_SESSION_KEY = "deuces-arena-mobile-room-session";
+const ACCOUNT_SESSION_KEY = "deuces-arena-mobile-account-session";
 
 type ConnectionStatus = "waking" | "online" | "offline";
 
@@ -52,9 +57,19 @@ type StoredRoomSession = {
   readonly guestId: string;
 };
 
+export type MobileAccountSession = {
+  readonly token: string;
+  readonly expiresAt: string;
+  readonly profileId: string;
+  readonly displayName: string | null;
+  readonly imageUrl: string | null;
+};
+
 type ArenaContextValue = {
   readonly connectionStatus: ConnectionStatus;
   readonly serverUrl: string;
+  readonly account: MobileAccountSession | null;
+  readonly accountWorking: boolean;
   readonly guestId: string | null;
   readonly playerName: string;
   readonly profile: PublicGuestProfile | null;
@@ -69,6 +84,10 @@ type ArenaContextValue = {
   readonly createCasualRoom: () => Promise<boolean>;
   readonly startCurrentRoom: (botCount: number) => Promise<boolean>;
   readonly joinRoom: (roomCode: string) => Promise<boolean>;
+  readonly joinRanked: () => Promise<boolean>;
+  readonly leaveRanked: () => Promise<boolean>;
+  readonly joinTournament: () => Promise<boolean>;
+  readonly leaveTournament: () => Promise<boolean>;
   readonly leaveRoom: () => Promise<void>;
   readonly submitMove: (move: Move) => Promise<boolean>;
   readonly sendChat: (body: string) => Promise<boolean>;
@@ -78,6 +97,8 @@ type ArenaContextValue = {
   readonly updateProfile: (displayName: string, avatarKey: ProfileAvatarKey) => Promise<boolean>;
   readonly refreshProfileData: () => void;
   readonly refreshLobby: () => void;
+  readonly signInWithGoogle: () => Promise<void>;
+  readonly signOutAccount: () => Promise<void>;
 };
 
 const ArenaContext = createContext<ArenaContextValue | null>(null);
@@ -87,6 +108,9 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
   const guestIdRef = useRef<string | null>(null);
   const playerNameRef = useRef("Player");
   const completedRoomRef = useRef<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [account, setAccount] = useState<MobileAccountSession | null>(null);
+  const [accountWorking, setAccountWorking] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("waking");
   const [guestId, setGuestId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("Player");
@@ -98,6 +122,22 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
   const [tournamentQueue, setTournamentQueue] = useState<PublicTournamentQueueState | null>(null);
   const [room, setRoom] = useState<PublicRoomState | null>(null);
   const [notice, setNotice] = useState("Connecting to live tables...");
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function restoreAccount() {
+      const stored = await readAccountSession();
+      if (disposed) return;
+      setAccount(stored);
+      setAuthReady(true);
+    }
+
+    void restoreAccount();
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   const refreshLobby = useCallback(() => {
     const socket = socketRef.current;
@@ -138,25 +178,105 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     if (guestIdRef.current !== null) refreshProfileDataForGuest(guestIdRef.current);
   }, [refreshProfileDataForGuest]);
 
+  const signInWithGoogle = useCallback(async () => {
+    setAccountWorking(true);
+    setNotice("Opening secure Google sign-in...");
+
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(
+        `${WEB_URL}/mobile-connect`,
+        "deucesarena://auth"
+      );
+
+      if (result.type !== "success") {
+        setNotice("Google sign-in was cancelled.");
+        return;
+      }
+
+      const callback = Linking.parse(result.url);
+      const handoff = firstQueryValue(callback.queryParams?.handoff);
+
+      if (handoff === null) {
+        setNotice("The website did not return a valid account connection.");
+        return;
+      }
+
+      const response = await fetch(`${SERVER_URL}/auth/mobile/exchange`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handoffToken: handoff })
+      });
+      const body = (await response.json()) as Partial<MobileAccountSession> & { error?: string };
+
+      if (
+        !response.ok ||
+        typeof body.token !== "string" ||
+        typeof body.expiresAt !== "string" ||
+        typeof body.profileId !== "string"
+      ) {
+        setNotice(body.error ?? "Unable to connect this Google account.");
+        return;
+      }
+
+      const session: MobileAccountSession = {
+        token: body.token,
+        expiresAt: body.expiresAt,
+        profileId: body.profileId,
+        displayName: normalizeDisplayName(firstQueryValue(callback.queryParams?.name)),
+        imageUrl: normalizeImageUrl(firstQueryValue(callback.queryParams?.image))
+      };
+      await writeAccountSession(session);
+      await AsyncStorage.removeItem(ROOM_SESSION_KEY);
+      setRoom(null);
+      setProfile(null);
+      setMatchHistory([]);
+      setAccount(session);
+      setNotice("Google account connected. Syncing your Arena profile...");
+    } catch {
+      setNotice("Unable to complete Google sign-in. Please try again.");
+    } finally {
+      setAccountWorking(false);
+    }
+  }, []);
+
+  const signOutAccount = useCallback(async () => {
+    setAccountWorking(true);
+    await deleteAccountSession();
+    await AsyncStorage.removeItem(ROOM_SESSION_KEY);
+    setRoom(null);
+    setProfile(null);
+    setMatchHistory([]);
+    setAccount(null);
+    setNotice("Signed out. Continuing with your guest profile.");
+    setAccountWorking(false);
+  }, []);
+
   useEffect(() => {
+    if (!authReady) return;
+
     let disposed = false;
     let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
     async function connect() {
       const storedGuestId = await AsyncStorage.getItem(GUEST_ID_KEY);
-      const activeGuestId = storedGuestId ?? createGuestId();
+      const localGuestId = storedGuestId ?? createGuestId();
+      const activeGuestId = account?.profileId ?? localGuestId;
       const storedName = await AsyncStorage.getItem(PLAYER_NAME_KEY);
 
-      if (storedGuestId === null) await AsyncStorage.setItem(GUEST_ID_KEY, activeGuestId);
+      if (storedGuestId === null) await AsyncStorage.setItem(GUEST_ID_KEY, localGuestId);
       if (disposed) return;
 
       guestIdRef.current = activeGuestId;
-      playerNameRef.current = storedName ?? "Player";
+      playerNameRef.current = account?.displayName ?? storedName ?? "Player";
       setGuestId(activeGuestId);
       setPlayerName(playerNameRef.current);
+      setConnectionStatus("waking");
+      setProfile(null);
+      setMatchHistory([]);
 
       socket = io(SERVER_URL, {
         autoConnect: true,
+        ...(account === null ? {} : { auth: { token: account.token } }),
         reconnection: true,
         timeout: 75_000,
         transports: ["websocket", "polling"]
@@ -167,7 +287,24 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
         setConnectionStatus("online");
         setNotice("Connected to Deuces Arena.");
         refreshLobby();
-        refreshProfileDataForGuest(activeGuestId);
+        if (account === null) {
+          refreshProfileDataForGuest(activeGuestId);
+        } else {
+          socket?.emit(
+            "profile:sync-account",
+            { displayName: account.displayName, imageUrl: account.imageUrl },
+            (ack) => {
+              if (ack.ok) {
+                setProfile(ack.data);
+                playerNameRef.current = ack.data.displayName ?? playerNameRef.current;
+                setPlayerName(playerNameRef.current);
+              } else {
+                setNotice(ack.error);
+              }
+              refreshProfileDataForGuest(activeGuestId);
+            }
+          );
+        }
 
         const storedRoom = await readStoredRoomSession();
         if (storedRoom === null || storedRoom.guestId !== activeGuestId || !socket?.connected)
@@ -194,7 +331,13 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
         setConnectionStatus("offline");
         setNotice("Connection lost. Reconnecting automatically...");
       });
-      socket.on("connect_error", () => {
+      socket.on("connect_error", (error) => {
+        if (account !== null && error.message.includes("Invalid or expired account session")) {
+          void deleteAccountSession();
+          setAccount(null);
+          setNotice("Your mobile session expired. Sign in again to restore account features.");
+          return;
+        }
         setConnectionStatus("offline");
         setNotice("The free server may be waking up. We will keep trying.");
       });
@@ -219,7 +362,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       socket?.disconnect();
       socketRef.current = null;
     };
-  }, [refreshLobby, refreshProfileDataForGuest]);
+  }, [account, authReady, refreshLobby, refreshProfileDataForGuest]);
 
   useEffect(() => {
     if (room?.yourPlayerId === null || room?.yourPlayerId === undefined || guestId === null) return;
@@ -316,6 +459,78 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       )
     );
     return handleRoomAck(ack, setRoom, setNotice);
+  }, []);
+
+  const joinRanked = useCallback(async () => {
+    const socket = socketRef.current;
+    if (account === null) {
+      setNotice("Sign in with Google before joining ranked.");
+      return false;
+    }
+    if (socket === null || !socket.connected) return false;
+
+    const ack = await emitWithAck<PublicRankedQueueState>((callback) =>
+      socket.emit("ranked:join", { playerName: playerNameRef.current }, callback)
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setRankedQueue(ack.data);
+    setNotice("Joined the ranked queue.");
+    return true;
+  }, [account]);
+
+  const leaveRanked = useCallback(async () => {
+    const socket = socketRef.current;
+    if (socket === null || !socket.connected) return false;
+
+    const ack = await emitWithAck<PublicRankedQueueState>((callback) =>
+      socket.emit("ranked:leave", callback)
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setRankedQueue(ack.data);
+    setNotice("Left the ranked queue.");
+    return true;
+  }, []);
+
+  const joinTournament = useCallback(async () => {
+    const socket = socketRef.current;
+    if (account === null) {
+      setNotice("Sign in with Google before joining a tournament.");
+      return false;
+    }
+    if (socket === null || !socket.connected) return false;
+
+    const ack = await emitWithAck<PublicTournamentQueueState>((callback) =>
+      socket.emit("tournament:join", { playerName: playerNameRef.current }, callback)
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setTournamentQueue(ack.data);
+    setNotice("Joined the tournament queue.");
+    return true;
+  }, [account]);
+
+  const leaveTournament = useCallback(async () => {
+    const socket = socketRef.current;
+    if (socket === null || !socket.connected) return false;
+
+    const ack = await emitWithAck<PublicTournamentQueueState>((callback) =>
+      socket.emit("tournament:leave", callback)
+    );
+    if (!ack.ok) {
+      setNotice(ack.error);
+      return false;
+    }
+    setTournamentQueue(ack.data);
+    setNotice("Left the tournament queue.");
+    return true;
   }, []);
 
   const startCurrentRoom = useCallback(
@@ -482,6 +697,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     () => ({
       connectionStatus,
       serverUrl: SERVER_URL,
+      account,
+      accountWorking,
       guestId,
       playerName,
       profile,
@@ -496,6 +713,10 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       createCasualRoom,
       startCurrentRoom,
       joinRoom,
+      joinRanked,
+      leaveRanked,
+      joinTournament,
+      leaveTournament,
       leaveRoom,
       submitMove,
       sendChat,
@@ -504,16 +725,24 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       submitFeedback,
       updateProfile,
       refreshProfileData,
-      refreshLobby
+      refreshLobby,
+      signInWithGoogle,
+      signOutAccount
     }),
     [
       connectionStatus,
+      account,
+      accountWorking,
       cosmetics,
       createBotGame,
       createCasualRoom,
       guestId,
       equipCosmetic,
       joinRoom,
+      joinRanked,
+      leaveRanked,
+      joinTournament,
+      leaveTournament,
       leaveRoom,
       lobby,
       matchHistory,
@@ -530,7 +759,9 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       startCurrentRoom,
       tournamentQueue,
       updateProfile,
-      refreshProfileData
+      refreshProfileData,
+      signInWithGoogle,
+      signOutAccount
     ]
   );
 
@@ -545,6 +776,74 @@ export function useArena(): ArenaContextValue {
 
 function createGuestId(): string {
   return `guest-mobile-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function readAccountSession(): Promise<MobileAccountSession | null> {
+  const stored = await readSecureValue(ACCOUNT_SESSION_KEY);
+  if (stored === null) return null;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<MobileAccountSession>;
+    if (
+      typeof parsed.token !== "string" ||
+      typeof parsed.expiresAt !== "string" ||
+      typeof parsed.profileId !== "string" ||
+      new Date(parsed.expiresAt).getTime() <= Date.now()
+    ) {
+      await deleteAccountSession();
+      return null;
+    }
+
+    return {
+      token: parsed.token,
+      expiresAt: parsed.expiresAt,
+      profileId: parsed.profileId,
+      displayName: typeof parsed.displayName === "string" ? parsed.displayName : null,
+      imageUrl: typeof parsed.imageUrl === "string" ? parsed.imageUrl : null
+    };
+  } catch {
+    await deleteAccountSession();
+    return null;
+  }
+}
+
+async function writeAccountSession(session: MobileAccountSession): Promise<void> {
+  const value = JSON.stringify(session);
+  if (await SecureStore.isAvailableAsync()) {
+    await SecureStore.setItemAsync(ACCOUNT_SESSION_KEY, value, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY
+    });
+    return;
+  }
+  await AsyncStorage.setItem(ACCOUNT_SESSION_KEY, value);
+}
+
+async function readSecureValue(key: string): Promise<string | null> {
+  return (await SecureStore.isAvailableAsync())
+    ? SecureStore.getItemAsync(key)
+    : AsyncStorage.getItem(key);
+}
+
+async function deleteAccountSession(): Promise<void> {
+  if (await SecureStore.isAvailableAsync()) await SecureStore.deleteItemAsync(ACCOUNT_SESSION_KEY);
+  await AsyncStorage.removeItem(ACCOUNT_SESSION_KEY);
+}
+
+function firstQueryValue(value: string | string[] | undefined): string | null {
+  const first = Array.isArray(value) ? value[0] : value;
+  const normalized = first?.trim();
+  return normalized === undefined || normalized === "" ? null : normalized;
+}
+
+function normalizeImageUrl(value: string | null): string | null {
+  if (value === null || !value.startsWith("https://") || value.length > 500) return null;
+  return value;
+}
+
+function normalizeDisplayName(value: string | null): string | null {
+  const normalized = value?.replace(/\s+/g, " ").trim();
+  if (normalized === undefined || normalized.length < 2) return null;
+  return normalized.slice(0, 18);
 }
 
 async function readStoredRoomSession(): Promise<StoredRoomSession | null> {

@@ -26,7 +26,11 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
-import { createRealtimeAuthToken } from "@deuces-arena/shared";
+import {
+  createMobileAuthHandoffToken,
+  createRealtimeAuthToken,
+  verifyRealtimeAuthToken
+} from "@deuces-arena/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server as SocketServer } from "socket.io";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -102,6 +106,32 @@ describe("realtime rooms", () => {
       realtimeAuth: "configured",
       disconnectedAutoMoveDelayMs: 10
     });
+  });
+
+  it("exchanges only purpose-limited mobile account handoffs", async () => {
+    const identity = { profileId: "auth-abcdefabcdefabcdefabcdefabcdefab" };
+    const handoffToken = createMobileAuthHandoffToken(identity, TEST_REALTIME_AUTH_SECRET);
+    const response = await fetch(`${serverUrl}/auth/mobile/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handoffToken })
+    });
+    const session = (await response.json()) as {
+      readonly token: string;
+      readonly profileId: string;
+    };
+
+    expect(response.ok).toBe(true);
+    expect(session.profileId).toBe(identity.profileId);
+    expect(verifyRealtimeAuthToken(session.token, TEST_REALTIME_AUTH_SECRET)).toEqual(identity);
+
+    const ordinaryToken = createRealtimeAuthToken(identity, TEST_REALTIME_AUTH_SECRET);
+    const rejected = await fetch(`${serverUrl}/auth/mobile/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ handoffToken: ordinaryToken })
+    });
+    expect(rejected.status).toBe(401);
   });
 
   it("protects the moderation queue with signed admin access", async () => {

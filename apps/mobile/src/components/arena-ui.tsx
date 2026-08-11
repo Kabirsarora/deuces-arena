@@ -205,7 +205,7 @@ function IconButton({ children, ...props }: PressableProps & { readonly children
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.ink },
-  scrollContent: { flexGrow: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: 88 },
   content: {
     width: "100%",
     maxWidth: 720,

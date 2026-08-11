@@ -11,6 +11,8 @@ import type {
 
 export {
   createRealtimeAuthToken,
+  createMobileAuthHandoffToken,
+  verifyMobileAuthHandoffToken,
   verifyRealtimeAuthToken,
   type RealtimeAuthIdentity
 } from "./realtime-auth.js";

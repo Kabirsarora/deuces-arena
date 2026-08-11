@@ -9,7 +9,11 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
 - Server-authoritative card selection, legal move validation, passing, trick state, and match results.
 - Live open-room discovery, room codes, casual room creation, and bot fill.
 - Persistent on-device guest identity and profile editing.
-- Live ranked and tournament queue status. Native account authentication is the next milestone before queue entry is enabled.
+- Secure Google account handoff through `deucesarena.com`, with the app session stored in the
+  iOS Keychain or Android Keystore.
+- Shared web/mobile ratings, coins, cosmetics, history, admin access, ranked matchmaking, and
+  tournament queue entry.
+- Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
 
 ## Start Locally
 
@@ -28,7 +32,13 @@ The hosted server defaults to `https://api.deucesarena.com`. To target another s
 
 ```bash
 EXPO_PUBLIC_SERVER_URL="http://localhost:4000"
+EXPO_PUBLIC_WEB_URL="http://localhost:3000"
 ```
+
+Production uses `https://deucesarena.com/mobile-connect` for Google sign-in. The website issues a
+two-minute, purpose-limited handoff; the realtime server exchanges it for a 30-day mobile session.
+No Google client secret is shipped in the app. Sign-in requires a development or production build
+that owns the `deucesarena://` URL scheme; guest play remains available in Expo Go.
 
 ## Verification
 
@@ -40,9 +50,8 @@ cd apps/mobile && npx expo-doctor
 
 ## Next Milestones
 
-1. Native Google sign-in and account/profile synchronization.
-2. Ranked and tournament queue entry.
-3. Chat, cosmetics shop/locker, match history, and reconnect persistence.
-4. Development builds, push notifications, device testing, accessibility, and store assets.
-5. App Store and Google Play submission.
-6. A separate iOS Messages extension for sharing and opening room invitations.
+1. Development builds, physical-device account testing, and accessibility QA.
+2. Push notifications for table invitations and matchmaking.
+3. App Store and Google Play screenshots, privacy declarations, and submission.
+4. Universal links to replace the custom-scheme account callback before broad distribution.
+5. A separate iOS Messages extension for sharing and opening room invitations.

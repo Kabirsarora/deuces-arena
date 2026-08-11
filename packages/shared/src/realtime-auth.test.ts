@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createRealtimeAuthToken, verifyRealtimeAuthToken } from "./realtime-auth.js";
+import {
+  createMobileAuthHandoffToken,
+  createRealtimeAuthToken,
+  verifyMobileAuthHandoffToken,
+  verifyRealtimeAuthToken
+} from "./realtime-auth.js";
 
 const SECRET = "test-realtime-auth-secret-with-at-least-32-characters";
 const IDENTITY = {
@@ -26,5 +31,12 @@ describe("realtime authentication tokens", () => {
     const afterExpiry = new Date(NOW.getTime() + 61_000);
 
     expect(verifyRealtimeAuthToken(token, SECRET, afterExpiry)).toBeNull();
+  });
+
+  it("keeps short mobile handoffs separate from realtime sessions", () => {
+    const handoff = createMobileAuthHandoffToken(IDENTITY, SECRET, NOW);
+
+    expect(verifyMobileAuthHandoffToken(handoff, SECRET, NOW)).toEqual(IDENTITY);
+    expect(verifyRealtimeAuthToken(handoff, SECRET, NOW)).toBeNull();
   });
 });

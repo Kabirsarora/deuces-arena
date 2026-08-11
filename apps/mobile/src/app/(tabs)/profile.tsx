@@ -55,6 +55,8 @@ const feedbackKinds: readonly { readonly label: string; readonly value: Feedback
 
 export default function ProfileScreen() {
   const {
+    account,
+    accountWorking,
     cosmetics,
     equipCosmetic,
     matchHistory,
@@ -64,6 +66,8 @@ export default function ProfileScreen() {
     purchaseCosmetic,
     refreshProfileData,
     submitFeedback,
+    signInWithGoogle,
+    signOutAccount,
     updateProfile
   } = useArena();
   const [view, setView] = useState<ProfileView>("profile");
@@ -91,9 +95,17 @@ export default function ProfileScreen() {
 
       <View style={styles.identity}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {avatars.find((item) => item.value === avatar)?.label}
-          </Text>
+          {profile?.imageUrl !== null && profile?.imageUrl !== undefined ? (
+            <Image
+              source={{ uri: profile.imageUrl }}
+              contentFit="cover"
+              style={styles.accountImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>
+              {avatars.find((item) => item.value === avatar)?.label}
+            </Text>
+          )}
         </View>
         <View style={styles.identityCopy}>
           <Text style={styles.rating}>{profile?.rating ?? 1000} rating</Text>
@@ -106,6 +118,13 @@ export default function ProfileScreen() {
         </View>
         {profile?.isAdmin ? <ShieldCheck color={palette.mint} size={23} /> : null}
       </View>
+
+      <ActionButton
+        label={account === null ? "Sign in with Google" : "Sign out of Google"}
+        loading={accountWorking}
+        variant={account === null ? "primary" : "secondary"}
+        onPress={() => void (account === null ? signInWithGoogle() : signOutAccount())}
+      />
 
       <SegmentedControl value={view} options={views} onChange={setView} />
 
@@ -443,6 +462,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.mint
   },
+  accountImage: { width: "100%", height: "100%", borderRadius: 33 },
   avatarText: { color: palette.text, fontSize: 25, fontWeight: "900" },
   identityCopy: { flex: 1 },
   rating: { color: palette.text, fontSize: 17, fontWeight: "900" },

@@ -69,6 +69,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { Server } from "socket.io";
 
 import { sanitizeChatMessage } from "./chat.js";
+import { createMobileAuthService } from "./mobile-auth.js";
 import {
   abandonPersistedMatch,
   completePersistedMatch,
@@ -203,6 +204,7 @@ const ADMIN_GUEST_IDS = [
 const DATABASE_CONFIGURED = isConfiguredEnvironmentValue(process.env.DATABASE_URL);
 const REDIS_CONFIGURED = isConfiguredEnvironmentValue(process.env.REDIS_URL);
 const REALTIME_AUTH_SECRET = normalizeRealtimeAuthSecret(process.env.REALTIME_AUTH_SECRET);
+const mobileAuth = createMobileAuthService(REALTIME_AUTH_SECRET);
 const CLASSIC_PLAYER_COUNT = 4;
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
@@ -603,6 +605,19 @@ app.get("/leaderboard", async (request, response) => {
 
 app.get("/cosmetics", async (_request, response) => {
   response.json(await publicCosmetics());
+});
+
+app.post("/auth/mobile/exchange", (request, response) => {
+  const result = mobileAuth.exchange(request.body?.handoffToken);
+
+  if (!result.ok) {
+    const status =
+      result.reason === "not-configured" ? 503 : result.reason === "invalid-request" ? 400 : 401;
+    response.status(status).json({ error: result.message });
+    return;
+  }
+
+  response.json(result.session);
 });
 
 app.get("/profiles/:guestId", async (request, response) => {

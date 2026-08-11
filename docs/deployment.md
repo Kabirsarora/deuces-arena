@@ -64,6 +64,19 @@ ADMIN_EMAILS="creator@example.com"
 ADMIN_GUEST_IDS=""
 ```
 
+Mobile build-time public configuration:
+
+```bash
+EXPO_PUBLIC_SERVER_URL="https://api.deucesarena.com"
+EXPO_PUBLIC_WEB_URL="https://deucesarena.com"
+```
+
+Mobile account sign-in starts at `/mobile-connect` on the web app. The web app creates a signed,
+two-minute handoff that only `/auth/mobile/exchange` on the realtime server can accept. The server
+returns a 30-day app session, which Expo SecureStore keeps in the device Keychain or Keystore. This
+reuses the existing Google OAuth configuration and `REALTIME_AUTH_SECRET`; no Google secret or
+additional paid authentication service is added to the mobile bundle.
+
 Generate `REALTIME_AUTH_SECRET` once and paste the exact same value into Vercel and the realtime
 server host:
 
