@@ -30,7 +30,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
+  type ViewStyle
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -82,7 +83,11 @@ export default function TableScreen() {
       { isFirstMove: room.turnNumber === 0, currentTrick: room.currentTrick }
     ).valid;
   const yourPlayer = room?.players.find((player) => player.id === room.yourPlayerId) ?? null;
-  const opponents = room?.players.filter((player) => player.id !== room.yourPlayerId) ?? [];
+  const seatedPlayers = useMemo(
+    () => getClockwiseSeatedPlayers(room?.players ?? [], room?.yourPlayerId ?? null),
+    [room?.players, room?.yourPlayerId]
+  );
+  const opponents = seatedPlayers.slice(1);
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const latestEvent = room?.recentEvents.at(-1) ?? null;
   const unreadChat = Math.max(0, (room?.recentChat.length ?? 0) - lastReadChatCount);
@@ -238,31 +243,38 @@ export default function TableScreen() {
         style={styles.felt}
       >
         <View pointerEvents="none" style={styles.feltShade} />
-        <ScrollView
-          horizontal
-          contentContainerStyle={styles.opponents}
-          showsHorizontalScrollIndicator={false}
-        >
-          {opponents.map((player) => (
-            <View
-              accessible
-              accessibilityLabel={`${player.name}, ${player.cardsRemaining} cards remaining${
-                player.id === room.activePlayerId ? ", taking their turn" : ""
-              }`}
-              key={player.id}
-              style={[styles.opponent, player.id === room.activePlayerId && styles.activeSeat]}
-            >
-              <OpponentCardFan
-                count={player.cardsRemaining}
-                imageUrl={cosmeticPreviewUrl(player, "CARD_BACK", webUrl)}
-              />
-              <Text numberOfLines={1} style={styles.opponentName}>
-                {player.name}
-              </Text>
-              <Text style={styles.opponentCount}>{player.cardsRemaining} cards</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <View pointerEvents="box-none" style={styles.opponents}>
+          {opponents.map((player, opponentIndex) => {
+            const position = opponentIndex + 1;
+            const orientation = getSeatHandOrientation(position, seatedPlayers.length);
+
+            return (
+              <View
+                accessible
+                accessibilityLabel={`${player.name}, ${player.cardsRemaining} cards remaining${
+                  player.id === room.activePlayerId ? ", taking their turn" : ""
+                }`}
+                key={player.id}
+                style={[
+                  styles.opponent,
+                  getMobileSeatPosition(position, seatedPlayers.length),
+                  orientation !== "top" && styles.sideOpponent,
+                  player.id === room.activePlayerId && styles.activeSeat
+                ]}
+              >
+                <OpponentCardFan
+                  count={player.cardsRemaining}
+                  imageUrl={cosmeticPreviewUrl(player, "CARD_BACK", webUrl)}
+                  orientation={orientation}
+                />
+                <Text numberOfLines={1} style={styles.opponentName}>
+                  {player.name}
+                </Text>
+                <Text style={styles.opponentCount}>{player.cardsRemaining} cards</Text>
+              </View>
+            );
+          })}
+        </View>
 
         <View style={styles.trickArea}>
           {latestEvent?.wasPass ? (
@@ -412,20 +424,24 @@ export default function TableScreen() {
 
 function OpponentCardFan({
   count,
-  imageUrl
+  imageUrl,
+  orientation
 }: {
   readonly count: number;
   readonly imageUrl: string | null;
+  readonly orientation: "top" | "left" | "right";
 }) {
+  const vertical = orientation !== "top";
   const overlap = 4;
-  const width = count === 0 ? 28 : 28 + Math.max(0, count - 1) * overlap;
+  const width = vertical ? 28 : count === 0 ? 28 : 28 + Math.max(0, count - 1) * overlap;
+  const height = vertical ? 42 + Math.max(0, count - 1) * overlap : 48;
   const middle = Math.max(0, count - 1) / 2;
 
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.opponentCards, { width }]}
+      style={[styles.opponentCards, { width, height }]}
     >
       {Array.from({ length: count }, (_, index) => (
         <View
@@ -433,9 +449,9 @@ function OpponentCardFan({
           style={[
             styles.fannedCard,
             {
-              left: index * overlap,
-              top: Math.abs(index - middle) * 0.45,
-              transform: [{ rotate: `${(index - middle) * 1.35}deg` }]
+              left: vertical ? 0 : index * overlap,
+              top: vertical ? index * overlap : Math.abs(index - middle) * 0.45,
+              transform: [{ rotate: `${(index - middle) * (vertical ? 0.35 : 1.35)}deg` }]
             }
           ]}
         >
@@ -444,6 +460,57 @@ function OpponentCardFan({
       ))}
     </View>
   );
+}
+
+function getClockwiseSeatedPlayers(
+  players: readonly PublicRoomPlayer[],
+  yourPlayerId: string | null
+): readonly PublicRoomPlayer[] {
+  const anchorIndex = players.findIndex((player) => player.id === yourPlayerId);
+  if (anchorIndex <= 0) return players;
+  return [...players.slice(anchorIndex), ...players.slice(0, anchorIndex)];
+}
+
+function getSeatHandOrientation(position: number, seatCount: number): "top" | "left" | "right" {
+  if (
+    seatCount === 2 ||
+    position === seatCount / 2 ||
+    (seatCount === 5 && (position === 2 || position === 3))
+  ) {
+    return "top";
+  }
+
+  return position < seatCount / 2 ? "left" : "right";
+}
+
+function getMobileSeatPosition(position: number, seatCount: number): ViewStyle {
+  const layouts: Readonly<Record<number, readonly ViewStyle[]>> = {
+    2: [{ top: 12, left: "50%", transform: [{ translateX: -47 }] }],
+    3: [
+      { left: 5, top: "35%", transform: [{ translateY: -55 }] },
+      { right: 5, top: "35%", transform: [{ translateY: -55 }] }
+    ],
+    4: [
+      { left: 5, top: "36%", transform: [{ translateY: -58 }] },
+      { top: 12, left: "50%", transform: [{ translateX: -47 }] },
+      { right: 5, top: "36%", transform: [{ translateY: -58 }] }
+    ],
+    5: [
+      { left: 5, top: "50%", transform: [{ translateY: -58 }] },
+      { top: 12, left: "28%", transform: [{ translateX: -47 }] },
+      { top: 12, right: "28%", transform: [{ translateX: 47 }] },
+      { right: 5, top: "50%", transform: [{ translateY: -58 }] }
+    ],
+    6: [
+      { left: 5, top: "55%", transform: [{ translateY: -58 }] },
+      { left: 5, top: "25%", transform: [{ translateY: -58 }] },
+      { top: 12, left: "50%", transform: [{ translateX: -47 }] },
+      { right: 5, top: "25%", transform: [{ translateY: -58 }] },
+      { right: 5, top: "55%", transform: [{ translateY: -58 }] }
+    ]
+  };
+
+  return layouts[seatCount]?.[position - 1] ?? { top: 12, left: "50%" };
 }
 
 function cosmeticPreviewUrl(
@@ -652,13 +719,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(3, 12, 9, 0.52)"
   },
   opponents: {
-    minWidth: "100%",
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.sm,
-    justifyContent: "center"
+    ...StyleSheet.absoluteFill,
+    zIndex: 3
   },
   opponent: {
+    position: "absolute",
     width: 94,
     alignItems: "center",
     padding: 7,
@@ -666,6 +731,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent"
   },
+  sideOpponent: { width: 56, paddingHorizontal: 3 },
   activeSeat: { backgroundColor: "rgba(241,199,91,0.11)", borderColor: "rgba(241,199,91,0.65)" },
   opponentCards: { height: 48, maxWidth: 88, alignSelf: "center" },
   fannedCard: { position: "absolute" },
