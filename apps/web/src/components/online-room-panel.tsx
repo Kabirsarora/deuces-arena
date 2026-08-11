@@ -4603,7 +4603,7 @@ function OnlineTable({
         ) : null}
       </AnimatePresence>
 
-      <div className="relative z-10 grid h-full min-h-[42rem] place-items-center pb-44 text-center sm:min-h-[46rem] sm:pb-48 lg:min-h-0">
+      <div className="relative z-10 grid h-full min-h-[42rem] translate-y-14 place-items-center pb-44 text-center sm:min-h-[46rem] sm:pb-48 lg:min-h-0">
         <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
           <p className="text-xs font-semibold uppercase text-zinc-400">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
@@ -5107,54 +5107,68 @@ function OnlineSeat({
   const avatarCosmetic = getEquippedCosmetic(player, "AVATAR");
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = getSeatPositionClass(position, seatCount);
-  const centeredSeat = position === 0 || (seatCount % 2 === 0 && position === seatCount / 2);
+  const handOrientation = getSeatHandOrientation(position, seatCount);
 
   return (
     <div
       className={cn(
-        "seat-panel absolute z-20 flex items-center justify-between gap-2 border px-2.5 py-2 sm:w-60",
-        centeredSeat ? "w-[min(14rem,calc(100%-2rem))]" : "w-40",
-        seatPosition,
-        active
-          ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
-          : profileBorder !== null
-            ? getProfileBorderClass(profileBorder)
-            : "border-white/10"
+        "absolute z-20 flex gap-2",
+        handOrientation === "top"
+          ? "flex-col items-center"
+          : handOrientation === "left"
+            ? "flex-row items-center"
+            : "flex-row-reverse items-center",
+        seatPosition
       )}
     >
       <div
         className={cn(
-          "grid size-9 shrink-0 place-items-center rounded-full border text-xs font-black",
-          avatarCosmetic === null
-            ? player.connected
-              ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
-              : "border-zinc-500/35 bg-zinc-500/12 text-zinc-300"
-            : getAvatarCosmeticClass(avatarCosmetic)
+          "seat-panel flex w-28 items-center gap-2 border px-2.5 py-2 sm:w-36",
+          active
+            ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
+            : profileBorder !== null
+              ? getProfileBorderClass(profileBorder)
+              : "border-white/10"
         )}
       >
-        {avatarCosmetic === null && player.imageUrl !== null && player.imageUrl !== undefined ? (
-          <span
-            className="size-full rounded-full bg-cover bg-center"
-            style={{ backgroundImage: `url(${player.imageUrl})` }}
-          />
-        ) : avatarCosmetic === null ? (
-          player.name.slice(0, 1).toUpperCase()
-        ) : (
-          getAvatarCosmeticSymbol(avatarCosmetic)
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <button
-          className="block max-w-full truncate text-left text-sm font-bold underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
-          type="button"
-          onClick={onOpenStats}
+        <div
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded-full border text-xs font-black sm:size-9",
+            avatarCosmetic === null
+              ? player.connected
+                ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
+                : "border-zinc-500/35 bg-zinc-500/12 text-zinc-300"
+              : getAvatarCosmeticClass(avatarCosmetic)
+          )}
         >
-          {player.name}
-        </button>
-        <p className="text-xs text-zinc-400">{player.cardsRemaining} cards</p>
-        <span className="sr-only">{player.connected ? "online" : "away"}</span>
+          {avatarCosmetic === null && player.imageUrl !== null && player.imageUrl !== undefined ? (
+            <span
+              className="size-full rounded-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${player.imageUrl})` }}
+            />
+          ) : avatarCosmetic === null ? (
+            player.name.slice(0, 1).toUpperCase()
+          ) : (
+            getAvatarCosmeticSymbol(avatarCosmetic)
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <button
+            className="block max-w-full truncate text-left text-xs font-bold underline-offset-4 transition hover:text-[var(--gold)] hover:underline sm:text-sm"
+            type="button"
+            onClick={onOpenStats}
+          >
+            {player.name}
+          </button>
+          <p className="text-[10px] text-zinc-400 sm:text-xs">{player.cardsRemaining} cards</p>
+          <span className="sr-only">{player.connected ? "online" : "away"}</span>
+        </div>
       </div>
-      <OnlineMiniCardStack count={player.cardsRemaining} cardBack={cardBack} />
+      <OnlineOpponentHand
+        count={player.cardsRemaining}
+        cardBack={cardBack}
+        orientation={handOrientation}
+      />
     </div>
   );
 }
@@ -5319,62 +5333,51 @@ function PlayerReportForm({
   );
 }
 
-function OnlineMiniCardStack({
+function OnlineOpponentHand({
   count,
-  cardBack
+  cardBack,
+  orientation
 }: {
   readonly count: number;
   readonly cardBack: PublicCosmetic | null;
+  readonly orientation: "top" | "left" | "right";
 }) {
-  const cardWidth = 18;
-  const cardStep = count <= 6 ? 8 : 5;
-  const fanWidth = Math.max(cardWidth, cardWidth + Math.max(0, count - 1) * cardStep);
-  const mobileCardStep = count <= 6 ? 5 : 2.8;
-  const mobileFanWidth = Math.max(12, 12 + Math.max(0, count - 1) * mobileCardStep);
+  const vertical = orientation !== "top";
+  const cardWidth = 28;
+  const cardHeight = 42;
+  const cardStep = count <= 6 ? 10 : 6;
+  const handLength = Math.max(
+    vertical ? cardHeight : cardWidth,
+    (vertical ? cardHeight : cardWidth) + Math.max(0, count - 1) * cardStep
+  );
 
   return (
-    <>
-      <div
-        className="relative h-6 shrink-0 sm:hidden"
-        style={{ width: mobileFanWidth }}
-        aria-label={`${count} cards remaining`}
-      >
-        {Array.from({ length: count }).map((_, index) => (
-          <div
-            key={`mobile-online-card-back-${index}`}
-            className={cn(
-              "card-back absolute h-6 w-3 rounded-[2px] border border-white/25 shadow-md",
-              getCardBackClass(cardBack)
-            )}
-            style={{
-              left: index * mobileCardStep,
-              transform: `rotate(${(index - (count - 1) / 2) * 0.8}deg)`,
-              transformOrigin: "50% 115%"
-            }}
-          />
-        ))}
-      </div>
-      <div
-        className="relative hidden h-8 shrink-0 sm:block"
-        style={{ width: fanWidth }}
-        aria-label={`${count} cards remaining`}
-      >
-        {Array.from({ length: count }).map((_, index) => (
-          <div
-            key={`online-card-back-${index}`}
-            className={cn(
-              "card-back absolute h-8 w-[1.125rem] rounded-[3px] border border-white/25 shadow-lg",
-              getCardBackClass(cardBack)
-            )}
-            style={{
-              left: index * cardStep,
-              transform: `rotate(${(index - (count - 1) / 2) * 1.3}deg)`,
-              transformOrigin: "50% 115%"
-            }}
-          />
-        ))}
-      </div>
-    </>
+    <div
+      className="relative shrink-0"
+      style={
+        vertical
+          ? { width: cardWidth, height: handLength }
+          : { width: handLength, height: cardHeight }
+      }
+      aria-label={`${count} face-down cards remaining`}
+    >
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          aria-hidden="true"
+          key={`online-opponent-card-back-${index}`}
+          className={cn(
+            "card-back absolute h-[42px] w-7 rounded-[4px] border border-white/30 shadow-lg",
+            getCardBackClass(cardBack)
+          )}
+          style={{
+            left: vertical ? 0 : index * cardStep,
+            top: vertical ? index * cardStep : Math.abs(index - (count - 1) / 2) * 0.7,
+            transform: `rotate(${(index - (count - 1) / 2) * (vertical ? 0.35 : 1.05)}deg)`,
+            transformOrigin: vertical ? "120% 50%" : "50% 115%"
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -6067,6 +6070,18 @@ function getSeatPositionClass(position: number, seatCount: number): string {
     CLASSIC_CLOCKWISE_SEAT_LAYOUT[0] ??
     ""
   );
+}
+
+function getSeatHandOrientation(position: number, seatCount: number): "top" | "left" | "right" {
+  if (
+    seatCount === 2 ||
+    position === seatCount / 2 ||
+    (seatCount === 5 && (position === 2 || position === 3))
+  ) {
+    return "top";
+  }
+
+  return position < seatCount / 2 ? "left" : "right";
 }
 
 function getTrickEntryOffset(
