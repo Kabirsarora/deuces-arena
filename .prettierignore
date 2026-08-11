@@ -1,4 +1,6 @@
 dist
+dist-*
+**/dist-*
 .next
 .vercel
 coverage

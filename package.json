@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev --workspaces --if-present",
+    "dev:mobile": "npm run start --workspace @deuces-arena/mobile",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "npm run lint --workspaces --if-present",
@@ -21,10 +22,17 @@
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
   },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.0",
+    "expo-router": "^57.0.12",
     "prettier": "^3.8.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4",
