@@ -14,6 +14,8 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
 - Shared web/mobile ratings, coins, cosmetics, history, admin access, ranked matchmaking, and
   tournament queue entry.
 - Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
+- A single immersive table surface for seats, tricks, controls, and the player hand, with exact
+  opponent card counts and saved card-back/table cosmetics shared across web and mobile.
 
 ## Start Locally
 
@@ -40,6 +42,26 @@ two-minute, purpose-limited handoff; the realtime server exchanges it for a 30-d
 No Google client secret is shipped in the app. Sign-in requires a development or production build
 that owns the `deucesarena://` URL scheme; guest play remains available in Expo Go.
 
+## Native Development Builds
+
+The checked-in `eas.json` provides development-device, iOS Simulator, internal-preview, and
+production profiles. All profiles target the hosted Deuces Arena web and realtime services. The
+first EAS setup is intentionally left unlinked so no Expo account or project identifier is committed
+without the owner's approval.
+
+From `apps/mobile`, link the project once and create the build you need:
+
+```bash
+npx eas-cli login
+npx eas-cli init
+npx eas-cli build --profile development-simulator --platform ios
+```
+
+For a physical device, use `--profile development` and choose `ios` or `android`. After installing
+the build, run `npm run start:dev-client --workspace @deuces-arena/mobile` from the repository root.
+EAS credentials and signing secrets stay in Expo's credential service and must not be added to
+`.env` files or committed.
+
 ## Verification
 
 ```bash
@@ -50,7 +72,7 @@ cd apps/mobile && npx expo-doctor
 
 ## Next Milestones
 
-1. Development builds, physical-device account testing, and accessibility QA.
+1. Link the EAS project, create development builds, and test account handoff on physical devices.
 2. Push notifications for table invitations and matchmaking.
 3. App Store and Google Play screenshots, privacy declarations, and submission.
 4. Universal links to replace the custom-scheme account callback before broad distribution.

@@ -10,10 +10,12 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.deucesarena.app",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
       "package": "com.deucesarena.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#081511",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

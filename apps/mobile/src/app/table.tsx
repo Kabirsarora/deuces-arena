@@ -5,6 +5,8 @@ import {
   type Card,
   type Move
 } from "@deuces-arena/game-engine";
+import type { CosmeticKind, PublicRoomPlayer } from "@deuces-arena/shared";
+import { ImageBackground } from "expo-image";
 import { router } from "expo-router";
 import {
   ArrowLeft,
@@ -34,11 +36,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ActionButton } from "@/components/arena-ui";
 import { CardBack, PlayingCard } from "@/components/playing-card";
+import jungleClubTable from "@/assets/images/jungle-club-table.jpg";
 import { palette, radius, spacing } from "@/constants/theme";
 import { useArena } from "@/providers/arena-provider";
 
 export default function TableScreen() {
-  const { leaveRoom, notice, room, sendChat, startCurrentRoom, submitMove } = useArena();
+  const { leaveRoom, notice, room, sendChat, startCurrentRoom, submitMove, webUrl } = useArena();
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [dealing, setDealing] = useState(false);
   const [working, setWorking] = useState(false);
@@ -83,6 +86,8 @@ export default function TableScreen() {
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const latestEvent = room?.recentEvents.at(-1) ?? null;
   const unreadChat = Math.max(0, (room?.recentChat.length ?? 0) - lastReadChatCount);
+  const yourCardBackUrl = cosmeticPreviewUrl(yourPlayer, "CARD_BACK", webUrl);
+  const tableThemeUrl = cosmeticPreviewUrl(yourPlayer, "TABLE_THEME", webUrl);
 
   useEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0)
@@ -226,7 +231,13 @@ export default function TableScreen() {
         </View>
       </View>
 
-      <View style={styles.felt}>
+      <ImageBackground
+        source={tableThemeUrl === null ? jungleClubTable : { uri: tableThemeUrl }}
+        contentFit="cover"
+        imageStyle={styles.feltImage}
+        style={styles.felt}
+      >
+        <View pointerEvents="none" style={styles.feltShade} />
         <ScrollView
           horizontal
           contentContainerStyle={styles.opponents}
@@ -234,15 +245,17 @@ export default function TableScreen() {
         >
           {opponents.map((player) => (
             <View
+              accessible
+              accessibilityLabel={`${player.name}, ${player.cardsRemaining} cards remaining${
+                player.id === room.activePlayerId ? ", taking their turn" : ""
+              }`}
               key={player.id}
               style={[styles.opponent, player.id === room.activePlayerId && styles.activeSeat]}
             >
-              <View style={styles.opponentCards}>
-                <CardBack compact />
-                <View style={styles.secondBack}>
-                  <CardBack compact />
-                </View>
-              </View>
+              <OpponentCardFan
+                count={player.cardsRemaining}
+                imageUrl={cosmeticPreviewUrl(player, "CARD_BACK", webUrl)}
+              />
               <Text numberOfLines={1} style={styles.opponentName}>
                 {player.name}
               </Text>
@@ -280,6 +293,91 @@ export default function TableScreen() {
           </Animated.View>
         </View>
 
+        {room.status !== "complete" ? (
+          <View style={styles.handArea}>
+            <View style={styles.handHeading}>
+              <View>
+                <Text style={styles.handTitle}>{yourPlayer?.name ?? "Your hand"}</Text>
+                <Text style={styles.handMeta}>
+                  {selectedCards.length} selected ·{" "}
+                  {legalMoves.filter((move) => move.type === "play").length} legal plays
+                </Text>
+              </View>
+              <Pressable
+                accessibilityLabel="Clear selected cards"
+                accessibilityRole="button"
+                disabled={selectedIds.length === 0}
+                onPress={() => setSelectedIds([])}
+                style={[styles.roundButton, selectedIds.length === 0 && styles.disabled]}
+              >
+                <RotateCcw color={palette.muted} size={17} />
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.hand}
+              showsHorizontalScrollIndicator={false}
+            >
+              {dealing ? (
+                <View style={styles.dealing}>
+                  <View style={styles.dealDeck}>
+                    <CardBack imageUrl={yourCardBackUrl} />
+                  </View>
+                  <Text accessibilityLiveRegion="polite" style={styles.dealingText}>
+                    Shuffling and dealing...
+                  </Text>
+                </View>
+              ) : (
+                room.yourHand.map((card) => (
+                  <PlayingCard
+                    key={getCardId(card)}
+                    card={card}
+                    selected={selectedIds.includes(getCardId(card))}
+                    disabled={!playableIds.has(getCardId(card))}
+                    onPress={() => toggleCard(card)}
+                  />
+                ))
+              )}
+            </ScrollView>
+            <View style={styles.moveActions}>
+              <Pressable
+                accessibilityLabel="Pass this turn"
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled: !canPass || room.activePlayerId !== room.yourPlayerId || working
+                }}
+                disabled={!canPass || room.activePlayerId !== room.yourPlayerId || working}
+                onPress={() => void move({ type: "pass" })}
+                style={({ pressed }) => [
+                  styles.passButton,
+                  (!canPass || room.activePlayerId !== room.yourPlayerId) && styles.disabled,
+                  pressed && styles.pressed
+                ]}
+              >
+                <SkipForward color={palette.text} size={19} />
+                <Text style={styles.passLabel}>Pass</Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`Play ${selectedCards.length} selected card${
+                  selectedCards.length === 1 ? "" : "s"
+                }`}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canPlay || working }}
+                disabled={!canPlay || working}
+                onPress={() => void move({ type: "play", cards: selectedCards })}
+                style={({ pressed }) => [
+                  styles.playButton,
+                  !canPlay && styles.disabled,
+                  pressed && styles.pressed
+                ]}
+              >
+                <Play color={palette.ink} fill={palette.ink} size={18} />
+                <Text style={styles.playLabel}>Play</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         {room.status === "complete" ? (
           <View style={styles.results}>
             <Text style={styles.resultsTitle}>Match complete</Text>
@@ -296,78 +394,7 @@ export default function TableScreen() {
             <ActionButton label="Back to lobby" onPress={() => void leave()} />
           </View>
         ) : null}
-      </View>
-
-      {room.status !== "complete" ? (
-        <View style={styles.handArea}>
-          <View style={styles.handHeading}>
-            <View>
-              <Text style={styles.handTitle}>{yourPlayer?.name ?? "Your hand"}</Text>
-              <Text style={styles.handMeta}>
-                {selectedCards.length} selected ·{" "}
-                {legalMoves.filter((move) => move.type === "play").length} legal plays
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Clear selected cards"
-              onPress={() => setSelectedIds([])}
-              style={styles.roundButton}
-            >
-              <RotateCcw color={palette.muted} size={17} />
-            </Pressable>
-          </View>
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.hand}
-            showsHorizontalScrollIndicator={false}
-          >
-            {dealing ? (
-              <View style={styles.dealing}>
-                <View style={styles.dealDeck}>
-                  <CardBack />
-                </View>
-                <Text style={styles.dealingText}>Shuffling and dealing...</Text>
-              </View>
-            ) : (
-              room.yourHand.map((card) => (
-                <PlayingCard
-                  key={getCardId(card)}
-                  card={card}
-                  selected={selectedIds.includes(getCardId(card))}
-                  disabled={!playableIds.has(getCardId(card))}
-                  onPress={() => toggleCard(card)}
-                />
-              ))
-            )}
-          </ScrollView>
-          <View style={styles.moveActions}>
-            <Pressable
-              disabled={!canPass || room.activePlayerId !== room.yourPlayerId || working}
-              onPress={() => void move({ type: "pass" })}
-              style={({ pressed }) => [
-                styles.passButton,
-                (!canPass || room.activePlayerId !== room.yourPlayerId) && styles.disabled,
-                pressed && styles.pressed
-              ]}
-            >
-              <SkipForward color={palette.text} size={19} />
-              <Text style={styles.passLabel}>Pass</Text>
-            </Pressable>
-            <Pressable
-              disabled={!canPlay || working}
-              onPress={() => void move({ type: "play", cards: selectedCards })}
-              style={({ pressed }) => [
-                styles.playButton,
-                !canPlay && styles.disabled,
-                pressed && styles.pressed
-              ]}
-            >
-              <Play color={palette.ink} fill={palette.ink} size={18} />
-              <Text style={styles.playLabel}>Play</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      </ImageBackground>
       <ChatSheet
         visible={chatOpen}
         messages={room.recentChat}
@@ -381,6 +408,54 @@ export default function TableScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function OpponentCardFan({
+  count,
+  imageUrl
+}: {
+  readonly count: number;
+  readonly imageUrl: string | null;
+}) {
+  const overlap = 4;
+  const width = count === 0 ? 28 : 28 + Math.max(0, count - 1) * overlap;
+  const middle = Math.max(0, count - 1) / 2;
+
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.opponentCards, { width }]}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.fannedCard,
+            {
+              left: index * overlap,
+              top: Math.abs(index - middle) * 0.45,
+              transform: [{ rotate: `${(index - middle) * 1.35}deg` }]
+            }
+          ]}
+        >
+          <CardBack accessible={false} imageUrl={imageUrl} mini />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function cosmeticPreviewUrl(
+  player: PublicRoomPlayer | null,
+  kind: CosmeticKind,
+  webUrl: string
+): string | null {
+  const previewUrl = player?.equippedCosmetics.find((item) => item.kind === kind)?.cosmetic
+    .previewUrl;
+  if (previewUrl === null || previewUrl === undefined) return null;
+  if (/^https?:\/\//.test(previewUrl)) return previewUrl;
+  return `${webUrl.replace(/\/$/, "")}${previewUrl.startsWith("/") ? "" : "/"}${previewUrl}`;
 }
 
 function ChatButton({
@@ -562,14 +637,19 @@ const styles = StyleSheet.create({
   unreadText: { color: palette.white, fontSize: 9, fontWeight: "900" },
   felt: {
     flex: 1,
-    minHeight: 310,
+    minHeight: 500,
+    marginHorizontal: 5,
+    marginBottom: 5,
     overflow: "hidden",
     backgroundColor: palette.feltDeep,
-    borderTopLeftRadius: radius.table,
-    borderTopRightRadius: radius.table,
+    borderRadius: radius.table,
     borderWidth: 3,
-    borderBottomWidth: 0,
     borderColor: "#1c332b"
+  },
+  feltImage: { borderRadius: radius.table },
+  feltShade: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(3, 12, 9, 0.52)"
   },
   opponents: {
     minWidth: "100%",
@@ -587,8 +667,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent"
   },
   activeSeat: { backgroundColor: "rgba(241,199,91,0.11)", borderColor: "rgba(241,199,91,0.65)" },
-  opponentCards: { height: 42, width: 58, transform: [{ scale: 0.56 }] },
-  secondBack: { position: "absolute", left: 15, top: 2 },
+  opponentCards: { height: 48, maxWidth: 88, alignSelf: "center" },
+  fannedCard: { position: "absolute" },
   opponentName: {
     width: "100%",
     color: palette.text,
@@ -597,7 +677,14 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   opponentCount: { color: palette.muted, fontSize: 10, marginTop: 2 },
-  trickArea: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.md },
+  trickArea: {
+    flex: 1,
+    minHeight: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
   passFlash: { color: palette.gold, fontSize: 13, fontWeight: "900", marginBottom: 5 },
   trickLabel: { color: palette.text, fontSize: 17, fontWeight: "900" },
   trickCards: {
@@ -618,11 +705,12 @@ const styles = StyleSheet.create({
   },
   emptyTrickText: { color: palette.muted, fontSize: 12 },
   handArea: {
-    minHeight: 230,
-    backgroundColor: palette.surface,
-    paddingTop: spacing.md,
+    minHeight: 220,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: palette.line
+    borderTopColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(3, 9, 7, 0.48)"
   },
   handHeading: {
     flexDirection: "row",
@@ -656,7 +744,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs
   },
   passButton: {
     flex: 1,

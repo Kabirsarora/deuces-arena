@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 16.18.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SERVER_URL": "https://api.deucesarena.com",
+        "EXPO_PUBLIC_WEB_URL": "https://deucesarena.com"
+      }
+    },
+    "development-simulator": {
+      "extends": "development",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SERVER_URL": "https://api.deucesarena.com",
+        "EXPO_PUBLIC_WEB_URL": "https://deucesarena.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SERVER_URL": "https://api.deucesarena.com",
+        "EXPO_PUBLIC_WEB_URL": "https://deucesarena.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

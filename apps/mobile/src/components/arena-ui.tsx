@@ -95,6 +95,8 @@ export function ActionButton({
   return (
     <Pressable
       {...props}
+      accessibilityRole={props.accessibilityRole ?? "button"}
+      accessibilityState={{ disabled: props.disabled === true || loading }}
       disabled={props.disabled === true || loading}
       style={({ pressed }) => [
         styles.actionButton,
@@ -132,6 +134,8 @@ export function SegmentedControl<T extends string>({
         return (
           <Pressable
             key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               styles.segment,
@@ -192,6 +196,8 @@ function IconButton({ children, ...props }: PressableProps & { readonly children
   return (
     <Pressable
       {...props}
+      accessibilityRole={props.accessibilityRole ?? "button"}
+      accessibilityState={{ disabled: props.disabled === true }}
       style={({ pressed }) => [
         styles.iconButton,
         props.disabled === true && styles.disabled,
