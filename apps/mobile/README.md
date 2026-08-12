@@ -7,7 +7,10 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
 - Native Play, Rooms, Ranked, and Profile tabs.
 - Configurable 2-6 player bot games with Classic or Arena 6 decks.
 - Server-authoritative card selection, legal move validation, passing, trick state, and match results.
-- Live open-room discovery, room codes, casual room creation, and bot fill.
+- Live open-room discovery, room codes, ready states, and host-controlled casual setup for 2-6
+  players, card counts, bot difficulty/pace, timers, bomb behavior, Arena 6, and bot fill.
+- Optional casual-only pregame card trading with the same private, server-validated limits as web;
+  ranked and tournament tables never enable it.
 - Persistent on-device guest identity and profile editing.
 - Secure Google account handoff through `deucesarena.com`, with the app session stored in the
   iOS Keychain or Android Keystore.

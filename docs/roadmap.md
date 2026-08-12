@@ -103,6 +103,8 @@
   competitive-match table routing for mobile runtime resilience.
 - Done: add native player detail sheets with public stats, persistent chat blocking, and structured
   safety reports backed by the shared moderation service.
+- Done: bring native casual rooms to web parity with host settings, human ready states, bot fill,
+  timers, rule variants, and the optional server-authoritative pregame trade window.
 - Next: link EAS, install development builds on physical devices, and finish Apple/Android domain verification with the generated signing identifiers.
 - Next: configure native push credentials and test ranked/tournament delivery on physical devices before enabling production sends.
 - Later: build a native iMessage extension with Apple's Messages framework so group conversations can send and join Deuces Arena games without claiming integration with GamePigeon.
