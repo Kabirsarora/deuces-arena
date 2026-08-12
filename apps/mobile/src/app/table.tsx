@@ -6,17 +6,19 @@ import {
   type Move
 } from "@deuces-arena/game-engine";
 import { createRoomInviteUrl } from "@deuces-arena/shared";
-import type { CosmeticKind, PublicRoomPlayer } from "@deuces-arena/shared";
+import type { CosmeticKind, PlayerReportReason, PublicRoomPlayer } from "@deuces-arena/shared";
 import { ImageBackground } from "expo-image";
 import { router } from "expo-router";
 import {
   ArrowLeft,
   CircleDot,
+  Flag,
   MessageCircle,
   Play,
   RotateCcw,
   Send,
   Share2,
+  ShieldBan,
   SkipForward,
   X
 } from "lucide-react-native";
@@ -44,7 +46,17 @@ import { palette, radius, spacing } from "@/constants/theme";
 import { useArena } from "@/providers/arena-provider";
 
 export default function TableScreen() {
-  const { leaveRoom, notice, room, sendChat, startCurrentRoom, submitMove, webUrl } = useArena();
+  const {
+    blockPlayer,
+    leaveRoom,
+    notice,
+    reportPlayer,
+    room,
+    sendChat,
+    startCurrentRoom,
+    submitMove,
+    webUrl
+  } = useArena();
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [dealing, setDealing] = useState(false);
   const [working, setWorking] = useState(false);
@@ -52,6 +64,7 @@ export default function TableScreen() {
   const [chatBody, setChatBody] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
   const [lastReadChatCount, setLastReadChatCount] = useState(0);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const trickAnimation = useRef(new Animated.Value(1)).current;
 
   const selectedCards = useMemo(
@@ -99,6 +112,7 @@ export default function TableScreen() {
     room?.players.find((player) => player.id === room.currentTrick?.lastPlayedByPlayerId) ?? null;
   const trickCardThemeSlug = cosmeticSlug(trickPlayer, "CARD_BACK");
   const tableThemeUrl = cosmeticPreviewUrl(yourPlayer, "TABLE_THEME", webUrl);
+  const selectedPlayer = room?.players.find((player) => player.id === selectedPlayerId) ?? null;
 
   useEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0)
@@ -283,17 +297,20 @@ export default function TableScreen() {
             const orientation = getSeatHandOrientation(position, seatedPlayers.length);
 
             return (
-              <View
-                accessible
+              <Pressable
                 accessibilityLabel={`${player.name}, ${player.cardsRemaining} cards remaining${
                   player.id === room.activePlayerId ? ", taking their turn" : ""
                 }`}
+                accessibilityHint="Shows player details and safety controls"
+                accessibilityRole="button"
                 key={player.id}
-                style={[
+                onPress={() => setSelectedPlayerId(player.id)}
+                style={({ pressed }) => [
                   styles.opponent,
                   getMobileSeatPosition(position, seatedPlayers.length),
                   orientation !== "top" && styles.sideOpponent,
-                  player.id === room.activePlayerId && styles.activeSeat
+                  player.id === room.activePlayerId && styles.activeSeat,
+                  pressed && styles.pressed
                 ]}
               >
                 <OpponentCardFan
@@ -305,7 +322,7 @@ export default function TableScreen() {
                   {player.name}
                 </Text>
                 <Text style={styles.opponentCount}>{player.cardsRemaining} cards</Text>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -457,6 +474,13 @@ export default function TableScreen() {
         onBodyChange={setChatBody}
         onClose={() => setChatOpen(false)}
         onSend={() => void sendMessage()}
+      />
+      <PlayerSheet
+        player={selectedPlayer}
+        blocked={selectedPlayer !== null && room.blockedPlayerIds.includes(selectedPlayer.id)}
+        onBlock={(blocked) => blockPlayer(selectedPlayer?.id ?? "", blocked)}
+        onClose={() => setSelectedPlayerId(null)}
+        onReport={(reason, details) => reportPlayer(selectedPlayer?.id ?? "", reason, details)}
       />
     </SafeAreaView>
   );
@@ -703,6 +727,171 @@ function ChatSheet({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+const REPORT_REASONS: readonly {
+  readonly label: string;
+  readonly value: PlayerReportReason;
+}[] = [
+  { label: "Harassment", value: "HARASSMENT" },
+  { label: "Hate speech", value: "HATE_SPEECH" },
+  { label: "Spam", value: "SPAM" },
+  { label: "Cheating", value: "CHEATING" },
+  { label: "Player name", value: "INAPPROPRIATE_NAME" },
+  { label: "Other", value: "OTHER" }
+];
+
+function PlayerSheet({
+  player,
+  blocked,
+  onBlock,
+  onClose,
+  onReport
+}: {
+  readonly player: PublicRoomPlayer | null;
+  readonly blocked: boolean;
+  readonly onBlock: (blocked: boolean) => Promise<boolean>;
+  readonly onClose: () => void;
+  readonly onReport: (reason: PlayerReportReason, details?: string) => Promise<boolean>;
+}) {
+  const [reason, setReason] = useState<PlayerReportReason>("HARASSMENT");
+  const [details, setDetails] = useState("");
+  const [working, setWorking] = useState<"block" | "report" | null>(null);
+
+  useEffect(() => {
+    setReason("HARASSMENT");
+    setDetails("");
+    setWorking(null);
+  }, [player?.id]);
+
+  if (player === null) return null;
+  const canModerate = player.kind !== "bot";
+
+  async function toggleBlock() {
+    setWorking("block");
+    await onBlock(!blocked);
+    setWorking(null);
+  }
+
+  async function submitReport() {
+    setWorking("report");
+    const sent = await onReport(reason, details);
+    setWorking(null);
+    if (sent) onClose();
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Pressable
+          accessibilityLabel="Close player details"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.scrim}
+        />
+        <View style={styles.playerSheet}>
+          <View style={styles.chatHeader}>
+            <View>
+              <Text style={styles.playerSheetTitle}>{player.name}</Text>
+              <Text style={styles.chatSubtitle}>
+                {player.kind === "bot" ? "Bot opponent" : "Player profile"}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Close player details"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={styles.roundButton}
+            >
+              <X color={palette.text} size={19} />
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.playerSheetBody}>
+            <View style={styles.playerStats}>
+              <PlayerStat label="Cards left" value={String(player.cardsRemaining)} />
+              <PlayerStat label="Rating" value={player.stats?.rating.toString() ?? "--"} />
+              <PlayerStat label="Games" value={player.stats?.gamesPlayed.toString() ?? "--"} />
+              <PlayerStat label="Wins" value={player.stats?.wins.toString() ?? "--"} />
+            </View>
+
+            {canModerate ? (
+              <>
+                <View style={styles.safetyHeading}>
+                  <Flag color={palette.coral} size={17} />
+                  <Text style={styles.safetyTitle}>Report player</Text>
+                </View>
+                <View style={styles.reasonGrid}>
+                  {REPORT_REASONS.map((option) => {
+                    const selected = option.value === reason;
+                    return (
+                      <Pressable
+                        key={option.value}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => setReason(option.value)}
+                        style={[styles.reasonButton, selected && styles.selectedReason]}
+                      >
+                        <Text style={[styles.reasonText, selected && styles.selectedReasonText]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  accessibilityLabel="Optional report details"
+                  maxLength={500}
+                  multiline
+                  onChangeText={setDetails}
+                  placeholder="Optional details"
+                  placeholderTextColor={palette.muted}
+                  style={styles.reportInput}
+                  textAlignVertical="top"
+                  value={details}
+                />
+                <View style={styles.safetyActions}>
+                  <ActionButton
+                    label={blocked ? "Unblock" : "Block"}
+                    loading={working === "block"}
+                    disabled={working !== null}
+                    variant="secondary"
+                    onPress={() => void toggleBlock()}
+                    style={styles.safetyAction}
+                  />
+                  <ActionButton
+                    label="Send report"
+                    loading={working === "report"}
+                    disabled={working !== null}
+                    variant="danger"
+                    onPress={() => void submitReport()}
+                    style={styles.safetyAction}
+                  />
+                </View>
+                <View style={styles.blockNote}>
+                  <ShieldBan color={palette.muted} size={15} />
+                  <Text style={styles.blockNoteText}>
+                    Blocking hides this player&apos;s table chat.
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.botNote}>Bot opponents use the selected table difficulty.</Text>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function PlayerStat({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={styles.playerStat}>
+      <Text style={styles.playerStatValue}>{value}</Text>
+      <Text style={styles.playerStatLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -1020,5 +1209,61 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: palette.gold
   },
-  chatNotice: { color: palette.coral, fontSize: 10, textAlign: "center", marginTop: spacing.sm }
+  chatNotice: { color: palette.coral, fontSize: 10, textAlign: "center", marginTop: spacing.sm },
+  playerSheet: {
+    maxHeight: "86%",
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: palette.line,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md
+  },
+  playerSheetTitle: { color: palette.text, fontSize: 22, fontWeight: "900" },
+  playerSheetBody: { gap: spacing.md, paddingBottom: spacing.sm },
+  playerStats: { flexDirection: "row", gap: spacing.sm },
+  playerStat: {
+    flex: 1,
+    minHeight: 62,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    backgroundColor: palette.ink
+  },
+  playerStatValue: { color: palette.text, fontSize: 17, fontWeight: "900" },
+  playerStatLabel: { color: palette.muted, fontSize: 9, marginTop: 2 },
+  safetyHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  safetyTitle: { color: palette.text, fontSize: 14, fontWeight: "900" },
+  reasonGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  reasonButton: {
+    width: "48%",
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.line,
+    backgroundColor: palette.ink
+  },
+  selectedReason: { borderColor: palette.gold, backgroundColor: "rgba(241,199,91,0.12)" },
+  reasonText: { color: palette.muted, fontSize: 12, fontWeight: "800" },
+  selectedReasonText: { color: palette.gold },
+  reportInput: {
+    minHeight: 74,
+    color: palette.text,
+    borderWidth: 1,
+    borderColor: palette.line,
+    borderRadius: radius.md,
+    backgroundColor: palette.ink,
+    padding: spacing.md,
+    fontSize: 13
+  },
+  safetyActions: { flexDirection: "row", gap: spacing.sm },
+  safetyAction: { flex: 1 },
+  blockNote: { flexDirection: "row", alignItems: "center", gap: 7 },
+  blockNoteText: { flex: 1, color: palette.muted, fontSize: 10 },
+  botNote: { color: palette.muted, fontSize: 12, lineHeight: 18 }
 });

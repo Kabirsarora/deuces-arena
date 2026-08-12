@@ -12,10 +12,12 @@ import type {
   PublicGuestProfile,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicModerationReceipt,
   PublicPushRegistration,
   PublicRankedQueueState,
   PublicRoomState,
   PublicTournamentQueueState,
+  PlayerReportReason,
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
@@ -99,6 +101,12 @@ type ArenaContextValue = {
   readonly leaveRoom: () => Promise<void>;
   readonly submitMove: (move: Move) => Promise<boolean>;
   readonly sendChat: (body: string) => Promise<boolean>;
+  readonly blockPlayer: (targetPlayerId: string, blocked: boolean) => Promise<boolean>;
+  readonly reportPlayer: (
+    targetPlayerId: string,
+    reason: PlayerReportReason,
+    details?: string
+  ) => Promise<boolean>;
   readonly equipCosmetic: (cosmeticId: string) => Promise<boolean>;
   readonly purchaseCosmetic: (cosmeticId: string) => Promise<boolean>;
   readonly submitFeedback: (kind: FeedbackKind, body: string) => Promise<boolean>;
@@ -734,6 +742,56 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     [room]
   );
 
+  const blockPlayer = useCallback(
+    async (targetPlayerId: string, blocked: boolean) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicRoomState>((callback) =>
+        socket.emit(
+          "moderation:block",
+          { roomCode: room.roomCode, targetPlayerId, blocked },
+          callback
+        )
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      setRoom(ack.data);
+      setNotice(blocked ? "Player blocked. Their chat is hidden." : "Player unblocked.");
+      return true;
+    },
+    [room]
+  );
+
+  const reportPlayer = useCallback(
+    async (targetPlayerId: string, reason: PlayerReportReason, details?: string) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicModerationReceipt>((callback) =>
+        socket.emit(
+          "moderation:report",
+          {
+            roomCode: room.roomCode,
+            targetPlayerId,
+            reason,
+            ...(details?.trim() ? { details: details.trim() } : {})
+          },
+          callback
+        )
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      setNotice("Report received. Thank you for helping keep tables respectful.");
+      return true;
+    },
+    [room]
+  );
+
   const equipCosmetic = useCallback(async (cosmeticId: string) => {
     const identity = activeIdentity(socketRef.current, guestIdRef.current);
     if (identity === null) return false;
@@ -852,6 +910,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       leaveRoom,
       submitMove,
       sendChat,
+      blockPlayer,
+      reportPlayer,
       equipCosmetic,
       purchaseCosmetic,
       submitFeedback,
@@ -870,6 +930,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       notificationsEnabled,
       notificationWorking,
       cosmetics,
+      blockPlayer,
       createBotGame,
       createCasualRoom,
       guestId,
@@ -888,6 +949,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       purchaseCosmetic,
       rankedQueue,
       refreshLobby,
+      reportPlayer,
       room,
       sendChat,
       submitFeedback,
