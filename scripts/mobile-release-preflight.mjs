@@ -118,6 +118,12 @@ if (expo.ios?.bundleIdentifier === expectedBundleId && expo.android?.package ===
   fail("native identifiers", "iOS bundle ID and Android package must remain stable");
 }
 
+if (expo.ios?.config?.usesNonExemptEncryption === false) {
+  pass("iOS export compliance", "standard exempt encryption declared");
+} else {
+  fail("iOS export compliance", "usesNonExemptEncryption must remain explicitly false");
+}
+
 if (
   expo.scheme === "deucesarena" &&
   expo.ios?.associatedDomains?.includes("applinks:deucesarena.com")
