@@ -97,6 +97,7 @@
 - Done: build an Expo / React Native client that reuses the game engine, shared contracts, backend, persistence model, and simulation tooling.
 - Done: add native room sharing, app deep-link joins, a browser fallback page, and universal/app-link configuration endpoints.
 - Done: add explicit notification permission, secure Expo token registration, signed-account ownership, opt-out, and notification room routing.
+- Done: add environment-gated ranked/tournament alerts, bounded Expo retries, durable receipt tracking, and invalid-device cleanup.
 - Next: link EAS, install development builds on physical devices, and finish Apple/Android domain verification with the generated signing identifiers.
-- Next: send invitation and matchmaking alerts from the server, prune invalid tokens from Expo receipts, and test delivery on physical devices.
+- Next: configure native push credentials and test ranked/tournament delivery on physical devices before enabling production sends.
 - Later: build a native iMessage extension with Apple's Messages framework so group conversations can send and join Deuces Arena games without claiming integration with GamePigeon.

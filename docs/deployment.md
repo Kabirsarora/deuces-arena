@@ -64,6 +64,9 @@ DISCONNECTED_AUTO_MOVE_DELAY_MS="15000"
 REALTIME_AUTH_SECRET="shared-realtime-secret"
 ADMIN_EMAILS="creator@example.com"
 ADMIN_GUEST_IDS=""
+PUSH_NOTIFICATIONS_ENABLED="false"
+# Optional only after enhanced Expo push security is enabled.
+EXPO_ACCESS_TOKEN=""
 ```
 
 Mobile build-time public configuration:
@@ -89,9 +92,11 @@ Mobile table alerts use Expo Notifications and do not add a paid notification ve
 `npx eas-cli init` before creating a development build so Expo places the project ID in the build,
 then configure the Apple and Android push credentials through EAS. Signed-in players must opt in
 from Profile before their Expo push token is stored. Expo Go on Android cannot register for remote
-push notifications; use a development or store build. The current server stores and removes tokens,
-but notification delivery and receipt cleanup must be enabled and tested before alerts are announced
-as a public feature.
+push notifications; use a development or store build. The server delivers ranked and tournament
+table alerts, checks Expo receipts, and removes tokens reported as `DeviceNotRegistered`, but the
+pipeline is inert while `PUSH_NOTIFICATIONS_ENABLED=false`. Keep it off until native credentials and
+an end-to-end device test succeed. `EXPO_ACCESS_TOKEN` is optional unless enhanced push security is
+enabled in the EAS dashboard.
 
 Generate `REALTIME_AUTH_SECRET` once and paste the exact same value into Vercel and the realtime
 server host:

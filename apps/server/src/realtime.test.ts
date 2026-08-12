@@ -54,6 +54,8 @@ beforeAll(async () => {
   process.env.ADMIN_EMAILS = "creator@example.com";
   process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS = "10";
   process.env.REALTIME_AUTH_SECRET = TEST_REALTIME_AUTH_SECRET;
+  process.env.PUSH_NOTIFICATIONS_ENABLED = "false";
+  delete process.env.EXPO_ACCESS_TOKEN;
   serverModule = await import("./index.js");
 
   if (serverModule.httpServer.address() === null) {
@@ -89,6 +91,7 @@ describe("realtime rooms", () => {
         readonly database: string;
         readonly redis: string;
         readonly realtimeAuth: string;
+        readonly pushNotifications: string;
         readonly disconnectedAutoMoveDelayMs: number;
       };
       readonly environment: string;
@@ -104,6 +107,7 @@ describe("realtime rooms", () => {
       database: "memory-fallback",
       redis: "disabled",
       realtimeAuth: "configured",
+      pushNotifications: "disabled",
       disconnectedAutoMoveDelayMs: 10
     });
   });

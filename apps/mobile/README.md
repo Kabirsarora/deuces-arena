@@ -67,8 +67,10 @@ EAS credentials and signing secrets stay in Expo's credential service and must n
 Table alerts require a development or store build; remote push notifications are not available in
 Expo Go on Android. After `eas init`, the app reads the EAS project ID from the native build, asks
 for notification permission only when the player taps Enable, and registers the resulting Expo push
-token against that signed-in Arena account. Registration is complete, while server delivery for
-room invitations and matchmaking remains a separate release step.
+token against that signed-in Arena account. The server can deliver ranked and tournament table
+alerts, persist Expo receipt IDs, retry temporary failures, and remove devices reported as
+unregistered. Delivery remains off until `PUSH_NOTIFICATIONS_ENABLED=true` is set after native
+credentials and a device test.
 
 ## Verification
 
@@ -82,6 +84,6 @@ cd apps/mobile && npx expo-doctor
 
 1. Link the EAS project, create development builds, and test account handoff, room links, and table-alert registration on physical devices.
 2. Add the EAS Apple Team ID and Android signing-certificate fingerprint to Vercel for verified universal links.
-3. Send table-invitation and matchmaking notifications from the server and process Expo delivery receipts.
+3. Configure native push credentials, run an end-to-end device test, and enable production delivery.
 4. App Store and Google Play screenshots, privacy declarations, and submission.
 5. A separate iOS Messages extension for sharing and opening room invitations.

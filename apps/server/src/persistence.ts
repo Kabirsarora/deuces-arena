@@ -105,6 +105,16 @@ export type SavePushSubscriptionResult =
       readonly reason: "database-unavailable" | "profile-not-found";
     };
 
+export type PersistedPushSubscription = {
+  readonly id: string;
+  readonly expoPushToken: string;
+};
+
+export type PersistedPushDeliveryTicket = {
+  readonly receiptId: string;
+  readonly subscriptionId: string;
+};
+
 type CosmeticProgressionStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -644,6 +654,145 @@ export async function deletePersistedPushSubscription(input: {
   } catch (error) {
     console.error("Unable to delete push subscription.", error);
     return { ok: false, reason: "database-unavailable" };
+  }
+}
+
+export async function getPersistedPushSubscriptions(
+  authProfileIds: readonly string[]
+): Promise<readonly PersistedPushSubscription[]> {
+  const db = await getDb();
+
+  if (db === null || authProfileIds.length === 0) {
+    return [];
+  }
+
+  try {
+    return await db.prisma.pushSubscription.findMany({
+      where: {
+        user: {
+          guestId: { in: [...new Set(authProfileIds)] }
+        }
+      },
+      select: {
+        id: true,
+        expoPushToken: true
+      }
+    });
+  } catch (error) {
+    console.error("Unable to read push subscriptions.", error);
+    return [];
+  }
+}
+
+export async function savePersistedPushDeliveryTickets(
+  tickets: readonly {
+    readonly subscriptionId: string;
+    readonly receiptId: string;
+  }[]
+): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || tickets.length === 0) {
+    return;
+  }
+
+  try {
+    await db.prisma.pushDeliveryTicket.createMany({
+      data: tickets.map((ticket) => ({
+        subscriptionId: ticket.subscriptionId,
+        receiptId: ticket.receiptId
+      })),
+      skipDuplicates: true
+    });
+  } catch (error) {
+    console.error("Unable to save push delivery tickets.", error);
+  }
+}
+
+export async function getPendingPersistedPushDeliveryTickets(
+  limit = 500
+): Promise<readonly PersistedPushDeliveryTicket[]> {
+  const db = await getDb();
+
+  if (db === null) {
+    return [];
+  }
+
+  try {
+    const now = Date.now();
+    const cutoff = new Date(now - 15 * 60_000);
+    const receiptExpiration = new Date(now - 24 * 60 * 60_000);
+    const auditExpiration = new Date(now - 7 * 24 * 60 * 60_000);
+
+    await db.prisma.pushDeliveryTicket.deleteMany({
+      where: {
+        OR: [
+          { checkedAt: { lt: auditExpiration } },
+          { checkedAt: null, createdAt: { lt: receiptExpiration } }
+        ]
+      }
+    });
+
+    const tickets = await db.prisma.pushDeliveryTicket.findMany({
+      where: {
+        checkedAt: null,
+        createdAt: { gte: receiptExpiration, lte: cutoff }
+      },
+      orderBy: { createdAt: "asc" },
+      take: Math.min(Math.max(limit, 1), 1_000),
+      select: {
+        receiptId: true,
+        subscriptionId: true
+      }
+    });
+
+    return tickets;
+  } catch (error) {
+    console.error("Unable to read push delivery tickets.", error);
+    return [];
+  }
+}
+
+export async function resolvePersistedPushDeliveryTickets(input: {
+  readonly checkedReceiptIds: readonly string[];
+  readonly invalidSubscriptionIds: readonly string[];
+}): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || input.checkedReceiptIds.length === 0) {
+    return;
+  }
+
+  try {
+    await db.prisma.$transaction([
+      db.prisma.pushDeliveryTicket.updateMany({
+        where: { receiptId: { in: [...input.checkedReceiptIds] } },
+        data: { checkedAt: new Date() }
+      }),
+      db.prisma.pushSubscription.deleteMany({
+        where: { id: { in: [...new Set(input.invalidSubscriptionIds)] } }
+      })
+    ]);
+  } catch (error) {
+    console.error("Unable to resolve push delivery tickets.", error);
+  }
+}
+
+export async function deletePersistedPushSubscriptionsByIds(
+  subscriptionIds: readonly string[]
+): Promise<void> {
+  const db = await getDb();
+
+  if (db === null || subscriptionIds.length === 0) {
+    return;
+  }
+
+  try {
+    await db.prisma.pushSubscription.deleteMany({
+      where: { id: { in: [...new Set(subscriptionIds)] } }
+    });
+  } catch (error) {
+    console.error("Unable to delete invalid push subscriptions.", error);
   }
 }
 
