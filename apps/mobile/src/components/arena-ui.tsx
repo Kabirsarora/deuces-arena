@@ -56,7 +56,9 @@ export function ScreenHeader({
     <View style={styles.header}>
       <View style={styles.headerCopy}>
         <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          {title}
+        </Text>
         {description === undefined ? null : <Text style={styles.description}>{description}</Text>}
       </View>
       <ConnectionBadge />
@@ -69,7 +71,11 @@ export function ConnectionBadge() {
   const online = connectionStatus === "online";
 
   return (
-    <View style={[styles.badge, online ? styles.onlineBadge : styles.offlineBadge]}>
+    <View
+      accessible
+      accessibilityLabel={`Server ${online ? "online" : connectionStatus}`}
+      style={[styles.badge, online ? styles.onlineBadge : styles.offlineBadge]}
+    >
       {online ? (
         <Wifi color={palette.mint} size={14} />
       ) : (
@@ -95,8 +101,13 @@ export function ActionButton({
   return (
     <Pressable
       {...props}
+      accessibilityLabel={props.accessibilityLabel ?? label}
       accessibilityRole={props.accessibilityRole ?? "button"}
-      accessibilityState={{ disabled: props.disabled === true || loading }}
+      accessibilityState={{
+        ...props.accessibilityState,
+        busy: loading,
+        disabled: props.disabled === true || loading
+      }}
       disabled={props.disabled === true || loading}
       style={({ pressed }) => [
         styles.actionButton,
@@ -134,6 +145,7 @@ export function SegmentedControl<T extends string>({
         return (
           <Pressable
             key={option.value}
+            accessibilityLabel={option.label}
             accessibilityRole="button"
             accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}

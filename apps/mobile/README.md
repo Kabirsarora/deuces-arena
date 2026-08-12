@@ -87,3 +87,6 @@ cd apps/mobile && npx expo-doctor
 3. Configure native push credentials, run an end-to-end device test, and enable production delivery.
 4. App Store and Google Play screenshots, privacy declarations, and submission.
 5. A separate iOS Messages extension for sharing and opening room invitations.
+
+Store listing copy, screenshots, disclosure notes, reviewer guidance, and the account-bound launch
+checklist live in [`docs/mobile-release.md`](../../docs/mobile-release.md).

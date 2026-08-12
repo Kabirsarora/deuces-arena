@@ -42,6 +42,8 @@ export default function RoomsScreen() {
 
       <View style={styles.joinRow}>
         <TextInput
+          accessibilityLabel="Room code"
+          accessibilityHint="Enter a six-character table code"
           autoCapitalize="characters"
           autoCorrect={false}
           maxLength={6}
@@ -69,6 +71,9 @@ export default function RoomsScreen() {
           lobby.openRooms.map((openRoom) => (
             <Pressable
               key={openRoom.roomCode}
+              accessibilityLabel={`${openRoom.hostName}'s table, ${openRoom.seatedPlayers} of ${openRoom.maxPlayers} players, room ${openRoom.roomCode}`}
+              accessibilityHint="Joins this table"
+              accessibilityRole="button"
               onPress={() => void enter(() => joinRoom(openRoom.roomCode))}
               style={({ pressed }) => [styles.roomRow, pressed && styles.pressed]}
             >
