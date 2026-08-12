@@ -31,6 +31,9 @@ jobs:
       - name: Check formatting
         run: npm run format
 
+      - name: Check mobile release metadata and artwork
+        run: npm run mobile:preflight -- --offline
+
       - name: Lint
         run: npm run lint
 

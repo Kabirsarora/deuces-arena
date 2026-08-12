@@ -75,9 +75,9 @@ await checkPage("/terms", "Terms of Service");
 await checkPage("/auth/sign-in", "Sign in");
 await checkPage("/manifest.webmanifest", '"name":"Deuces Arena"');
 await checkPage("/sitemap.xml", `${new URL(webUrl).origin}/privacy`);
-await checkAsset("/icon", "image/png");
-await checkAsset("/apple-icon", "image/png");
-await checkAsset("/opengraph-image", "image/png");
+await checkAsset("/icon.png", "image/png");
+await checkAsset("/apple-icon.png", "image/png");
+await checkAsset("/opengraph-image.png", "image/png");
 
 try {
   const response = await fetchWithWakeup(new URL("/", webUrl));
