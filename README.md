@@ -166,7 +166,7 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.
 - Expand the current non-pay-to-win cosmetic catalog and supporter presentation options.
 - Link EAS, test the completed native account, queue, chat, cosmetic, history, reconnect, and notification-registration flows on physical devices.
-- Add server delivery and receipt cleanup for mobile table alerts, then prepare store artwork, accessibility testing, and App Store / Google Play submissions.
+- Test and enable the completed ranked/tournament alert pipeline on signed development builds, then prepare store artwork, accessibility testing, and App Store / Google Play submissions.
 - Add a separate native iOS Messages extension that sends Deuces Arena room invitations and game state inside group conversations.
 
 ## Known Limitations

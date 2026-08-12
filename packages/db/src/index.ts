@@ -35,6 +35,8 @@ export type {
   Match,
   MatchPlayer,
   MoveEvent,
+  PushDeliveryTicket,
+  PushSubscription,
   ReplayLabel,
   User,
   UserCosmeticUnlock,

@@ -70,6 +70,7 @@ import { Server } from "socket.io";
 
 import { sanitizeChatMessage } from "./chat.js";
 import { createMobileAuthService } from "./mobile-auth.js";
+import { createPushNotificationService } from "./push.js";
 import {
   abandonPersistedMatch,
   completePersistedMatch,
@@ -212,7 +213,13 @@ const ADMIN_GUEST_IDS = [
 const DATABASE_CONFIGURED = isConfiguredEnvironmentValue(process.env.DATABASE_URL);
 const REDIS_CONFIGURED = isConfiguredEnvironmentValue(process.env.REDIS_URL);
 const REALTIME_AUTH_SECRET = normalizeRealtimeAuthSecret(process.env.REALTIME_AUTH_SECRET);
+const PUSH_NOTIFICATIONS_ENABLED = parseBooleanSetting(process.env.PUSH_NOTIFICATIONS_ENABLED);
+const EXPO_ACCESS_TOKEN = normalizeOptionalEnvironmentValue(process.env.EXPO_ACCESS_TOKEN);
 const mobileAuth = createMobileAuthService(REALTIME_AUTH_SECRET);
+const pushNotifications = createPushNotificationService({
+  enabled: PUSH_NOTIFICATIONS_ENABLED,
+  ...(EXPO_ACCESS_TOKEN === null ? {} : { accessToken: EXPO_ACCESS_TOKEN })
+});
 const CLASSIC_PLAYER_COUNT = 4;
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
@@ -601,6 +608,7 @@ app.get("/health", (_request, response) => {
       database: DATABASE_CONFIGURED ? "configured" : "memory-fallback",
       redis: REDIS_CONFIGURED ? "configured" : "disabled",
       realtimeAuth: REALTIME_AUTH_SECRET === null ? "disabled" : "configured",
+      pushNotifications: PUSH_NOTIFICATIONS_ENABLED ? "enabled" : "disabled",
       disconnectedAutoMoveDelayMs: DISCONNECTED_AUTO_MOVE_DELAY_MS
     },
     activity: publicLobbyState().activity
@@ -1934,6 +1942,15 @@ httpServer.listen(PORT, () => {
   console.log(`Deuces Arena server listening on http://localhost:${PORT}`);
 });
 
+const pushReceiptInterval = PUSH_NOTIFICATIONS_ENABLED
+  ? setInterval(() => runPushTask(pushNotifications.processPendingReceipts()), 15 * 60_000)
+  : null;
+pushReceiptInterval?.unref();
+
+if (PUSH_NOTIFICATIONS_ENABLED) {
+  runPushTask(pushNotifications.processPendingReceipts());
+}
+
 export { app, httpServer, io };
 
 process.once("SIGINT", () => closeServer("SIGINT"));
@@ -1948,6 +1965,7 @@ function closeServer(signal: NodeJS.Signals): void {
 
   isClosing = true;
   console.log(`Received ${signal}. Closing Deuces Arena server.`);
+  if (pushReceiptInterval !== null) clearInterval(pushReceiptInterval);
   for (const room of rooms.values()) {
     clearTurnTimer(room);
     clearTradeTimer(room);
@@ -2877,6 +2895,16 @@ async function createRankedRoom(queuedPlayers: readonly RankedQueuedPlayer[]): P
   room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
   resetTurnTimer(room);
   rooms.set(room.code, room);
+  runPushTask(
+    pushNotifications.sendRoomAlert(
+      room.players.flatMap((player) => (player.guestId === null ? [] : [player.guestId])),
+      {
+        title: "Ranked match found",
+        body: "Your Deuces Arena table is ready.",
+        roomCode: room.code
+      }
+    )
+  );
 
   for (const player of room.players) {
     if (player.socketId === null) {
@@ -2983,6 +3011,19 @@ async function createTournamentRoom(
   );
   resetTurnTimer(room);
   rooms.set(room.code, room);
+  runPushTask(
+    pushNotifications.sendRoomAlert(
+      room.players.flatMap((player) => (player.guestId === null ? [] : [player.guestId])),
+      {
+        title: stage === "final" ? "Tournament final ready" : "Tournament match ready",
+        body:
+          stage === "final"
+            ? "You advanced. Your final table is ready."
+            : "Your Deuces Arena tournament table is ready.",
+        roomCode: room.code
+      }
+    )
+  );
 
   const match = tournament.matches.find((candidate) => candidate.stage === stage);
 
@@ -3210,8 +3251,23 @@ function parseIntegerSetting(
   return clampInteger(parsed, min, max);
 }
 
+function parseBooleanSetting(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
+
 function isConfiguredEnvironmentValue(value: string | undefined): boolean {
   return value !== undefined && value.trim() !== "";
+}
+
+function normalizeOptionalEnvironmentValue(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized === undefined || normalized === "" ? null : normalized;
+}
+
+function runPushTask(task: Promise<void>): void {
+  void task.catch((error: unknown) => {
+    console.error("Push notification task failed.", error);
+  });
 }
 
 function normalizeRealtimeAuthSecret(value: string | undefined): string | null {

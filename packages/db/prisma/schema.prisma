@@ -110,16 +110,29 @@ model User {
 }
 
 model PushSubscription {
-  id            String   @id @default(cuid())
-  userId        String
-  expoPushToken String   @unique
-  platform      String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  lastSeenAt    DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String               @id @default(cuid())
+  userId          String
+  expoPushToken   String               @unique
+  platform        String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  lastSeenAt      DateTime             @default(now())
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveryTickets PushDeliveryTicket[]
 
   @@index([userId])
+}
+
+model PushDeliveryTicket {
+  id             String           @id @default(cuid())
+  subscriptionId String
+  receiptId      String           @unique
+  createdAt      DateTime         @default(now())
+  checkedAt      DateTime?
+  subscription   PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([checkedAt, createdAt])
+  @@index([subscriptionId])
 }
 
 model UserBlock {
