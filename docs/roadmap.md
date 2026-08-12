@@ -29,6 +29,8 @@
 ## Phase 4: Online Multiplayer
 
 - Done: add rooms, lobby, ready states, reconnects, leave-room flow, and room links.
+- Done: enforce server-authoritative waiting-room hosts, shared setup state, host transfer, configured
+  room capacity, and unique replacement-seat IDs across web and mobile.
 - Done: add live lobby activity with open rooms, connected users, active tables, humans, and bots.
 - Done: make public lobby activity human-centered with online users and open/active room counts.
 - Done: add Socket.IO event contracts and server-authoritative move validation.

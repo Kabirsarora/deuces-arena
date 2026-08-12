@@ -22,6 +22,9 @@ For online play, clients submit requested moves. The server validates those move
 Realtime state is intentionally shaped for resume-visible systems work:
 
 - Public lobby activity exposes connected users, open rooms, active tables, seated humans, seated bots, and joinable room metadata.
+- Waiting-room state names one authoritative host and shares saved seat, bot, timer, rule, and trade
+  settings across clients. Only that host may configure or start; ownership transfers when the host
+  leaves.
 - Room state includes public players, current trick, placements, recent replay events, recent chat, and the current player's private hand.
 - Player state includes profile stats and equipped cosmetic loadouts, while the server remains responsible for validating equipment.
 - Match completion updates ratings, match history, move history, replay state, and earned cosmetic unlocks when persistence is enabled.

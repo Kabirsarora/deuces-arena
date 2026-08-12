@@ -99,6 +99,7 @@ type ArenaContextValue = {
   readonly notice: string;
   readonly createBotGame: (options: BotGameOptions) => Promise<boolean>;
   readonly createCasualRoom: () => Promise<boolean>;
+  readonly configureCurrentRoom: (options: CasualRoomOptions) => Promise<boolean>;
   readonly startCurrentRoom: (options: CasualRoomOptions) => Promise<boolean>;
   readonly setReady: (ready: boolean) => Promise<boolean>;
   readonly joinRoom: (roomCode: string) => Promise<boolean>;
@@ -721,6 +722,39 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     [room]
   );
 
+  const configureCurrentRoom = useCallback(
+    async (options: CasualRoomOptions) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicRoomState>((callback) =>
+        socket.emit(
+          "room:configure",
+          {
+            roomCode: room.roomCode,
+            botCount: options.botCount,
+            botDifficulty: options.difficulty,
+            botPace: options.pace,
+            rules: {
+              bombEndsTrick: options.bombEndsTrick,
+              deckType: options.deckType,
+              playerCount: options.playerCount,
+              cardsPerPlayer: options.cardsPerPlayer
+            },
+            timer: {
+              enabled: options.timerEnabled,
+              secondsPerTurn: options.secondsPerTurn
+            },
+            trade: { enabled: options.tradeEnabled }
+          },
+          callback
+        )
+      );
+      return handleRoomAck(ack, setRoom, setNotice);
+    },
+    [room]
+  );
+
   const setReady = useCallback(
     async (ready: boolean) => {
       const socket = socketRef.current;
@@ -991,6 +1025,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       notice,
       createBotGame,
       createCasualRoom,
+      configureCurrentRoom,
       startCurrentRoom,
       setReady,
       joinRoom,
@@ -1024,6 +1059,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       notificationWorking,
       cosmetics,
       blockPlayer,
+      configureCurrentRoom,
       createBotGame,
       createCasualRoom,
       guestId,

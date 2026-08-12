@@ -112,6 +112,7 @@ export type PublicOpenRoom = {
   readonly readyPlayers: number;
   readonly maxPlayers: number;
   readonly botSeatsAvailable: number;
+  readonly configuredBotCount: number;
   readonly createdAt: string;
 };
 
@@ -310,8 +311,15 @@ export type PublicRoomState = {
   readonly roomCode: string;
   readonly mode: MatchMode;
   readonly status: RoomStatus;
+  readonly hostPlayerId: string | null;
   readonly tournament: { readonly id: string; readonly stage: TournamentStage } | null;
   readonly rules: PublicRoomRules;
+  readonly timerSettings: {
+    readonly enabled: boolean;
+    readonly secondsPerTurn: number;
+  };
+  readonly tradeEnabled: boolean;
+  readonly configuredBotCount: number;
   readonly botDifficulty: PublicBotDifficulty;
   readonly botPace: PublicBotPace;
   readonly players: readonly PublicRoomPlayer[];
@@ -370,6 +378,21 @@ export type ReconnectRoomPayload = {
   readonly guestId?: string;
 };
 
+export type ConfigureRoomPayload = {
+  readonly roomCode: string;
+  readonly timer: {
+    readonly enabled: boolean;
+    readonly secondsPerTurn: number;
+  };
+  readonly rules: PublicRoomRules;
+  readonly botDifficulty: PublicBotDifficulty;
+  readonly botPace: PublicBotPace;
+  readonly trade: {
+    readonly enabled: boolean;
+  };
+  readonly botCount: number;
+};
+
 export type MovePayload = {
   readonly roomCode: string;
   readonly move: Move;
@@ -416,6 +439,10 @@ export type ClientToServerEvents = {
   ) => void;
   "room:reconnect": (
     payload: ReconnectRoomPayload,
+    callback: (ack: ServerAck<PublicRoomState>) => void
+  ) => void;
+  "room:configure": (
+    payload: ConfigureRoomPayload,
     callback: (ack: ServerAck<PublicRoomState>) => void
   ) => void;
   "room:start": (

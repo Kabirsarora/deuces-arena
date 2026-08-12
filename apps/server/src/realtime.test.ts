@@ -6,6 +6,7 @@ import { generateLegalMoves, type Card, type Move, type Rank } from "@deuces-are
 import type {
   ClientToServerEvents,
   ChatPayload,
+  ConfigureRoomPayload,
   CreateRoomPayload,
   FeedbackPayload,
   JoinRoomPayload,
@@ -772,6 +773,143 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.players.filter((player) => player.kind === "bot")).toHaveLength(2);
     expect(startedRoom.data.yourHand).toHaveLength(13);
     expect(startedRoom.data.turnTimer).toBeNull();
+  });
+
+  it("keeps waiting-room settings server-authoritative and host-only", async () => {
+    const host = await connectTestSocket();
+    const guest = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Host",
+      guestId: "guest-config-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+    if (!createdRoom.ok) return;
+
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRoom = await joinRoom(guest, {
+      roomCode,
+      playerName: "Guest",
+      guestId: "guest-config-guest"
+    });
+    expect(joinedRoom.ok).toBe(true);
+    if (!joinedRoom.ok) return;
+
+    expect(createdRoom.data.hostPlayerId).toBe(createdRoom.data.yourPlayerId);
+
+    const guestConfigure = await configureRoom(guest, {
+      roomCode,
+      botCount: 4,
+      rules: {
+        bombEndsTrick: true,
+        deckType: "arena-six",
+        playerCount: 6,
+        cardsPerPlayer: 13
+      },
+      timer: { enabled: true, secondsPerTurn: 60 },
+      botDifficulty: "hard",
+      botPace: "quick",
+      trade: { enabled: true }
+    });
+    expect(guestConfigure.ok).toBe(false);
+    if (!guestConfigure.ok) expect(guestConfigure.error).toContain("host");
+
+    await setReady(host, { roomCode, ready: true });
+    await setReady(guest, { roomCode, ready: true });
+    const guestUpdate = waitForRoomStateMatching(
+      guest,
+      (state) => state.rules.playerCount === 6 && state.configuredBotCount === 4
+    );
+    const configured = await configureRoom(host, {
+      roomCode,
+      botCount: 4,
+      rules: {
+        bombEndsTrick: true,
+        deckType: "arena-six",
+        playerCount: 6,
+        cardsPerPlayer: 13
+      },
+      timer: { enabled: true, secondsPerTurn: 60 },
+      botDifficulty: "hard",
+      botPace: "quick",
+      trade: { enabled: true }
+    });
+
+    expect(configured.ok).toBe(true);
+    if (!configured.ok) return;
+    expect(configured.data.rules).toEqual({
+      bombEndsTrick: true,
+      deckType: "arena-six",
+      playerCount: 6,
+      cardsPerPlayer: 13
+    });
+    expect(configured.data.timerSettings).toEqual({ enabled: true, secondsPerTurn: 60 });
+    expect(configured.data.tradeEnabled).toBe(true);
+    expect(configured.data.botDifficulty).toBe("hard");
+    expect(configured.data.botPace).toBe("quick");
+    expect(configured.data.players.every((player) => !player.ready)).toBe(true);
+    expect((await guestUpdate).rules).toEqual(configured.data.rules);
+
+    const guestStart = await startRoom(guest, { roomCode, botCount: 4 });
+    expect(guestStart.ok).toBe(false);
+    if (!guestStart.ok) expect(guestStart.error).toContain("host");
+  });
+
+  it("transfers waiting-room host ownership without reusing player IDs", async () => {
+    const host = await connectTestSocket();
+    const nextHost = await connectTestSocket();
+    const replacement = await connectTestSocket();
+    const createdRoom = await createRoom(host, {
+      playerName: "Original Host",
+      guestId: "guest-transfer-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+    if (!createdRoom.ok) return;
+    const roomCode = createdRoom.data.roomCode;
+    const joinedRoom = await joinRoom(nextHost, {
+      roomCode,
+      playerName: "Next Host",
+      guestId: "guest-transfer-next"
+    });
+    expect(joinedRoom.ok).toBe(true);
+    if (!joinedRoom.ok) return;
+
+    const nextHostUpdate = waitForRoomStateMatching(
+      nextHost,
+      (state) => state.hostPlayerId === joinedRoom.data.yourPlayerId
+    );
+    const left = await leaveStartedRoom(host, roomCode);
+    expect(left.ok).toBe(true);
+    expect((await nextHostUpdate).hostPlayerId).toBe(joinedRoom.data.yourPlayerId);
+
+    const replacementRoom = await joinRoom(replacement, {
+      roomCode,
+      playerName: "Replacement",
+      guestId: "guest-transfer-replacement"
+    });
+    expect(replacementRoom.ok).toBe(true);
+    if (!replacementRoom.ok) return;
+
+    const playerIds = replacementRoom.data.players.map((player) => player.id);
+    expect(new Set(playerIds).size).toBe(playerIds.length);
+    expect(replacementRoom.data.hostPlayerId).toBe(joinedRoom.data.yourPlayerId);
+
+    const configured = await configureRoom(nextHost, {
+      roomCode,
+      botCount: 2,
+      rules: {
+        bombEndsTrick: false,
+        deckType: "classic",
+        playerCount: 4,
+        cardsPerPlayer: 13
+      },
+      timer: { enabled: false, secondsPerTurn: 45 },
+      botDifficulty: "normal",
+      botPace: "relaxed",
+      trade: { enabled: false }
+    });
+    expect(configured.ok).toBe(true);
   });
 
   it("runs a private, server-authoritative casual card trade window", async () => {
@@ -1933,6 +2071,15 @@ function reconnectRoom(
     socket.emit("room:reconnect", payload, (ack) => {
       resolve(ack);
     });
+  });
+}
+
+function configureRoom(
+  socket: TestSocket,
+  payload: ConfigureRoomPayload
+): Promise<ServerAck<PublicRoomState>> {
+  return new Promise((resolve) => {
+    socket.emit("room:configure", payload, (ack) => resolve(ack));
   });
 }
 

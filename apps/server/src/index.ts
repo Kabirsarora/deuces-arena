@@ -126,6 +126,7 @@ type Room = {
   readonly code: string;
   readonly mode: MatchMode;
   readonly createdAt: Date;
+  hostPlayerId: string | null;
   players: RoomPlayer[];
   chatMessages: PublicChatMessage[];
   coachEvaluations: PublicCoachEvaluationRecord[];
@@ -136,6 +137,8 @@ type Room = {
   rules: RoomRuleSettings;
   botDifficulty: PublicBotDifficulty;
   botPace: PublicBotPace;
+  tradeEnabled: boolean;
+  configuredBotCount: number;
   turnDeadlineAt: Date | null;
   timerTimeout: NodeJS.Timeout | null;
   trade: RoomTradeState;
@@ -835,9 +838,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (
-      room.players.filter((player) => player.kind === "human").length >= MAX_CASUAL_PLAYERS_PER_ROOM
-    ) {
+    if (room.players.filter((player) => player.kind === "human").length >= room.rules.playerCount) {
       callback(fail("Room is full."));
       return;
     }
@@ -917,6 +918,43 @@ io.on("connection", (socket) => {
     scheduleAutomatedTurn(room);
   });
 
+  socket.on("room:configure", (payload, callback) => {
+    const room = rooms.get(normalizeRoomCode(payload.roomCode));
+
+    if (room === undefined) {
+      callback(fail("Room not found."));
+      return;
+    }
+
+    if (room.game !== null) {
+      callback(fail("Room settings can only be changed before a game starts."));
+      return;
+    }
+
+    if (!isRoomHost(room, socket.id)) {
+      callback(fail("Only the room host can change table settings."));
+      return;
+    }
+
+    room.rules = normalizeRuleSettings(payload.rules, room.players.length);
+    room.timer = normalizeTimerSettings(payload.timer);
+    room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
+    room.botPace = normalizeBotPace(payload.botPace);
+    room.tradeEnabled = payload.trade.enabled;
+    room.configuredBotCount = normalizeBotCount(
+      payload.botCount,
+      room.players.length,
+      room.rules.playerCount
+    );
+    room.players = room.players.map((player) =>
+      player.kind === "human" ? { ...player, ready: false } : player
+    );
+
+    callback(ok(publicStateForSocket(room, socket.id)));
+    emitRoomState(room);
+    emitLobbyState();
+  });
+
   socket.on("room:start", async (payload, callback) => {
     const room = rooms.get(normalizeRoomCode(payload.roomCode));
 
@@ -925,8 +963,8 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (!isPlayerInRoom(room, socket.id)) {
-      callback(fail("You are not seated in this room."));
+    if (!isRoomHost(room, socket.id)) {
+      callback(fail("Only the room host can start the game."));
       return;
     }
 
@@ -940,8 +978,9 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const rules = normalizeRuleSettings(payload.rules, room.players.length);
+    const rules = normalizeRuleSettings(payload.rules ?? room.rules, room.players.length);
     const botCount = normalizeBotCount(payload.botCount, room.players.length, rules.playerCount);
+    room.configuredBotCount = botCount;
 
     if (createDeck(rules.deckType).length < rules.playerCount * rules.cardsPerPlayer) {
       callback(fail("Selected deck does not have enough cards for this table setup."));
@@ -954,10 +993,11 @@ io.on("connection", (socket) => {
     }
 
     fillRoomWithBots(room, botCount, rules.playerCount);
-    room.timer = normalizeTimerSettings(payload.timer);
+    room.timer = normalizeTimerSettings(payload.timer ?? room.timer);
     room.rules = rules;
-    room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty);
-    room.botPace = normalizeBotPace(payload.botPace);
+    room.botDifficulty = normalizeBotDifficulty(payload.botDifficulty ?? room.botDifficulty);
+    room.botPace = normalizeBotPace(payload.botPace ?? room.botPace);
+    room.tradeEnabled = payload.trade?.enabled ?? room.tradeEnabled;
     room.game = createInitialGame(
       room.players.map((player) => player.id),
       shuffleDeck(room.rules.deckType, room.rules.playerCount, room.rules.cardsPerPlayer),
@@ -966,7 +1006,7 @@ io.on("connection", (socket) => {
       }
     );
     room.persistedMatch = await createPersistedMatch(room.code, room.players, room.mode);
-    startTradePhase(room, payload.trade?.enabled === true);
+    startTradePhase(room, room.tradeEnabled);
     resetTurnTimer(room);
 
     callback(ok(publicStateForSocket(room, socket.id)));
@@ -1980,6 +2020,7 @@ function closeServer(signal: NodeJS.Signals): void {
 function createRoom(playerName: string, socketId: string, guestId: string | undefined): Room {
   const room = createEmptyRoom();
   room.players = [createHumanPlayer(playerName, socketId, 0, guestId)];
+  room.hostPlayerId = room.players[0]?.id ?? null;
   rooms.set(room.code, room);
   return room;
 }
@@ -1989,6 +2030,7 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
     code: createRoomCode(),
     mode,
     createdAt: new Date(),
+    hostPlayerId: null,
     players: [],
     chatMessages: [],
     coachEvaluations: [],
@@ -2007,6 +2049,8 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
     },
     botDifficulty: "normal",
     botPace: "relaxed",
+    tradeEnabled: false,
+    configuredBotCount: CLASSIC_PLAYER_COUNT - 1,
     turnDeadlineAt: null,
     timerTimeout: null,
     trade: createDisabledTradeState(),
@@ -2020,8 +2064,14 @@ function addHumanPlayer(
   socketId: string,
   guestId: string | undefined
 ): RoomPlayer {
-  const player = createHumanPlayer(playerName, socketId, room.players.length, guestId);
+  const seatIndex = nextRoomPlayerIndex(room);
+  const player = createHumanPlayer(playerName, socketId, seatIndex, guestId);
   room.players = [...room.players, player];
+  room.configuredBotCount = normalizeBotCount(
+    room.configuredBotCount,
+    room.players.length,
+    room.rules.playerCount
+  );
   return player;
 }
 
@@ -2035,6 +2085,13 @@ function leaveRoom(room: Room, playerId: string, explicitlyLeft = false): void {
       rooms.delete(room.code);
       emitLobbyState();
       return;
+    }
+
+    if (room.hostPlayerId === playerId) {
+      room.hostPlayerId =
+        room.players.find((player) => player.kind === "human" && player.socketId !== null)?.id ??
+        room.players.find((player) => player.kind === "human")?.id ??
+        null;
     }
 
     emitRoomState(room);
@@ -2113,6 +2170,23 @@ function canStartRoom(room: Room): boolean {
   }
 
   return connectedHumans.every((player) => player.ready);
+}
+
+function getRoomHost(room: Room): RoomPlayer | null {
+  return room.players.find((player) => player.id === room.hostPlayerId) ?? null;
+}
+
+function isRoomHost(room: Room, socketId: string): boolean {
+  return getRoomHost(room)?.socketId === socketId;
+}
+
+function nextRoomPlayerIndex(room: Room): number {
+  const usedIndexes = room.players.flatMap((player) => {
+    const match = /^player-(\d+)$/.exec(player.id);
+    return match?.[1] === undefined ? [] : [Number(match[1]) - 1];
+  });
+
+  return usedIndexes.length === 0 ? 0 : Math.max(...usedIndexes) + 1;
 }
 
 function fillRoomWithBots(room: Room, botCount: number, targetPlayerCount: number): void {
@@ -2557,8 +2631,12 @@ function publicStateForSocket(room: Room, socketId: string): PublicRoomState {
     roomCode: room.code,
     mode: room.mode,
     status: room.game?.status ?? "waiting",
+    hostPlayerId: getRoomHost(room)?.id ?? null,
     tournament: room.tournament,
     rules: room.rules,
+    timerSettings: room.timer,
+    tradeEnabled: room.tradeEnabled,
+    configuredBotCount: room.configuredBotCount,
     botDifficulty: room.botDifficulty,
     botPace: room.botPace,
     players: room.players.map((roomPlayer) => toPublicPlayer(room, roomPlayer)),
@@ -2739,7 +2817,7 @@ function publicLobbyState(): PublicLobbyState {
     .filter(
       (room) =>
         room.game === null &&
-        room.players.length < MAX_CASUAL_PLAYERS_PER_ROOM &&
+        room.players.length < room.rules.playerCount &&
         room.players.some((player) => player.socketId !== null)
     )
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
@@ -2751,12 +2829,13 @@ function publicLobbyState(): PublicLobbyState {
 
       return {
         roomCode: room.code,
-        hostName: room.players[0]?.name ?? "Open table",
+        hostName: getRoomHost(room)?.name ?? "Open table",
         rules: room.rules,
         seatedPlayers,
         readyPlayers,
         maxPlayers: room.rules.playerCount,
         botSeatsAvailable: Math.max(0, room.rules.playerCount - seatedPlayers),
+        configuredBotCount: room.configuredBotCount,
         createdAt: room.createdAt.toISOString()
       };
     });
