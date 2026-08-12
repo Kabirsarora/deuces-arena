@@ -13,6 +13,7 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
   iOS Keychain or Android Keystore.
 - Shared web/mobile ratings, coins, cosmetics, history, admin access, ranked matchmaking, and
   tournament queue entry.
+- Automatic table entry when ranked matchmaking or a tournament stage fills.
 - Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
 - Native system sharing and `/join/ROOMCODE` deep links with a safe browser fallback.
 - Explicit, signed-account table-alert registration stored securely on-device and in PostgreSQL.
