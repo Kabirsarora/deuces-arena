@@ -80,6 +80,9 @@ web_modules/
 out
 apps/web/next-env.d.ts
 
+# Expo local device and development-server state
+.expo/
+
 # Nuxt.js build / generate output
 .nuxt
 dist

@@ -35,6 +35,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { requestTableAlertToken } from "@/lib/notifications";
+import { emitWithAck } from "@/lib/server-ack";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "https://api.deucesarena.com";
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://deucesarena.com";
@@ -138,14 +139,22 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     let disposed = false;
 
     async function restoreAccount() {
-      const [stored, storedPushToken] = await Promise.all([
-        readAccountSession(),
-        readSecureValue(PUSH_TOKEN_KEY)
-      ]);
-      if (disposed) return;
-      setAccount(stored);
-      setNotificationsEnabled(stored !== null && storedPushToken !== null);
-      setAuthReady(true);
+      try {
+        const [stored, storedPushToken] = await Promise.all([
+          readAccountSession(),
+          readSecureValue(PUSH_TOKEN_KEY)
+        ]);
+        if (disposed) return;
+        setAccount(stored);
+        setNotificationsEnabled(stored !== null && storedPushToken !== null);
+      } catch {
+        if (disposed) return;
+        setAccount(null);
+        setNotificationsEnabled(false);
+        setNotice("Local account storage is unavailable. Continuing in guest mode.");
+      } finally {
+        if (!disposed) setAuthReady(true);
+      }
     }
 
     void restoreAccount();
@@ -360,12 +369,30 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
     async function connect() {
-      const storedGuestId = await AsyncStorage.getItem(GUEST_ID_KEY);
+      let storedGuestId: string | null = null;
+      let storedName: string | null = null;
+
+      try {
+        [storedGuestId, storedName] = await Promise.all([
+          AsyncStorage.getItem(GUEST_ID_KEY),
+          AsyncStorage.getItem(PLAYER_NAME_KEY)
+        ]);
+      } catch {
+        if (!disposed) {
+          setNotice("Local profile storage is unavailable. Using a temporary guest profile.");
+        }
+      }
+
       const localGuestId = storedGuestId ?? createGuestId();
       const activeGuestId = account?.profileId ?? localGuestId;
-      const storedName = await AsyncStorage.getItem(PLAYER_NAME_KEY);
 
-      if (storedGuestId === null) await AsyncStorage.setItem(GUEST_ID_KEY, localGuestId);
+      if (storedGuestId === null) {
+        try {
+          await AsyncStorage.setItem(GUEST_ID_KEY, localGuestId);
+        } catch {
+          // Guest play can continue with the in-memory identity.
+        }
+      }
       if (disposed) return;
 
       guestIdRef.current = activeGuestId;
@@ -989,12 +1016,6 @@ function activeIdentity(
   readonly guestId: string;
 } | null {
   return socket !== null && socket.connected && guestId !== null ? { socket, guestId } : null;
-}
-
-function emitWithAck<T = undefined>(
-  emit: (callback: (ack: ServerAck<T>) => void) => void
-): Promise<ServerAck<T>> {
-  return new Promise((resolve) => emit(resolve));
 }
 
 function handleRoomAck(

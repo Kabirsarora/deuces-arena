@@ -47,6 +47,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint .",
+    "test": "vitest run src --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "private": true
