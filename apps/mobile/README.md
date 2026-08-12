@@ -78,6 +78,7 @@ credentials and a device test.
 npm run typecheck --workspace @deuces-arena/mobile
 npm run lint --workspace @deuces-arena/mobile
 cd apps/mobile && npx expo-doctor
+cd ../.. && npm run mobile:preflight
 ```
 
 ## Next Milestones

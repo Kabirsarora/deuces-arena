@@ -51,6 +51,16 @@ code. Use one coherent cosmetic loadout across the set.
 7. Profile with rating, coins, cosmetics, and match history.
 8. Moderated table chat or post-match result screen.
 
+## Brand Artwork
+
+The checked-in native icon is an original crossed-card Deuces crest built around the high `2`, four
+classic suits, emerald felt, mint details, and antique gold. The opaque 1024px store icon and the
+transparent Android/splash derivatives live under `apps/mobile/assets/images`; editable master and
+isolated emblem sources live in `apps/mobile/assets/images/brand`. Do not restore Expo starter art or
+add rounded corners to the master icon because each operating system applies its own mask. The web
+install icons and Open Graph image use the same crest so shared links and installed apps retain one
+identity.
+
 ## Review Notes
 
 Provide the reviewer a normal Google test account if sign-in must be exercised. Explain that guest
@@ -104,8 +114,12 @@ npm test
 npm run lint
 npm run typecheck
 npm run build
+npm run mobile:preflight
 cd apps/mobile && npx expo-doctor
 ```
+
+Run `npm run mobile:preflight:strict` immediately before store submission. Strict mode also fails
+while notification delivery or either signed app-link association remains incomplete.
 
 Do not commit signing files, service-account JSON, Apple keys, Google credentials, Expo access
 tokens, reviewer passwords, or `.env.local` files.
