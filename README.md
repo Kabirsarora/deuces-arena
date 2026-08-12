@@ -165,8 +165,8 @@ Use [docs/demo-readiness.md](docs/demo-readiness.md) before sharing a hosted lin
 - Build grounded AI coach explanations and replay mistake detection from legal moves, replay state, rollout outcomes, and future model scores.
 - Expand post-game analysis beyond the current replay timeline, labels, filters, and Move Lab records.
 - Expand the current non-pay-to-win cosmetic catalog and supporter presentation options.
-- Add native Google sign-in, ranked/tournament queue entry, chat, cosmetics, match history, and reconnect persistence to the Expo client.
-- Prepare development builds, push notifications, device accessibility testing, store artwork, and App Store / Google Play submissions.
+- Link EAS, test the completed native account, queue, chat, cosmetic, history, reconnect, and notification-registration flows on physical devices.
+- Add server delivery and receipt cleanup for mobile table alerts, then prepare store artwork, accessibility testing, and App Store / Google Play submissions.
 - Add a separate native iOS Messages extension that sends Deuces Arena room invitations and game state inside group conversations.
 
 ## Known Limitations

@@ -398,6 +398,13 @@ export type ServerAck<T = undefined> =
       readonly error: string;
     };
 
+export type PushPlatform = "ios" | "android";
+
+export type PublicPushRegistration = {
+  readonly enabled: boolean;
+  readonly platform: PushPlatform;
+};
+
 export type ClientToServerEvents = {
   "room:create": (
     payload: CreateRoomPayload,
@@ -458,6 +465,17 @@ export type ClientToServerEvents = {
       readonly imageUrl: string | null;
     },
     callback: (ack: ServerAck<PublicGuestProfile>) => void
+  ) => void;
+  "notifications:register": (
+    payload: {
+      readonly expoPushToken: string;
+      readonly platform: PushPlatform;
+    },
+    callback: (ack: ServerAck<PublicPushRegistration>) => void
+  ) => void;
+  "notifications:unregister": (
+    payload: { readonly expoPushToken: string },
+    callback: (ack: ServerAck<{ readonly enabled: false }>) => void
   ) => void;
   "leaderboard:list": (
     payload: { readonly limit?: number },

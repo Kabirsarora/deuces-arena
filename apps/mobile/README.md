@@ -15,6 +15,7 @@ Expo / React Native client for Deuces Arena. It reuses the monorepo game engine,
   tournament queue entry.
 - Moderated table chat, cosmetics shop and locker, match history, feedback, and room reconnect.
 - Native system sharing and `/join/ROOMCODE` deep links with a safe browser fallback.
+- Explicit, signed-account table-alert registration stored securely on-device and in PostgreSQL.
 - A single immersive table surface for seats, tricks, controls, and the player hand, with exact
   opponent card counts and saved card-back/table cosmetics shared across web and mobile.
 
@@ -63,6 +64,12 @@ the build, run `npm run start:dev-client --workspace @deuces-arena/mobile` from 
 EAS credentials and signing secrets stay in Expo's credential service and must not be added to
 `.env` files or committed.
 
+Table alerts require a development or store build; remote push notifications are not available in
+Expo Go on Android. After `eas init`, the app reads the EAS project ID from the native build, asks
+for notification permission only when the player taps Enable, and registers the resulting Expo push
+token against that signed-in Arena account. Registration is complete, while server delivery for
+room invitations and matchmaking remains a separate release step.
+
 ## Verification
 
 ```bash
@@ -73,8 +80,8 @@ cd apps/mobile && npx expo-doctor
 
 ## Next Milestones
 
-1. Link the EAS project, create development builds, and test account handoff and room links on physical devices.
+1. Link the EAS project, create development builds, and test account handoff, room links, and table-alert registration on physical devices.
 2. Add the EAS Apple Team ID and Android signing-certificate fingerprint to Vercel for verified universal links.
-3. Push notifications for table invitations and matchmaking.
+3. Send table-invitation and matchmaking notifications from the server and process Expo delivery receipts.
 4. App Store and Google Play screenshots, privacy declarations, and submission.
 5. A separate iOS Messages extension for sharing and opening room invitations.

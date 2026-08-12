@@ -12,6 +12,7 @@ import type {
   PublicGuestProfile,
   PublicLobbyState,
   PublicMatchHistoryItem,
+  PublicPushRegistration,
   PublicRankedQueueState,
   PublicRoomState,
   PublicTournamentQueueState,
@@ -33,12 +34,15 @@ import {
 } from "react";
 import { io, type Socket } from "socket.io-client";
 
+import { requestTableAlertToken } from "@/lib/notifications";
+
 const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "https://api.deucesarena.com";
 const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://deucesarena.com";
 const GUEST_ID_KEY = "deuces-arena-mobile-guest-id";
 const PLAYER_NAME_KEY = "deuces-arena-mobile-player-name";
 const ROOM_SESSION_KEY = "deuces-arena-mobile-room-session";
 const ACCOUNT_SESSION_KEY = "deuces-arena-mobile-account-session";
+const PUSH_TOKEN_KEY = "deuces-arena-mobile-push-token";
 
 type ConnectionStatus = "waking" | "online" | "offline";
 
@@ -71,6 +75,8 @@ type ArenaContextValue = {
   readonly webUrl: string;
   readonly account: MobileAccountSession | null;
   readonly accountWorking: boolean;
+  readonly notificationsEnabled: boolean;
+  readonly notificationWorking: boolean;
   readonly guestId: string | null;
   readonly playerName: string;
   readonly profile: PublicGuestProfile | null;
@@ -100,6 +106,8 @@ type ArenaContextValue = {
   readonly refreshLobby: () => void;
   readonly signInWithGoogle: () => Promise<void>;
   readonly signOutAccount: () => Promise<void>;
+  readonly enableNotifications: () => Promise<boolean>;
+  readonly disableNotifications: () => Promise<boolean>;
 };
 
 const ArenaContext = createContext<ArenaContextValue | null>(null);
@@ -112,6 +120,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [account, setAccount] = useState<MobileAccountSession | null>(null);
   const [accountWorking, setAccountWorking] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationWorking, setNotificationWorking] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("waking");
   const [guestId, setGuestId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState("Player");
@@ -128,9 +138,13 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     let disposed = false;
 
     async function restoreAccount() {
-      const stored = await readAccountSession();
+      const [stored, storedPushToken] = await Promise.all([
+        readAccountSession(),
+        readSecureValue(PUSH_TOKEN_KEY)
+      ]);
       if (disposed) return;
       setAccount(stored);
+      setNotificationsEnabled(stored !== null && storedPushToken !== null);
       setAuthReady(true);
     }
 
@@ -240,8 +254,95 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
     }
   }, []);
 
+  const enableNotifications = useCallback(async () => {
+    if (account === null) {
+      setNotice("Sign in with Google before enabling table alerts.");
+      return false;
+    }
+
+    const socket = socketRef.current;
+    if (socket === null || !socket.connected) {
+      setNotice("Reconnect to Deuces Arena before enabling table alerts.");
+      return false;
+    }
+
+    setNotificationWorking(true);
+    const tokenResult = await requestTableAlertToken();
+
+    if (!tokenResult.ok) {
+      setNotice(tokenResult.message);
+      setNotificationWorking(false);
+      return false;
+    }
+
+    const ack = await emitWithAck<PublicPushRegistration>((callback) =>
+      socket.emit(
+        "notifications:register",
+        {
+          expoPushToken: tokenResult.expoPushToken,
+          platform: tokenResult.platform
+        },
+        callback
+      )
+    );
+
+    if (!ack.ok) {
+      setNotice(ack.error);
+      setNotificationWorking(false);
+      return false;
+    }
+
+    await writeSecureValue(PUSH_TOKEN_KEY, tokenResult.expoPushToken);
+    setNotificationsEnabled(true);
+    setNotificationWorking(false);
+    setNotice("Table alerts enabled.");
+    return true;
+  }, [account]);
+
+  const disableNotifications = useCallback(async () => {
+    const socket = socketRef.current;
+    const token = await readSecureValue(PUSH_TOKEN_KEY);
+
+    if (token === null) {
+      setNotificationsEnabled(false);
+      return true;
+    }
+
+    if (account === null || socket === null || !socket.connected) {
+      setNotice("Reconnect to Deuces Arena before disabling table alerts.");
+      return false;
+    }
+
+    setNotificationWorking(true);
+    const ack = await emitWithAck<{ readonly enabled: false }>((callback) =>
+      socket.emit("notifications:unregister", { expoPushToken: token }, callback)
+    );
+
+    if (!ack.ok) {
+      setNotice(ack.error);
+      setNotificationWorking(false);
+      return false;
+    }
+
+    await deleteSecureValue(PUSH_TOKEN_KEY);
+    setNotificationsEnabled(false);
+    setNotificationWorking(false);
+    setNotice("Table alerts disabled.");
+    return true;
+  }, [account]);
+
   const signOutAccount = useCallback(async () => {
     setAccountWorking(true);
+    const pushToken = await readSecureValue(PUSH_TOKEN_KEY);
+    const socket = socketRef.current;
+
+    if (pushToken !== null && socket?.connected === true) {
+      await emitWithAck<{ readonly enabled: false }>((callback) =>
+        socket.emit("notifications:unregister", { expoPushToken: pushToken }, callback)
+      );
+    }
+    await deleteSecureValue(PUSH_TOKEN_KEY);
+    setNotificationsEnabled(false);
     await deleteAccountSession();
     await AsyncStorage.removeItem(ROOM_SESSION_KEY);
     setRoom(null);
@@ -701,6 +802,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       webUrl: WEB_URL,
       account,
       accountWorking,
+      notificationsEnabled,
+      notificationWorking,
       guestId,
       playerName,
       profile,
@@ -729,12 +832,16 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       refreshProfileData,
       refreshLobby,
       signInWithGoogle,
-      signOutAccount
+      signOutAccount,
+      enableNotifications,
+      disableNotifications
     }),
     [
       connectionStatus,
       account,
       accountWorking,
+      notificationsEnabled,
+      notificationWorking,
       cosmetics,
       createBotGame,
       createCasualRoom,
@@ -763,7 +870,9 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       updateProfile,
       refreshProfileData,
       signInWithGoogle,
-      signOutAccount
+      signOutAccount,
+      enableNotifications,
+      disableNotifications
     ]
   );
 
@@ -811,13 +920,17 @@ async function readAccountSession(): Promise<MobileAccountSession | null> {
 
 async function writeAccountSession(session: MobileAccountSession): Promise<void> {
   const value = JSON.stringify(session);
+  await writeSecureValue(ACCOUNT_SESSION_KEY, value);
+}
+
+async function writeSecureValue(key: string, value: string): Promise<void> {
   if (await SecureStore.isAvailableAsync()) {
-    await SecureStore.setItemAsync(ACCOUNT_SESSION_KEY, value, {
+    await SecureStore.setItemAsync(key, value, {
       keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY
     });
     return;
   }
-  await AsyncStorage.setItem(ACCOUNT_SESSION_KEY, value);
+  await AsyncStorage.setItem(key, value);
 }
 
 async function readSecureValue(key: string): Promise<string | null> {
@@ -827,8 +940,12 @@ async function readSecureValue(key: string): Promise<string | null> {
 }
 
 async function deleteAccountSession(): Promise<void> {
-  if (await SecureStore.isAvailableAsync()) await SecureStore.deleteItemAsync(ACCOUNT_SESSION_KEY);
-  await AsyncStorage.removeItem(ACCOUNT_SESSION_KEY);
+  await deleteSecureValue(ACCOUNT_SESSION_KEY);
+}
+
+async function deleteSecureValue(key: string): Promise<void> {
+  if (await SecureStore.isAvailableAsync()) await SecureStore.deleteItemAsync(key);
+  await AsyncStorage.removeItem(key);
 }
 
 function firstQueryValue(value: string | string[] | undefined): string | null {

@@ -39,6 +39,10 @@ export default function PrivacyPage() {
             recovery information stored in your browser. Authentication also uses secure session
             cookies.
           </li>
+          <li>
+            <strong>Mobile notification data:</strong> an Expo push token and device platform when a
+            signed-in app user chooses to enable table alerts.
+          </li>
         </ul>
       </section>
 
@@ -49,6 +53,7 @@ export default function PrivacyPage() {
           <li>authenticate accounts and keep profiles available across devices;</li>
           <li>run rooms, validate moves, reconnect seats, calculate results, and prevent abuse;</li>
           <li>maintain ratings, match history, replays, earned currency, and cosmetics;</li>
+          <li>deliver opted-in room invitation and matchmaking alerts to the mobile app;</li>
           <li>analyze game decisions through simulations and improve future coaching tools; and</li>
           <li>investigate feedback, bugs, balance concerns, and service reliability.</li>
         </ul>
@@ -94,9 +99,10 @@ export default function PrivacyPage() {
         <h2>Your choices</h2>
         <p>
           You can play casual modes as a guest, sign out of Google, clear local browser storage, or
-          stop using the service. To request access, correction, or deletion of account information,
-          submit a privacy request through the in-app feedback form and include an email address
-          that can be used to verify the account.
+          stop using the service. Mobile table alerts are optional and can be disabled from the
+          player profile. To request access, correction, or deletion of account information, submit
+          a privacy request through the in-app feedback form and include an email address that can
+          be used to verify the account.
         </p>
       </section>
 

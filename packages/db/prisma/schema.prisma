@@ -104,8 +104,22 @@ model User {
   reportsReceived   PlayerReport[]          @relation("Reported")
   tournamentEntries TournamentParticipant[]
   tournamentWins    Tournament[]            @relation("TournamentChampion")
+  pushSubscriptions PushSubscription[]
 
   @@index([rating])
+}
+
+model PushSubscription {
+  id            String   @id @default(cuid())
+  userId        String
+  expoPushToken String   @unique
+  platform      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastSeenAt    DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model UserBlock {

@@ -98,6 +98,13 @@ export type SaveReplayLabelResult =
       readonly reason: "database-unavailable" | "profile-not-found" | "match-not-found";
     };
 
+export type SavePushSubscriptionResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reason: "database-unavailable" | "profile-not-found";
+    };
+
 type CosmeticProgressionStats = {
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -563,6 +570,80 @@ export async function getPersistedGuestProfile(
   } catch (error) {
     console.error("Unable to read guest profile.", error);
     return null;
+  }
+}
+
+export async function savePersistedPushSubscription(input: {
+  readonly authProfileId: string;
+  readonly expoPushToken: string;
+  readonly platform: "ios" | "android";
+}): Promise<SavePushSubscriptionResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return { ok: false, reason: "database-unavailable" };
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: { guestId: input.authProfileId },
+      select: { id: true }
+    });
+
+    if (user === null) {
+      return { ok: false, reason: "profile-not-found" };
+    }
+
+    await db.prisma.pushSubscription.upsert({
+      where: { expoPushToken: input.expoPushToken },
+      create: {
+        userId: user.id,
+        expoPushToken: input.expoPushToken,
+        platform: input.platform
+      },
+      update: {
+        userId: user.id,
+        platform: input.platform,
+        lastSeenAt: new Date()
+      }
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("Unable to save push subscription.", error);
+    return { ok: false, reason: "database-unavailable" };
+  }
+}
+
+export async function deletePersistedPushSubscription(input: {
+  readonly authProfileId: string;
+  readonly expoPushToken: string;
+}): Promise<SavePushSubscriptionResult> {
+  const db = await getDb();
+
+  if (db === null) {
+    return { ok: false, reason: "database-unavailable" };
+  }
+
+  try {
+    const user = await db.prisma.user.findUnique({
+      where: { guestId: input.authProfileId },
+      select: { id: true }
+    });
+
+    if (user === null) {
+      return { ok: false, reason: "profile-not-found" };
+    }
+
+    await db.prisma.pushSubscription.deleteMany({
+      where: {
+        userId: user.id,
+        expoPushToken: input.expoPushToken
+      }
+    });
+    return { ok: true };
+  } catch (error) {
+    console.error("Unable to delete push subscription.", error);
+    return { ok: false, reason: "database-unavailable" };
   }
 }
 

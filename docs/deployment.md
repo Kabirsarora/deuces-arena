@@ -85,6 +85,14 @@ credentials, set `APPLE_TEAM_ID` and `ANDROID_SHA256_CERT_FINGERPRINTS` on Verce
 verify `/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json`. Multiple Android
 fingerprints may be supplied as a comma-separated list during certificate rotation.
 
+Mobile table alerts use Expo Notifications and do not add a paid notification vendor. Run
+`npx eas-cli init` before creating a development build so Expo places the project ID in the build,
+then configure the Apple and Android push credentials through EAS. Signed-in players must opt in
+from Profile before their Expo push token is stored. Expo Go on Android cannot register for remote
+push notifications; use a development or store build. The current server stores and removes tokens,
+but notification delivery and receipt cleanup must be enabled and tested before alerts are announced
+as a public feature.
+
 Generate `REALTIME_AUTH_SECRET` once and paste the exact same value into Vercel and the realtime
 server host:
 
