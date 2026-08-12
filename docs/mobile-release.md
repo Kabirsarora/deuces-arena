@@ -27,7 +27,8 @@ Casual play remains available without an account.
 Features include:
 
 - Classic four-suit Deuces and the optional six-suit Arena 6 variant
-- Two-to-six player casual tables with configurable bots and timers
+- Two-to-six player casual tables with ready states, configurable bots, timers, rule variants, and
+  an optional private pregame trade window
 - Four-player ranked matchmaking with placement-based ratings
 - Eight-player tournaments with semifinals and a final
 - Moderated room chat, blocking, reporting, feedback, and reconnect support

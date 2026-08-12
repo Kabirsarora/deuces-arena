@@ -1,12 +1,23 @@
 import {
   generateLegalMoves,
   getCardId,
+  RANKS,
   validateMove,
   type Card,
-  type Move
+  type DeckType,
+  type Move,
+  type Rank
 } from "@deuces-arena/game-engine";
 import { createRoomInviteUrl } from "@deuces-arena/shared";
-import type { CosmeticKind, PlayerReportReason, PublicRoomPlayer } from "@deuces-arena/shared";
+import type {
+  CosmeticKind,
+  PlayerReportReason,
+  PublicBotDifficulty,
+  PublicBotPace,
+  PublicCardTradeRequest,
+  PublicRoomState,
+  PublicRoomPlayer
+} from "@deuces-arena/shared";
 import { ImageBackground } from "expo-image";
 import { router } from "expo-router";
 import {
@@ -19,10 +30,11 @@ import {
   Send,
   Share2,
   ShieldBan,
+  SlidersHorizontal,
   SkipForward,
   X
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   KeyboardAvoidingView,
@@ -32,6 +44,7 @@ import {
   ScrollView,
   Share as NativeShare,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -39,11 +52,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ActionButton } from "@/components/arena-ui";
+import { ActionButton, SegmentedControl, Stepper } from "@/components/arena-ui";
 import { CardBack, PlayingCard } from "@/components/playing-card";
 import jungleClubTable from "@/assets/images/jungle-club-table.jpg";
 import { palette, radius, spacing } from "@/constants/theme";
-import { useArena } from "@/providers/arena-provider";
+import { useArena, type CasualRoomOptions } from "@/providers/arena-provider";
 
 export default function TableScreen() {
   const {
@@ -51,8 +64,11 @@ export default function TableScreen() {
     leaveRoom,
     notice,
     reportPlayer,
+    requestTrade,
+    respondToTrade,
     room,
     sendChat,
+    setReady,
     startCurrentRoom,
     submitMove,
     webUrl
@@ -65,6 +81,19 @@ export default function TableScreen() {
   const [sendingChat, setSendingChat] = useState(false);
   const [lastReadChatCount, setLastReadChatCount] = useState(0);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [playerCount, setPlayerCount] = useState(4);
+  const [cardsPerPlayer, setCardsPerPlayer] = useState(13);
+  const [deckType, setDeckType] = useState<DeckType>("classic");
+  const [difficulty, setDifficulty] = useState<PublicBotDifficulty>("normal");
+  const [pace, setPace] = useState<PublicBotPace>("relaxed");
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [secondsPerTurn, setSecondsPerTurn] = useState(45);
+  const [bombEndsTrick, setBombEndsTrick] = useState(false);
+  const [tradeEnabled, setTradeEnabled] = useState(false);
+  const [tradeTargetPlayerId, setTradeTargetPlayerId] = useState("");
+  const [tradeRequestedRank, setTradeRequestedRank] = useState<Rank>("3");
+  const [timerNow, setTimerNow] = useState(Date.now());
   const trickAnimation = useRef(new Animated.Value(1)).current;
 
   const selectedCards = useMemo(
@@ -113,6 +142,13 @@ export default function TableScreen() {
   const trickCardThemeSlug = cosmeticSlug(trickPlayer, "CARD_BACK");
   const tableThemeUrl = cosmeticPreviewUrl(yourPlayer, "TABLE_THEME", webUrl);
   const selectedPlayer = room?.players.find((player) => player.id === selectedPlayerId) ?? null;
+  const tradeOpen = room?.tradePhase.status === "open";
+  const incomingTrade = room?.tradePhase.requests.find(
+    (request) => request.toPlayerId === room.yourPlayerId
+  );
+  const outgoingTrade = room?.tradePhase.requests.find(
+    (request) => request.fromPlayerId === room.yourPlayerId
+  );
 
   useEffect(() => {
     if (room?.status !== "in-progress" || room.turnNumber !== 0 || room.yourHand.length === 0)
@@ -133,6 +169,12 @@ export default function TableScreen() {
       useNativeDriver: true
     }).start();
   }, [room?.turnNumber, trickAnimation]);
+
+  useEffect(() => {
+    if (!tradeOpen) return;
+    const interval = setInterval(() => setTimerNow(Date.now()), 1_000);
+    return () => clearInterval(interval);
+  }, [tradeOpen]);
 
   if (room === null) {
     return (
@@ -184,7 +226,29 @@ export default function TableScreen() {
   }
 
   if (room.status === "waiting") {
-    const emptySeats = Math.max(0, room.rules.playerCount - room.players.length);
+    const humanPlayers = room.players.filter((player) => player.kind === "human");
+    const isHost = room.yourPlayerId === room.players[0]?.id;
+    const yourWaitingPlayer = room.players.find((player) => player.id === room.yourPlayerId);
+    const allHumansReady = humanPlayers.length <= 1 || humanPlayers.every((player) => player.ready);
+    const safePlayerCount = Math.max(humanPlayers.length, playerCount);
+    const emptySeats = Math.max(0, safePlayerCount - room.players.length);
+    const maximumCards = Math.min(
+      20,
+      Math.floor((deckType === "arena-six" ? 78 : 52) / safePlayerCount)
+    );
+    const safeCards = Math.min(cardsPerPlayer, maximumCards);
+    const startOptions: CasualRoomOptions = {
+      playerCount: safePlayerCount,
+      botCount: emptySeats,
+      cardsPerPlayer: safeCards,
+      deckType,
+      difficulty,
+      pace,
+      timerEnabled,
+      secondsPerTurn,
+      bombEndsTrick,
+      tradeEnabled
+    };
     return (
       <SafeAreaView style={styles.waiting}>
         <View style={styles.waitingHeader}>
@@ -196,7 +260,19 @@ export default function TableScreen() {
           >
             <ArrowLeft color={palette.text} size={22} />
           </Pressable>
-          <ChatButton unread={unreadChat} onPress={openChat} />
+          <View style={styles.waitingHeaderActions}>
+            {isHost ? (
+              <Pressable
+                accessibilityLabel="Open table settings"
+                accessibilityRole="button"
+                onPress={() => setSettingsOpen(true)}
+                style={styles.roundButton}
+              >
+                <SlidersHorizontal color={palette.text} size={18} />
+              </Pressable>
+            ) : null}
+            <ChatButton unread={unreadChat} onPress={openChat} />
+          </View>
         </View>
         <View style={styles.waitingCenter}>
           <View style={styles.waitingTable}>
@@ -213,23 +289,38 @@ export default function TableScreen() {
             </Pressable>
           </View>
           <Text style={styles.seatStatus}>
-            {room.players.length}/{room.rules.playerCount} seats filled
+            {room.players.length}/{safePlayerCount} seats filled ·{" "}
+            {humanPlayers.filter((player) => player.ready).length}/{humanPlayers.length} ready
           </Text>
           <Text style={styles.waitingNotice}>{notice}</Text>
         </View>
         <View style={styles.waitingActions}>
-          <ActionButton
-            label={
-              emptySeats === 0
-                ? "Start table"
-                : `Fill ${emptySeats} seat${emptySeats === 1 ? "" : "s"} with bots`
-            }
-            loading={working}
-            onPress={() => {
-              setWorking(true);
-              void startCurrentRoom(emptySeats).finally(() => setWorking(false));
-            }}
-          />
+          {humanPlayers.length > 1 ? (
+            <ActionButton
+              label={yourWaitingPlayer?.ready ? "Not ready" : "Ready"}
+              variant={yourWaitingPlayer?.ready ? "secondary" : "primary"}
+              loading={working}
+              onPress={() => {
+                setWorking(true);
+                void setReady(!yourWaitingPlayer?.ready).finally(() => setWorking(false));
+              }}
+            />
+          ) : null}
+          {isHost ? (
+            <ActionButton
+              label={
+                emptySeats === 0
+                  ? "Start table"
+                  : `Start with ${emptySeats} bot${emptySeats === 1 ? "" : "s"}`
+              }
+              loading={working}
+              disabled={!allHumansReady}
+              onPress={() => {
+                setWorking(true);
+                void startCurrentRoom(startOptions).finally(() => setWorking(false));
+              }}
+            />
+          ) : null}
           <ActionButton label="Leave room" variant="secondary" onPress={() => void leave()} />
         </View>
         <ChatSheet
@@ -242,6 +333,30 @@ export default function TableScreen() {
           onBodyChange={setChatBody}
           onClose={() => setChatOpen(false)}
           onSend={() => void sendMessage()}
+        />
+        <RoomSettingsSheet
+          visible={settingsOpen}
+          minimumPlayers={Math.max(2, humanPlayers.length)}
+          playerCount={safePlayerCount}
+          cardsPerPlayer={safeCards}
+          maximumCards={maximumCards}
+          deckType={deckType}
+          difficulty={difficulty}
+          pace={pace}
+          timerEnabled={timerEnabled}
+          secondsPerTurn={secondsPerTurn}
+          bombEndsTrick={bombEndsTrick}
+          tradeEnabled={tradeEnabled}
+          onPlayerCountChange={setPlayerCount}
+          onCardsPerPlayerChange={setCardsPerPlayer}
+          onDeckTypeChange={setDeckType}
+          onDifficultyChange={setDifficulty}
+          onPaceChange={setPace}
+          onTimerEnabledChange={setTimerEnabled}
+          onSecondsPerTurnChange={setSecondsPerTurn}
+          onBombEndsTrickChange={setBombEndsTrick}
+          onTradeEnabledChange={setTradeEnabled}
+          onClose={() => setSettingsOpen(false)}
         />
       </SafeAreaView>
     );
@@ -402,48 +517,84 @@ export default function TableScreen() {
                     card={card}
                     themeSlug={yourCardThemeSlug}
                     selected={selectedIds.includes(getCardId(card))}
-                    disabled={!playableIds.has(getCardId(card))}
+                    disabled={!tradeOpen && !playableIds.has(getCardId(card))}
                     onPress={() => toggleCard(card)}
                   />
                 ))
               )}
             </ScrollView>
-            <View style={styles.moveActions}>
-              <Pressable
-                accessibilityLabel="Pass this turn"
-                accessibilityRole="button"
-                accessibilityState={{
-                  disabled: !canPass || room.activePlayerId !== room.yourPlayerId || working
+            {tradeOpen ? (
+              <TradeActions
+                room={room}
+                selectedCards={selectedCards}
+                incomingTrade={incomingTrade}
+                outgoingTrade={outgoingTrade}
+                targetPlayerId={tradeTargetPlayerId}
+                requestedRank={tradeRequestedRank}
+                timerNow={timerNow}
+                working={working}
+                onTargetChange={setTradeTargetPlayerId}
+                onRankChange={setTradeRequestedRank}
+                onRequest={() => {
+                  const card = selectedCards[0];
+                  if (card === undefined || tradeTargetPlayerId === "") return;
+                  setWorking(true);
+                  void requestTrade(tradeTargetPlayerId, card, tradeRequestedRank).finally(() => {
+                    setWorking(false);
+                    setSelectedIds([]);
+                  });
                 }}
-                disabled={!canPass || room.activePlayerId !== room.yourPlayerId || working}
-                onPress={() => void move({ type: "pass" })}
-                style={({ pressed }) => [
-                  styles.passButton,
-                  (!canPass || room.activePlayerId !== room.yourPlayerId) && styles.disabled,
-                  pressed && styles.pressed
-                ]}
-              >
-                <SkipForward color={palette.text} size={19} />
-                <Text style={styles.passLabel}>Pass</Text>
-              </Pressable>
-              <Pressable
-                accessibilityLabel={`Play ${selectedCards.length} selected card${
-                  selectedCards.length === 1 ? "" : "s"
-                }`}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: !canPlay || working }}
-                disabled={!canPlay || working}
-                onPress={() => void move({ type: "play", cards: selectedCards })}
-                style={({ pressed }) => [
-                  styles.playButton,
-                  !canPlay && styles.disabled,
-                  pressed && styles.pressed
-                ]}
-              >
-                <Play color={palette.ink} fill={palette.ink} size={18} />
-                <Text style={styles.playLabel}>Play</Text>
-              </Pressable>
-            </View>
+                onRespond={(accept) => {
+                  if (incomingTrade === undefined) return;
+                  setWorking(true);
+                  void respondToTrade(
+                    incomingTrade.id,
+                    accept,
+                    accept ? selectedCards[0] : undefined
+                  ).finally(() => {
+                    setWorking(false);
+                    setSelectedIds([]);
+                  });
+                }}
+              />
+            ) : (
+              <View style={styles.moveActions}>
+                <Pressable
+                  accessibilityLabel="Pass this turn"
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: !canPass || room.activePlayerId !== room.yourPlayerId || working
+                  }}
+                  disabled={!canPass || room.activePlayerId !== room.yourPlayerId || working}
+                  onPress={() => void move({ type: "pass" })}
+                  style={({ pressed }) => [
+                    styles.passButton,
+                    (!canPass || room.activePlayerId !== room.yourPlayerId) && styles.disabled,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <SkipForward color={palette.text} size={19} />
+                  <Text style={styles.passLabel}>Pass</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={`Play ${selectedCards.length} selected card${
+                    selectedCards.length === 1 ? "" : "s"
+                  }`}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canPlay || working }}
+                  disabled={!canPlay || working}
+                  onPress={() => void move({ type: "play", cards: selectedCards })}
+                  style={({ pressed }) => [
+                    styles.playButton,
+                    !canPlay && styles.disabled,
+                    pressed && styles.pressed
+                  ]}
+                >
+                  <Play color={palette.ink} fill={palette.ink} size={18} />
+                  <Text style={styles.playLabel}>Play</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         ) : null}
 
@@ -614,6 +765,345 @@ function ChatButton({
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+function RoomSettingsSheet({
+  visible,
+  minimumPlayers,
+  playerCount,
+  cardsPerPlayer,
+  maximumCards,
+  deckType,
+  difficulty,
+  pace,
+  timerEnabled,
+  secondsPerTurn,
+  bombEndsTrick,
+  tradeEnabled,
+  onPlayerCountChange,
+  onCardsPerPlayerChange,
+  onDeckTypeChange,
+  onDifficultyChange,
+  onPaceChange,
+  onTimerEnabledChange,
+  onSecondsPerTurnChange,
+  onBombEndsTrickChange,
+  onTradeEnabledChange,
+  onClose
+}: {
+  readonly visible: boolean;
+  readonly minimumPlayers: number;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
+  readonly maximumCards: number;
+  readonly deckType: DeckType;
+  readonly difficulty: PublicBotDifficulty;
+  readonly pace: PublicBotPace;
+  readonly timerEnabled: boolean;
+  readonly secondsPerTurn: number;
+  readonly bombEndsTrick: boolean;
+  readonly tradeEnabled: boolean;
+  readonly onPlayerCountChange: (value: number) => void;
+  readonly onCardsPerPlayerChange: (value: number) => void;
+  readonly onDeckTypeChange: (value: DeckType) => void;
+  readonly onDifficultyChange: (value: PublicBotDifficulty) => void;
+  readonly onPaceChange: (value: PublicBotPace) => void;
+  readonly onTimerEnabledChange: (value: boolean) => void;
+  readonly onSecondsPerTurnChange: (value: number) => void;
+  readonly onBombEndsTrickChange: (value: boolean) => void;
+  readonly onTradeEnabledChange: (value: boolean) => void;
+  readonly onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Pressable
+          accessibilityLabel="Close table settings"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.scrim}
+        />
+        <View style={styles.settingsSheet}>
+          <View style={styles.chatHeader}>
+            <View>
+              <Text style={styles.playerSheetTitle}>Table settings</Text>
+              <Text style={styles.chatSubtitle}>Applied when the host starts the match</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Close table settings"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={styles.roundButton}
+            >
+              <X color={palette.text} size={19} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.settingsBody}>
+            <Stepper
+              label="Players"
+              value={playerCount}
+              minimum={minimumPlayers}
+              maximum={6}
+              onChange={onPlayerCountChange}
+            />
+            <Stepper
+              label="Cards each"
+              value={cardsPerPlayer}
+              minimum={5}
+              maximum={maximumCards}
+              onChange={onCardsPerPlayerChange}
+            />
+            <SettingsGroup title="Deck">
+              <SegmentedControl
+                value={deckType}
+                options={[
+                  { label: "Classic", value: "classic" },
+                  { label: "Arena 6", value: "arena-six" }
+                ]}
+                onChange={onDeckTypeChange}
+              />
+            </SettingsGroup>
+            <SettingsGroup title="Bot difficulty">
+              <SegmentedControl
+                value={difficulty}
+                options={[
+                  { label: "Easy", value: "easy" },
+                  { label: "Normal", value: "normal" },
+                  { label: "Hard", value: "hard" }
+                ]}
+                onChange={onDifficultyChange}
+              />
+            </SettingsGroup>
+            <SettingsGroup title="Bot pace">
+              <SegmentedControl
+                value={pace}
+                options={[
+                  { label: "Quick", value: "quick" },
+                  { label: "Normal", value: "normal" },
+                  { label: "Relaxed", value: "relaxed" }
+                ]}
+                onChange={onPaceChange}
+              />
+            </SettingsGroup>
+            <SettingsToggle
+              label="Turn timer"
+              detail={
+                timerEnabled ? `${secondsPerTurn} seconds per turn` : "No automatic turn limit"
+              }
+              value={timerEnabled}
+              onChange={onTimerEnabledChange}
+            />
+            {timerEnabled ? (
+              <Stepper
+                label="Timer seconds"
+                value={secondsPerTurn}
+                minimum={15}
+                maximum={120}
+                onChange={onSecondsPerTurnChange}
+              />
+            ) : null}
+            <SettingsToggle
+              label="Bomb ends trick"
+              detail="A bomb immediately wins the current trick"
+              value={bombEndsTrick}
+              onChange={onBombEndsTrickChange}
+            />
+            <SettingsToggle
+              label="Pregame card trades"
+              detail="One request per player during a 20-second casual-only window"
+              value={tradeEnabled}
+              onChange={onTradeEnabledChange}
+            />
+          </ScrollView>
+          <ActionButton label="Done" onPress={onClose} />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function TradeActions({
+  room,
+  selectedCards,
+  incomingTrade,
+  outgoingTrade,
+  targetPlayerId,
+  requestedRank,
+  timerNow,
+  working,
+  onTargetChange,
+  onRankChange,
+  onRequest,
+  onRespond
+}: {
+  readonly room: PublicRoomState;
+  readonly selectedCards: readonly Card[];
+  readonly incomingTrade: PublicCardTradeRequest | undefined;
+  readonly outgoingTrade: PublicCardTradeRequest | undefined;
+  readonly targetPlayerId: string;
+  readonly requestedRank: Rank;
+  readonly timerNow: number;
+  readonly working: boolean;
+  readonly onTargetChange: (playerId: string) => void;
+  readonly onRankChange: (rank: Rank) => void;
+  readonly onRequest: () => void;
+  readonly onRespond: (accept: boolean) => void;
+}) {
+  const targets = room.players.filter(
+    (player) => player.id !== room.yourPlayerId && player.kind === "human" && player.connected
+  );
+  const secondsRemaining =
+    room.tradePhase.deadlineAt === null
+      ? 0
+      : Math.max(0, Math.ceil((new Date(room.tradePhase.deadlineAt).getTime() - timerNow) / 1_000));
+  const selectedCard = selectedCards[0];
+
+  return (
+    <View style={styles.tradePanel}>
+      <View style={styles.tradeHeading}>
+        <View>
+          <Text style={styles.tradeTitle}>Card trade</Text>
+          <Text style={styles.chatSubtitle}>One request and one accepted trade per player</Text>
+        </View>
+        <Text accessibilityLiveRegion="polite" style={styles.tradeTimer}>
+          {secondsRemaining}s
+        </Text>
+      </View>
+
+      {incomingTrade !== undefined ? (
+        <View style={styles.tradeBody}>
+          <Text style={styles.tradeCopy}>
+            {room.players.find((player) => player.id === incomingTrade.fromPlayerId)?.name ??
+              "Player"}{" "}
+            offers a card for one of your {incomingTrade.requestedRank}s. Select one matching card.
+          </Text>
+          <View style={styles.safetyActions}>
+            <ActionButton
+              label="Decline"
+              variant="secondary"
+              disabled={working}
+              onPress={() => onRespond(false)}
+              style={styles.safetyAction}
+            />
+            <ActionButton
+              label="Accept"
+              loading={working}
+              disabled={
+                selectedCards.length !== 1 || selectedCard?.rank !== incomingTrade.requestedRank
+              }
+              onPress={() => onRespond(true)}
+              style={styles.safetyAction}
+            />
+          </View>
+        </View>
+      ) : outgoingTrade !== undefined ? (
+        <Text style={styles.tradeCopy}>
+          Waiting for{" "}
+          {room.players.find((player) => player.id === outgoingTrade.toPlayerId)?.name ??
+            "the player"}{" "}
+          to answer your request for a {outgoingTrade.requestedRank}.
+        </Text>
+      ) : room.tradePhase.yourTradeCompleted ? (
+        <Text style={styles.tradeCopy}>Trade complete. Normal play begins when time expires.</Text>
+      ) : room.tradePhase.yourRequestUsed ? (
+        <Text style={styles.tradeCopy}>
+          Your request is finished. Waiting for the window to close.
+        </Text>
+      ) : targets.length === 0 ? (
+        <Text style={styles.tradeCopy}>No other connected human is available to trade.</Text>
+      ) : (
+        <View style={styles.tradeBody}>
+          <Text style={styles.tradeCopy}>
+            Select one card to offer, then choose a player and rank.
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tradeChoices}
+          >
+            {targets.map((player) => (
+              <Pressable
+                key={player.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: targetPlayerId === player.id }}
+                onPress={() => onTargetChange(player.id)}
+                style={[styles.tradeChoice, targetPlayerId === player.id && styles.selectedReason]}
+              >
+                <Text style={styles.reasonText}>{player.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tradeChoices}
+          >
+            {RANKS.map((rank) => (
+              <Pressable
+                key={rank}
+                accessibilityLabel={`Request rank ${rank}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: requestedRank === rank }}
+                onPress={() => onRankChange(rank)}
+                style={[styles.rankChoice, requestedRank === rank && styles.selectedReason]}
+              >
+                <Text style={styles.reasonText}>{rank}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ActionButton
+            label="Send trade request"
+            loading={working}
+            disabled={selectedCards.length !== 1 || targetPlayerId === ""}
+            onPress={onRequest}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
+function SettingsGroup({
+  title,
+  children
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <View style={styles.settingsGroup}>
+      <Text style={styles.safetyTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function SettingsToggle({
+  label,
+  detail,
+  value,
+  onChange
+}: {
+  readonly label: string;
+  readonly detail: string;
+  readonly value: boolean;
+  readonly onChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.settingsToggle}>
+      <View style={styles.settingsToggleCopy}>
+        <Text style={styles.safetyTitle}>{label}</Text>
+        <Text style={styles.chatSubtitle}>{detail}</Text>
+      </View>
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: palette.line, true: palette.felt }}
+        thumbColor={value ? palette.gold : palette.muted}
+      />
+    </View>
   );
 }
 
@@ -1116,6 +1606,7 @@ const styles = StyleSheet.create({
   missingTitle: { color: palette.text, fontSize: 26, fontWeight: "900", textAlign: "center" },
   waiting: { flex: 1, backgroundColor: palette.ink, padding: spacing.lg },
   waitingHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  waitingHeaderActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   backButton: {
     width: 42,
     height: 42,
@@ -1265,5 +1756,79 @@ const styles = StyleSheet.create({
   safetyAction: { flex: 1 },
   blockNote: { flexDirection: "row", alignItems: "center", gap: 7 },
   blockNoteText: { flex: 1, color: palette.muted, fontSize: 10 },
-  botNote: { color: palette.muted, fontSize: 12, lineHeight: 18 }
+  botNote: { color: palette.muted, fontSize: 12, lineHeight: 18 },
+  tradePanel: {
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(241,199,91,0.38)",
+    backgroundColor: "rgba(5,12,9,0.88)"
+  },
+  tradeHeading: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm
+  },
+  tradeTitle: { color: palette.gold, fontSize: 15, fontWeight: "900" },
+  tradeTimer: {
+    minWidth: 42,
+    color: palette.ink,
+    backgroundColor: palette.gold,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    overflow: "hidden",
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  tradeBody: { gap: spacing.sm },
+  tradeCopy: { color: palette.text, fontSize: 12, lineHeight: 17 },
+  tradeChoices: { gap: spacing.sm, paddingVertical: 2 },
+  tradeChoice: {
+    minHeight: 38,
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.line,
+    paddingHorizontal: spacing.md,
+    backgroundColor: palette.ink
+  },
+  rankChoice: {
+    width: 40,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.line,
+    backgroundColor: palette.ink
+  },
+  settingsSheet: {
+    height: "88%",
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: palette.line,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl
+  },
+  settingsBody: { gap: spacing.md, paddingBottom: spacing.xl },
+  settingsGroup: { gap: spacing.sm },
+  settingsToggle: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.line
+  },
+  settingsToggleCopy: { flex: 1 }
 });

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { DeckType, Move } from "@deuces-arena/game-engine";
+import type { Card, DeckType, Move, Rank } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
   FeedbackKind,
@@ -58,6 +58,13 @@ type BotGameOptions = {
   readonly pace: PublicBotPace;
 };
 
+export type CasualRoomOptions = BotGameOptions & {
+  readonly bombEndsTrick: boolean;
+  readonly timerEnabled: boolean;
+  readonly secondsPerTurn: number;
+  readonly tradeEnabled: boolean;
+};
+
 type StoredRoomSession = {
   readonly roomCode: string;
   readonly playerId: string;
@@ -92,7 +99,8 @@ type ArenaContextValue = {
   readonly notice: string;
   readonly createBotGame: (options: BotGameOptions) => Promise<boolean>;
   readonly createCasualRoom: () => Promise<boolean>;
-  readonly startCurrentRoom: (botCount: number) => Promise<boolean>;
+  readonly startCurrentRoom: (options: CasualRoomOptions) => Promise<boolean>;
+  readonly setReady: (ready: boolean) => Promise<boolean>;
   readonly joinRoom: (roomCode: string) => Promise<boolean>;
   readonly joinRanked: () => Promise<boolean>;
   readonly leaveRanked: () => Promise<boolean>;
@@ -106,6 +114,16 @@ type ArenaContextValue = {
     targetPlayerId: string,
     reason: PlayerReportReason,
     details?: string
+  ) => Promise<boolean>;
+  readonly requestTrade: (
+    toPlayerId: string,
+    offeredCard: Card,
+    requestedRank: Rank
+  ) => Promise<boolean>;
+  readonly respondToTrade: (
+    requestId: string,
+    accept: boolean,
+    requestedCard?: Card
   ) => Promise<boolean>;
   readonly equipCosmetic: (cosmeticId: string) => Promise<boolean>;
   readonly purchaseCosmetic: (cosmeticId: string) => Promise<boolean>;
@@ -671,7 +689,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const startCurrentRoom = useCallback(
-    async (botCount: number) => {
+    async (options: CasualRoomOptions) => {
       const socket = socketRef.current;
       if (socket === null || room === null) return false;
 
@@ -680,15 +698,36 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
           "room:start",
           {
             roomCode: room.roomCode,
-            botCount,
-            botDifficulty: room.botDifficulty,
-            botPace: room.botPace,
-            rules: room.rules,
-            timer: { enabled: false, secondsPerTurn: 45 },
-            trade: { enabled: false }
+            botCount: options.botCount,
+            botDifficulty: options.difficulty,
+            botPace: options.pace,
+            rules: {
+              bombEndsTrick: options.bombEndsTrick,
+              deckType: options.deckType,
+              playerCount: options.playerCount,
+              cardsPerPlayer: options.cardsPerPlayer
+            },
+            timer: {
+              enabled: options.timerEnabled,
+              secondsPerTurn: options.secondsPerTurn
+            },
+            trade: { enabled: options.tradeEnabled }
           },
           callback
         )
+      );
+      return handleRoomAck(ack, setRoom, setNotice);
+    },
+    [room]
+  );
+
+  const setReady = useCallback(
+    async (ready: boolean) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicRoomState>((callback) =>
+        socket.emit("room:ready", { roomCode: room.roomCode, ready }, callback)
       );
       return handleRoomAck(ack, setRoom, setNotice);
     },
@@ -787,6 +826,57 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
         return false;
       }
       setNotice("Report received. Thank you for helping keep tables respectful.");
+      return true;
+    },
+    [room]
+  );
+
+  const requestTrade = useCallback(
+    async (toPlayerId: string, offeredCard: Card, requestedRank: Rank) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicRoomState>((callback) =>
+        socket.emit(
+          "trade:request",
+          { roomCode: room.roomCode, toPlayerId, offeredCard, requestedRank },
+          callback
+        )
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      setRoom(ack.data);
+      setNotice("Trade request sent.");
+      return true;
+    },
+    [room]
+  );
+
+  const respondToTrade = useCallback(
+    async (requestId: string, accept: boolean, requestedCard?: Card) => {
+      const socket = socketRef.current;
+      if (socket === null || room === null) return false;
+
+      const ack = await emitWithAck<PublicRoomState>((callback) =>
+        socket.emit(
+          "trade:respond",
+          {
+            roomCode: room.roomCode,
+            requestId,
+            accept,
+            ...(requestedCard === undefined ? {} : { requestedCard })
+          },
+          callback
+        )
+      );
+      if (!ack.ok) {
+        setNotice(ack.error);
+        return false;
+      }
+      setRoom(ack.data);
+      setNotice(accept ? "Trade accepted." : "Trade declined.");
       return true;
     },
     [room]
@@ -902,6 +992,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       createBotGame,
       createCasualRoom,
       startCurrentRoom,
+      setReady,
       joinRoom,
       joinRanked,
       leaveRanked,
@@ -912,6 +1003,8 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       sendChat,
       blockPlayer,
       reportPlayer,
+      requestTrade,
+      respondToTrade,
       equipCosmetic,
       purchaseCosmetic,
       submitFeedback,
@@ -950,10 +1043,13 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
       rankedQueue,
       refreshLobby,
       reportPlayer,
+      requestTrade,
+      respondToTrade,
       room,
       sendChat,
       submitFeedback,
       submitMove,
+      setReady,
       startCurrentRoom,
       tournamentQueue,
       updateProfile,
