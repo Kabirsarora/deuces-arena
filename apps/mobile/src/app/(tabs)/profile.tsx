@@ -6,6 +6,8 @@ import type {
 } from "@deuces-arena/shared";
 import { Image } from "expo-image";
 import {
+  Bell,
+  BellOff,
   Bug,
   Coins,
   Lightbulb,
@@ -62,6 +64,8 @@ export default function ProfileScreen() {
     equipCosmetic,
     matchHistory,
     notice,
+    notificationsEnabled,
+    notificationWorking,
     playerName,
     profile,
     purchaseCosmetic,
@@ -69,6 +73,8 @@ export default function ProfileScreen() {
     submitFeedback,
     signInWithGoogle,
     signOutAccount,
+    enableNotifications,
+    disableNotifications,
     updateProfile
   } = useArena();
   const [view, setView] = useState<ProfileView>("profile");
@@ -130,17 +136,27 @@ export default function ProfileScreen() {
       <SegmentedControl value={view} options={views} onChange={setView} />
 
       {view === "profile" ? (
-        <ProfileEditor
-          avatar={avatar}
-          name={name}
-          saving={saving}
-          games={profile?.gamesPlayed ?? 0}
-          wins={profile?.wins ?? 0}
-          averagePlacement={profile?.averagePlacement?.toFixed(1) ?? "--"}
-          onAvatarChange={setAvatar}
-          onNameChange={setName}
-          onSave={() => void save()}
-        />
+        <>
+          <ProfileEditor
+            avatar={avatar}
+            name={name}
+            saving={saving}
+            games={profile?.gamesPlayed ?? 0}
+            wins={profile?.wins ?? 0}
+            averagePlacement={profile?.averagePlacement?.toFixed(1) ?? "--"}
+            onAvatarChange={setAvatar}
+            onNameChange={setName}
+            onSave={() => void save()}
+          />
+          <NotificationPreferences
+            signedIn={account !== null}
+            enabled={notificationsEnabled}
+            working={notificationWorking}
+            onChange={() =>
+              void (notificationsEnabled ? disableNotifications() : enableNotifications())
+            }
+          />
+        </>
       ) : null}
 
       {view === "locker" ? (
@@ -195,6 +211,45 @@ export default function ProfileScreen() {
 
       {view === "feedback" ? <FeedbackPanel notice={notice} onSubmit={submitFeedback} /> : null}
     </ArenaScreen>
+  );
+}
+
+function NotificationPreferences({
+  signedIn,
+  enabled,
+  working,
+  onChange
+}: {
+  readonly signedIn: boolean;
+  readonly enabled: boolean;
+  readonly working: boolean;
+  readonly onChange: () => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.alertHeading}>
+        <View style={styles.alertIcon}>
+          {enabled ? (
+            <Bell color={palette.mint} size={20} />
+          ) : (
+            <BellOff color={palette.muted} size={20} />
+          )}
+        </View>
+        <View style={styles.alertCopy}>
+          <Text style={styles.sectionTitle}>Table alerts</Text>
+          <Text style={styles.alertStatus}>
+            {signedIn ? (enabled ? "On" : "Off") : "Sign in required"}
+          </Text>
+        </View>
+      </View>
+      <ActionButton
+        label={enabled ? "Disable alerts" : "Enable alerts"}
+        loading={working}
+        disabled={!signedIn}
+        variant={enabled ? "secondary" : "primary"}
+        onPress={onChange}
+      />
+    </View>
   );
 }
 
@@ -614,5 +669,18 @@ const styles = StyleSheet.create({
   },
   emptyText: { color: palette.muted, fontSize: 13, textAlign: "center" },
   helper: { color: palette.muted, fontSize: 11, lineHeight: 16 },
-  notice: { color: palette.mint, fontSize: 11, textAlign: "center" }
+  notice: { color: palette.mint, fontSize: 11, textAlign: "center" },
+  alertHeading: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  alertIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.surfaceRaised,
+    borderWidth: 1,
+    borderColor: palette.line
+  },
+  alertCopy: { flex: 1, gap: 3 },
+  alertStatus: { color: palette.muted, fontSize: 12, fontWeight: "700" }
 });

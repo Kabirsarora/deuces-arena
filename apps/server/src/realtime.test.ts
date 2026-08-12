@@ -286,6 +286,48 @@ describe("realtime rooms", () => {
     expect(profile.ok).toBe(false);
   });
 
+  it("requires a signed account before registering table alerts", async () => {
+    const socket = await connectTestSocket();
+    const registration = await registerPushToken(socket, {
+      expoPushToken: "ExpoPushToken[test-device-token]",
+      platform: "ios"
+    });
+
+    expect(registration.ok).toBe(false);
+
+    if (!registration.ok) {
+      expect(registration.error).toContain("Sign in with Google");
+    }
+  });
+
+  it("rejects malformed push tokens before accessing persistence", async () => {
+    const socket = await connectTestSocket("auth-33333333333333333333333333333333");
+    const registration = await registerPushToken(socket, {
+      expoPushToken: "not-a-push-token",
+      platform: "android"
+    });
+
+    expect(registration.ok).toBe(false);
+
+    if (!registration.ok) {
+      expect(registration.error).toContain("invalid");
+    }
+  });
+
+  it("fails safely when push persistence is unavailable", async () => {
+    const socket = await connectTestSocket("auth-44444444444444444444444444444444");
+    const registration = await registerPushToken(socket, {
+      expoPushToken: "ExpoPushToken[valid-test-device-token]",
+      platform: "ios"
+    });
+
+    expect(registration.ok).toBe(false);
+
+    if (!registration.ok) {
+      expect(registration.error).toContain("temporarily unavailable");
+    }
+  });
+
   it("serves the cosmetic catalog over REST and Socket.IO", async () => {
     const socket = await connectTestSocket();
     const socketCatalog = await listCosmetics(socket);
@@ -2089,6 +2131,18 @@ function syncAccountProfile(
 ): Promise<ServerAck<PublicGuestProfile>> {
   return new Promise((resolve) => {
     socket.emit("profile:sync-account", payload, resolve);
+  });
+}
+
+function registerPushToken(
+  socket: TestSocket,
+  payload: {
+    readonly expoPushToken: string;
+    readonly platform: "ios" | "android";
+  }
+): Promise<ServerAck<{ readonly enabled: boolean; readonly platform: "ios" | "android" }>> {
+  return new Promise((resolve) => {
+    socket.emit("notifications:register", payload, resolve);
   });
 }
 

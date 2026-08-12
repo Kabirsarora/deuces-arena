@@ -91,8 +91,10 @@ import {
   persistMoveEvent,
   purchasePersistedCosmetic,
   recordPersistedTournamentStage,
+  savePersistedPushSubscription,
   savePersistedReplayLabel,
   setPersistedUserBlock,
+  deletePersistedPushSubscription,
   updatePersistedGuestProfile,
   updatePersistedPlayerReportStatus,
   type PersistedMatch
@@ -156,7 +158,13 @@ type RoomTradeState = {
   timeout: NodeJS.Timeout | null;
 };
 
-type RateLimitBucket = "chat" | "coach" | "feedback" | "moderation-report" | "replay-label";
+type RateLimitBucket =
+  | "chat"
+  | "coach"
+  | "feedback"
+  | "moderation-report"
+  | "push-registration"
+  | "replay-label";
 
 type RateLimitRule = {
   readonly maxEvents: number;
@@ -211,6 +219,7 @@ const DEFAULT_CARDS_PER_PLAYER = 13;
 const TRADE_WINDOW_MS = 20_000;
 const MAX_CHAT_MESSAGES_PER_ROOM = 50;
 const MAX_COACH_EVALUATIONS_PER_ROOM = 50;
+const EXPO_PUSH_TOKEN_PATTERN = /^(?:Expo|Exponent)PushToken\[[^\]\s]{8,200}\]$/;
 const DEFAULT_TIMER_SECONDS = 45;
 const DISCONNECTED_AUTO_MOVE_DELAY_MS = parseIntegerSetting(
   process.env.DISCONNECTED_AUTO_MOVE_DELAY_MS,
@@ -238,6 +247,11 @@ const RATE_LIMITS: Readonly<Record<RateLimitBucket, RateLimitRule>> = {
     maxEvents: 5,
     windowMs: 60 * 60_000,
     message: "You have submitted several reports. Please wait before sending another."
+  },
+  "push-registration": {
+    maxEvents: 6,
+    windowMs: 60_000,
+    message: "Please wait before changing table alerts again."
   },
   "replay-label": {
     maxEvents: 10,
@@ -1108,6 +1122,78 @@ io.on("connection", (socket) => {
 
     callback(ok(profile));
     emitRoomStatesForGuest(guestId);
+  });
+
+  socket.on("notifications:register", async (payload, callback) => {
+    const authProfileId = socket.data.authProfileId ?? null;
+    const expoPushToken = payload.expoPushToken.trim();
+    const platform =
+      payload.platform === "ios" || payload.platform === "android" ? payload.platform : null;
+    const rateLimitError = checkSocketRateLimit(socket.id, "push-registration");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    if (authProfileId === null) {
+      callback(fail("Sign in with Google to enable table alerts."));
+      return;
+    }
+
+    if (!EXPO_PUSH_TOKEN_PATTERN.test(expoPushToken) || platform === null) {
+      callback(fail("Push notification token is invalid."));
+      return;
+    }
+
+    const result = await savePersistedPushSubscription({
+      authProfileId,
+      expoPushToken,
+      platform
+    });
+
+    if (!result.ok) {
+      callback(
+        fail(
+          result.reason === "profile-not-found"
+            ? "Sync your Arena profile before enabling table alerts."
+            : "Table alerts are temporarily unavailable."
+        )
+      );
+      return;
+    }
+
+    callback(ok({ enabled: true, platform }));
+  });
+
+  socket.on("notifications:unregister", async (payload, callback) => {
+    const authProfileId = socket.data.authProfileId ?? null;
+    const expoPushToken = payload.expoPushToken.trim();
+    const rateLimitError = checkSocketRateLimit(socket.id, "push-registration");
+
+    if (rateLimitError !== null) {
+      callback(fail(rateLimitError));
+      return;
+    }
+
+    if (authProfileId === null) {
+      callback(fail("Sign in with Google to change table alerts."));
+      return;
+    }
+
+    if (!EXPO_PUSH_TOKEN_PATTERN.test(expoPushToken)) {
+      callback(fail("Push notification token is invalid."));
+      return;
+    }
+
+    const result = await deletePersistedPushSubscription({ authProfileId, expoPushToken });
+
+    if (!result.ok) {
+      callback(fail("Table alerts are temporarily unavailable."));
+      return;
+    }
+
+    callback(ok({ enabled: false }));
   });
 
   socket.on("leaderboard:list", async (payload, callback) => {
