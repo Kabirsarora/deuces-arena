@@ -89,6 +89,10 @@ The app does not sell data, use gameplay data for advertising, request contacts/
 or offer real-money purchases or wagering. Recheck these answers if analytics, ads, or payments are
 added later.
 
+The iOS build declares `usesNonExemptEncryption: false` because it relies on standard operating
+system and HTTPS encryption rather than shipping custom or non-exempt cryptography. Revisit that
+answer before submission if native security or networking behavior changes.
+
 ## Owner Checklist
 
 These steps require the owner's Expo, Apple, or Google accounts and cannot be completed from source

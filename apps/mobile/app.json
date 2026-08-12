@@ -13,6 +13,9 @@
       "bundleIdentifier": "com.deucesarena.app",
       "buildNumber": "1",
       "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "associatedDomains": ["applinks:deucesarena.com"]
     },
     "android": {
