@@ -75,8 +75,9 @@ export default function PrivacyPage() {
         <p>
           Service providers process data only as needed to operate the app. Current infrastructure
           includes Google for authentication, Vercel for the web app, Render for realtime services,
-          and Neon for PostgreSQL storage. These providers may process normal network metadata such
-          as IP addresses and request logs under their own policies.
+          Neon for PostgreSQL storage, and Expo for opted-in mobile notification delivery. These
+          providers may process normal network metadata such as IP addresses, request logs, device
+          push tokens, and delivery receipts under their own policies.
         </p>
       </section>
 

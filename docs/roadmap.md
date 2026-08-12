@@ -98,6 +98,7 @@
 - Done: add native room sharing, app deep-link joins, a browser fallback page, and universal/app-link configuration endpoints.
 - Done: add explicit notification permission, secure Expo token registration, signed-account ownership, opt-out, and notification room routing.
 - Done: add environment-gated ranked/tournament alerts, bounded Expo retries, durable receipt tracking, and invalid-device cleanup.
+- Done: add native accessibility labels/states and a checked-in iOS/Android store release packet.
 - Next: link EAS, install development builds on physical devices, and finish Apple/Android domain verification with the generated signing identifiers.
 - Next: configure native push credentials and test ranked/tournament delivery on physical devices before enabling production sends.
 - Later: build a native iMessage extension with Apple's Messages framework so group conversations can send and join Deuces Arena games without claiming integration with GamePigeon.

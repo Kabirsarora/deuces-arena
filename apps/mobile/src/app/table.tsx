@@ -174,7 +174,12 @@ export default function TableScreen() {
     return (
       <SafeAreaView style={styles.waiting}>
         <View style={styles.waitingHeader}>
-          <Pressable onPress={() => void leave()} style={styles.backButton}>
+          <Pressable
+            accessibilityLabel="Leave waiting room"
+            accessibilityRole="button"
+            onPress={() => void leave()}
+            style={styles.backButton}
+          >
             <ArrowLeft color={palette.text} size={22} />
           </Pressable>
           <ChatButton unread={unreadChat} onPress={openChat} />
@@ -238,6 +243,7 @@ export default function TableScreen() {
       <View style={styles.tableHeader}>
         <Pressable
           accessibilityLabel="Leave table"
+          accessibilityRole="button"
           onPress={() => void leave()}
           style={styles.roundButton}
         >
@@ -571,7 +577,12 @@ function ChatButton({
   readonly onPress: () => void;
 }) {
   return (
-    <Pressable accessibilityLabel="Open table chat" onPress={onPress} style={styles.roundButton}>
+    <Pressable
+      accessibilityLabel={unread > 0 ? `Open table chat, ${unread} unread` : "Open table chat"}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.roundButton}
+    >
       <MessageCircle color={palette.text} size={19} />
       {unread > 0 ? (
         <View style={styles.unreadBadge}>
@@ -617,7 +628,12 @@ function ChatSheet({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.modalRoot}
       >
-        <Pressable accessibilityLabel="Close table chat" onPress={onClose} style={styles.scrim} />
+        <Pressable
+          accessibilityLabel="Close table chat"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.scrim}
+        />
         <View style={styles.chatSheet}>
           <View style={styles.chatHeader}>
             <View>
@@ -626,6 +642,7 @@ function ChatSheet({
             </View>
             <Pressable
               accessibilityLabel="Close table chat"
+              accessibilityRole="button"
               onPress={onClose}
               style={styles.roundButton}
             >
@@ -659,6 +676,7 @@ function ChatSheet({
           </ScrollView>
           <View style={styles.composer}>
             <TextInput
+              accessibilityLabel="Table chat message"
               value={body}
               onChangeText={onBodyChange}
               onSubmitEditing={onSend}
@@ -670,6 +688,8 @@ function ChatSheet({
             />
             <Pressable
               accessibilityLabel="Send message"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: body.trim() === "" || sending, busy: sending }}
               disabled={body.trim() === "" || sending}
               onPress={onSend}
               style={[styles.sendButton, (body.trim() === "" || sending) && styles.disabled]}

@@ -2,6 +2,7 @@
   "expo": {
     "name": "Deuces Arena",
     "slug": "deuces-arena",
+    "description": "Play Deuces and Big Two online in casual rooms, ranked matches, tournaments, and polished bot games.",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

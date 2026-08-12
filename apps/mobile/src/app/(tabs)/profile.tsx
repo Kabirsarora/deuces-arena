@@ -104,6 +104,7 @@ export default function ProfileScreen() {
         <View style={styles.avatar}>
           {profile?.imageUrl !== null && profile?.imageUrl !== undefined ? (
             <Image
+              accessibilityLabel={`${profile.displayName} profile photo`}
               source={{ uri: profile.imageUrl }}
               contentFit="cover"
               style={styles.accountImage}
@@ -283,6 +284,7 @@ function ProfileEditor({
       </View>
       <Text style={styles.label}>Display name</Text>
       <TextInput
+        accessibilityLabel="Display name"
         value={name}
         onChangeText={onNameChange}
         maxLength={18}
@@ -361,6 +363,23 @@ function Locker({
                 {cosmetic.description ?? kindLabel(cosmetic.kind)}
               </Text>
               <Pressable
+                accessibilityLabel={`${
+                  equipped
+                    ? "Equipped"
+                    : owned
+                      ? "Equip"
+                      : cosmetic.isSupporter
+                        ? "Supporter cosmetic"
+                        : cosmetic.coinPrice === null
+                          ? "Reward"
+                          : `Unlock for ${cosmetic.coinPrice} coins`
+                } ${cosmetic.name}`}
+                accessibilityRole="button"
+                accessibilityState={{
+                  busy: workingId === cosmetic.id,
+                  disabled: disabled || workingId !== null,
+                  selected: equipped
+                }}
                 disabled={disabled || workingId !== null}
                 onPress={() => void act(cosmetic)}
                 style={({ pressed }) => [
@@ -477,6 +496,7 @@ function FeedbackPanel({
       </View>
       <SegmentedControl value={kind} options={feedbackKinds} onChange={setKind} />
       <TextInput
+        accessibilityLabel="Feedback details"
         value={body}
         onChangeText={setBody}
         multiline
