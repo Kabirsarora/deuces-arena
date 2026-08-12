@@ -61,6 +61,7 @@ import { useArena, type CasualRoomOptions } from "@/providers/arena-provider";
 export default function TableScreen() {
   const {
     blockPlayer,
+    configureCurrentRoom,
     leaveRoom,
     notice,
     reportPlayer,
@@ -83,6 +84,7 @@ export default function TableScreen() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);
+  const [botCount, setBotCount] = useState(3);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(13);
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [difficulty, setDifficulty] = useState<PublicBotDifficulty>("normal");
@@ -176,6 +178,20 @@ export default function TableScreen() {
     return () => clearInterval(interval);
   }, [tradeOpen]);
 
+  useEffect(() => {
+    if (room?.status !== "waiting") return;
+    setPlayerCount(room.rules.playerCount);
+    setBotCount(room.configuredBotCount);
+    setCardsPerPlayer(room.rules.cardsPerPlayer);
+    setDeckType(room.rules.deckType);
+    setDifficulty(room.botDifficulty);
+    setPace(room.botPace);
+    setTimerEnabled(room.timerSettings.enabled);
+    setSecondsPerTurn(room.timerSettings.secondsPerTurn);
+    setBombEndsTrick(room.rules.bombEndsTrick);
+    setTradeEnabled(room.tradeEnabled);
+  }, [room]);
+
   if (room === null) {
     return (
       <SafeAreaView style={styles.missing}>
@@ -227,27 +243,25 @@ export default function TableScreen() {
 
   if (room.status === "waiting") {
     const humanPlayers = room.players.filter((player) => player.kind === "human");
-    const isHost = room.yourPlayerId === room.players[0]?.id;
+    const isHost = room.yourPlayerId === room.hostPlayerId;
     const yourWaitingPlayer = room.players.find((player) => player.id === room.yourPlayerId);
     const allHumansReady = humanPlayers.length <= 1 || humanPlayers.every((player) => player.ready);
-    const safePlayerCount = Math.max(humanPlayers.length, playerCount);
-    const emptySeats = Math.max(0, safePlayerCount - room.players.length);
-    const maximumCards = Math.min(
-      20,
-      Math.floor((deckType === "arena-six" ? 78 : 52) / safePlayerCount)
+    const safePlayerCount = Math.max(humanPlayers.length, room.rules.playerCount);
+    const emptySeats = Math.min(
+      room.configuredBotCount,
+      Math.max(0, safePlayerCount - room.players.length)
     );
-    const safeCards = Math.min(cardsPerPlayer, maximumCards);
     const startOptions: CasualRoomOptions = {
       playerCount: safePlayerCount,
       botCount: emptySeats,
-      cardsPerPlayer: safeCards,
-      deckType,
-      difficulty,
-      pace,
-      timerEnabled,
-      secondsPerTurn,
-      bombEndsTrick,
-      tradeEnabled
+      cardsPerPlayer: room.rules.cardsPerPlayer,
+      deckType: room.rules.deckType,
+      difficulty: room.botDifficulty,
+      pace: room.botPace,
+      timerEnabled: room.timerSettings.enabled,
+      secondsPerTurn: room.timerSettings.secondsPerTurn,
+      bombEndsTrick: room.rules.bombEndsTrick,
+      tradeEnabled: room.tradeEnabled
     };
     return (
       <SafeAreaView style={styles.waiting}>
@@ -337,9 +351,14 @@ export default function TableScreen() {
         <RoomSettingsSheet
           visible={settingsOpen}
           minimumPlayers={Math.max(2, humanPlayers.length)}
-          playerCount={safePlayerCount}
-          cardsPerPlayer={safeCards}
-          maximumCards={maximumCards}
+          playerCount={playerCount}
+          botCount={Math.min(botCount, Math.max(0, playerCount - humanPlayers.length))}
+          maximumBots={Math.max(0, playerCount - humanPlayers.length)}
+          cardsPerPlayer={cardsPerPlayer}
+          maximumCards={Math.min(
+            20,
+            Math.floor((deckType === "arena-six" ? 78 : 52) / playerCount)
+          )}
           deckType={deckType}
           difficulty={difficulty}
           pace={pace}
@@ -347,7 +366,9 @@ export default function TableScreen() {
           secondsPerTurn={secondsPerTurn}
           bombEndsTrick={bombEndsTrick}
           tradeEnabled={tradeEnabled}
+          saving={working}
           onPlayerCountChange={setPlayerCount}
+          onBotCountChange={setBotCount}
           onCardsPerPlayerChange={setCardsPerPlayer}
           onDeckTypeChange={setDeckType}
           onDifficultyChange={setDifficulty}
@@ -357,6 +378,24 @@ export default function TableScreen() {
           onBombEndsTrickChange={setBombEndsTrick}
           onTradeEnabledChange={setTradeEnabled}
           onClose={() => setSettingsOpen(false)}
+          onSave={() => {
+            setWorking(true);
+            void configureCurrentRoom({
+              playerCount,
+              botCount: Math.min(botCount, Math.max(0, playerCount - room.players.length)),
+              cardsPerPlayer,
+              deckType,
+              difficulty,
+              pace,
+              timerEnabled,
+              secondsPerTurn,
+              bombEndsTrick,
+              tradeEnabled
+            }).finally(() => {
+              setWorking(false);
+              setSettingsOpen(false);
+            });
+          }}
         />
       </SafeAreaView>
     );
@@ -772,6 +811,8 @@ function RoomSettingsSheet({
   visible,
   minimumPlayers,
   playerCount,
+  botCount,
+  maximumBots,
   cardsPerPlayer,
   maximumCards,
   deckType,
@@ -781,7 +822,9 @@ function RoomSettingsSheet({
   secondsPerTurn,
   bombEndsTrick,
   tradeEnabled,
+  saving,
   onPlayerCountChange,
+  onBotCountChange,
   onCardsPerPlayerChange,
   onDeckTypeChange,
   onDifficultyChange,
@@ -790,11 +833,14 @@ function RoomSettingsSheet({
   onSecondsPerTurnChange,
   onBombEndsTrickChange,
   onTradeEnabledChange,
-  onClose
+  onClose,
+  onSave
 }: {
   readonly visible: boolean;
   readonly minimumPlayers: number;
   readonly playerCount: number;
+  readonly botCount: number;
+  readonly maximumBots: number;
   readonly cardsPerPlayer: number;
   readonly maximumCards: number;
   readonly deckType: DeckType;
@@ -804,7 +850,9 @@ function RoomSettingsSheet({
   readonly secondsPerTurn: number;
   readonly bombEndsTrick: boolean;
   readonly tradeEnabled: boolean;
+  readonly saving: boolean;
   readonly onPlayerCountChange: (value: number) => void;
+  readonly onBotCountChange: (value: number) => void;
   readonly onCardsPerPlayerChange: (value: number) => void;
   readonly onDeckTypeChange: (value: DeckType) => void;
   readonly onDifficultyChange: (value: PublicBotDifficulty) => void;
@@ -814,6 +862,7 @@ function RoomSettingsSheet({
   readonly onBombEndsTrickChange: (value: boolean) => void;
   readonly onTradeEnabledChange: (value: boolean) => void;
   readonly onClose: () => void;
+  readonly onSave: () => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -828,7 +877,7 @@ function RoomSettingsSheet({
           <View style={styles.chatHeader}>
             <View>
               <Text style={styles.playerSheetTitle}>Table settings</Text>
-              <Text style={styles.chatSubtitle}>Applied when the host starts the match</Text>
+              <Text style={styles.chatSubtitle}>Shared with everyone in the waiting room</Text>
             </View>
             <Pressable
               accessibilityLabel="Close table settings"
@@ -844,8 +893,18 @@ function RoomSettingsSheet({
               label="Players"
               value={playerCount}
               minimum={minimumPlayers}
-              maximum={6}
+              maximum={Math.min(
+                6,
+                Math.floor((deckType === "arena-six" ? 78 : 52) / cardsPerPlayer)
+              )}
               onChange={onPlayerCountChange}
+            />
+            <Stepper
+              label="Bots"
+              value={botCount}
+              minimum={0}
+              maximum={maximumBots}
+              onChange={onBotCountChange}
             />
             <Stepper
               label="Cards each"
@@ -916,7 +975,7 @@ function RoomSettingsSheet({
               onChange={onTradeEnabledChange}
             />
           </ScrollView>
-          <ActionButton label="Done" onPress={onClose} />
+          <ActionButton label="Save settings" loading={saving} onPress={onSave} />
         </View>
       </View>
     </Modal>

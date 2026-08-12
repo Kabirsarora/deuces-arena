@@ -307,6 +307,7 @@ export function OnlineRoomPanel({
     room.status === "waiting" &&
     room.players.length + selectedBotSeats >= selectedPlayerCount &&
     (connectedHumans.length <= 1 || connectedHumans.every((player) => player.ready));
+  const isRoomHost = room !== null && room.hostPlayerId === room.yourPlayerId;
   const activePlayer = room?.players.find((player) => player.id === room.activePlayerId) ?? null;
   const turnStatus =
     room?.status === "complete"
@@ -335,6 +336,20 @@ export function OnlineRoomPanel({
   useEffect(() => {
     mutedPlayerIdsRef.current = new Set(mutedPlayerIds);
   }, [mutedPlayerIds]);
+
+  useEffect(() => {
+    if (room?.status !== "waiting") return;
+    setPlayerCount(room.rules.playerCount);
+    setCardsPerPlayer(room.rules.cardsPerPlayer);
+    setDeckType(room.rules.deckType);
+    setBotSeats(room.configuredBotCount);
+    setBotDifficulty(room.botDifficulty);
+    setBotPace(room.botPace);
+    setLobbyTimerEnabled(room.timerSettings.enabled);
+    setTurnTimerSeconds(room.timerSettings.secondsPerTurn);
+    setBombEndsTrick(room.rules.bombEndsTrick);
+    setTradingEnabled(room.tradeEnabled);
+  }, [room]);
 
   useEffect(() => {
     setManualCardOrderIds((current) => normalizeManualCardOrder(current, room?.yourHand ?? []));
@@ -763,6 +778,58 @@ export function OnlineRoomPanel({
         }
       },
       handleRoomAck("Game started.")
+    );
+  }
+
+  function configureRoom(next: {
+    readonly botSeats?: number;
+    readonly deckType?: DeckType;
+    readonly playerCount?: number;
+    readonly cardsPerPlayer?: number;
+    readonly timerEnabled?: boolean;
+    readonly timerSeconds?: number;
+    readonly bombEndsTrick?: boolean;
+    readonly tradingEnabled?: boolean;
+    readonly botDifficulty?: PublicBotDifficulty;
+    readonly botPace?: PublicBotPace;
+  }) {
+    if (room === null || !isRoomHost) return;
+
+    const nextDeckType = next.deckType ?? deckType;
+    const requestedPlayerCount = next.playerCount ?? selectedPlayerCount;
+    const nextCardsPerPlayer = Math.min(
+      next.cardsPerPlayer ?? selectedCardsPerPlayer,
+      getMaxCardsPerPlayer(nextDeckType, requestedPlayerCount)
+    );
+    const nextPlayerCount = Math.max(
+      room.players.length,
+      Math.min(requestedPlayerCount, getMaxPlayersForSetup(nextDeckType, nextCardsPerPlayer))
+    );
+    const nextBotSeats = Math.min(
+      next.botSeats ?? selectedBotSeats,
+      Math.max(0, nextPlayerCount - room.players.length)
+    );
+
+    socketRef.current?.emit(
+      "room:configure",
+      {
+        roomCode: room.roomCode,
+        botCount: nextBotSeats,
+        timer: {
+          enabled: next.timerEnabled ?? lobbyTimerEnabled,
+          secondsPerTurn: next.timerSeconds ?? turnTimerSeconds
+        },
+        rules: {
+          bombEndsTrick: next.bombEndsTrick ?? bombEndsTrick,
+          deckType: nextDeckType,
+          playerCount: nextPlayerCount,
+          cardsPerPlayer: nextCardsPerPlayer
+        },
+        botDifficulty: next.botDifficulty ?? botDifficulty,
+        botPace: next.botPace ?? botPace,
+        trade: { enabled: next.tradingEnabled ?? tradingEnabled }
+      },
+      handleRoomAck("Table settings updated. Players must ready again.")
     );
   }
 
@@ -1291,6 +1358,7 @@ export function OnlineRoomPanel({
         botDifficulty={botDifficulty}
         botPace={botPace}
         roomCanStart={roomCanStart}
+        isHost={isRoomHost}
         yourReady={yourPlayer?.ready ?? false}
         onCopyRoomCode={() => {
           void navigator.clipboard?.writeText(room.roomCode);
@@ -1303,16 +1371,16 @@ export function OnlineRoomPanel({
         onReady={() => setReady(!yourPlayer?.ready)}
         onStart={startRoom}
         onLeave={leaveRoom}
-        onBotSeatsChange={setBotSeats}
-        onDeckTypeChange={changeDeckType}
-        onPlayerCountChange={setPlayerCount}
-        onCardsPerPlayerChange={setCardsPerPlayer}
-        onTimerEnabledChange={setLobbyTimerEnabled}
-        onTimerSecondsChange={setTurnTimerSeconds}
-        onBombEndsTrickChange={setBombEndsTrick}
-        onTradingEnabledChange={setTradingEnabled}
-        onBotDifficultyChange={setBotDifficulty}
-        onBotPaceChange={setBotPace}
+        onBotSeatsChange={(value) => configureRoom({ botSeats: value })}
+        onDeckTypeChange={(value) => configureRoom({ deckType: value })}
+        onPlayerCountChange={(value) => configureRoom({ playerCount: value })}
+        onCardsPerPlayerChange={(value) => configureRoom({ cardsPerPlayer: value })}
+        onTimerEnabledChange={(value) => configureRoom({ timerEnabled: value })}
+        onTimerSecondsChange={(value) => configureRoom({ timerSeconds: value })}
+        onBombEndsTrickChange={(value) => configureRoom({ bombEndsTrick: value })}
+        onTradingEnabledChange={(value) => configureRoom({ tradingEnabled: value })}
+        onBotDifficultyChange={(value) => configureRoom({ botDifficulty: value })}
+        onBotPaceChange={(value) => configureRoom({ botPace: value })}
       />
     );
   }
@@ -2070,11 +2138,13 @@ function CompactRange({
 function CompactTimerControl({
   enabled,
   seconds,
+  disabled = false,
   onEnabledChange,
   onSecondsChange
 }: {
   readonly enabled: boolean;
   readonly seconds: number;
+  readonly disabled?: boolean;
   readonly onEnabledChange: (enabled: boolean) => void;
   readonly onSecondsChange: (seconds: number) => void;
 }) {
@@ -2086,6 +2156,7 @@ function CompactTimerControl({
           className="size-4 accent-[var(--gold)]"
           type="checkbox"
           checked={enabled}
+          disabled={disabled}
           onChange={(event) => onEnabledChange(event.target.checked)}
         />
       </label>
@@ -2096,7 +2167,7 @@ function CompactTimerControl({
         max="90"
         step="15"
         value={seconds}
-        disabled={!enabled}
+        disabled={disabled || !enabled}
         onChange={(event) => onSecondsChange(Number(event.target.value))}
       />
       <p className="mt-1 text-zinc-400">{seconds}s per turn</p>
@@ -2106,9 +2177,11 @@ function CompactTimerControl({
 
 function CompactBotDifficulty({
   value,
+  disabled = false,
   onChange
 }: {
   readonly value: PublicBotDifficulty;
+  readonly disabled?: boolean;
   readonly onChange: (difficulty: PublicBotDifficulty) => void;
 }) {
   return (
@@ -2125,6 +2198,7 @@ function CompactBotDifficulty({
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
             )}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -2144,9 +2218,11 @@ function CompactBotDifficulty({
 
 function CompactBotPace({
   value,
+  disabled = false,
   onChange
 }: {
   readonly value: PublicBotPace;
+  readonly disabled?: boolean;
   readonly onChange: (pace: PublicBotPace) => void;
 }) {
   return (
@@ -2163,6 +2239,7 @@ function CompactBotPace({
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
             )}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -2178,9 +2255,11 @@ function CompactBotPace({
 
 function CompactDeckControl({
   value,
+  disabled = false,
   onChange
 }: {
   readonly value: DeckType;
+  readonly disabled?: boolean;
   readonly onChange: (deckType: DeckType) => void;
 }) {
   return (
@@ -2200,6 +2279,7 @@ function CompactDeckControl({
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
             )}
             type="button"
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -2219,11 +2299,13 @@ function CompactRuleToggle({
   label,
   description = "A bomb immediately wins the trick.",
   enabled,
+  disabled = false,
   onChange
 }: {
   readonly label: string;
   readonly description?: string;
   readonly enabled: boolean;
+  readonly disabled?: boolean;
   readonly onChange: (enabled: boolean) => void;
 }) {
   return (
@@ -2236,6 +2318,7 @@ function CompactRuleToggle({
         className="size-4 shrink-0 accent-[var(--gold)]"
         type="checkbox"
         checked={enabled}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
       />
     </label>
@@ -2893,6 +2976,7 @@ function OnlineWaitingRoom({
   botDifficulty,
   botPace,
   roomCanStart,
+  isHost,
   yourReady,
   onCopyRoomCode,
   onCopyInvite,
@@ -2926,6 +3010,7 @@ function OnlineWaitingRoom({
   readonly botDifficulty: PublicBotDifficulty;
   readonly botPace: PublicBotPace;
   readonly roomCanStart: boolean;
+  readonly isHost: boolean;
   readonly yourReady: boolean;
   readonly onCopyRoomCode: () => void;
   readonly onCopyInvite: () => void;
@@ -3014,16 +3099,16 @@ function OnlineWaitingRoom({
             value={playerCount}
             min={Math.max(2, room.players.length)}
             max={maximumPlayerCount}
-            disabled={!connected}
+            disabled={!connected || !isHost}
             onChange={onPlayerCountChange}
           />
-          <CompactDeckControl value={deckType} onChange={onDeckTypeChange} />
+          <CompactDeckControl disabled={!isHost} value={deckType} onChange={onDeckTypeChange} />
           <CompactRange
             label="Cards each"
             value={cardsPerPlayer}
             min={DEFAULT_CARDS_PER_PLAYER}
             max={getMaxCardsPerPlayer(deckType, playerCount)}
-            disabled={!connected}
+            disabled={!connected || !isHost}
             onChange={onCardsPerPlayerChange}
           />
 
@@ -3040,27 +3125,34 @@ function OnlineWaitingRoom({
             value={botSeats}
             min={0}
             max={maxBotSeats}
-            disabled={!connected}
+            disabled={!connected || !isHost}
             onChange={onBotSeatsChange}
           />
           <CompactTimerControl
             enabled={timerEnabled}
             seconds={timerSeconds}
+            disabled={!isHost}
             onEnabledChange={onTimerEnabledChange}
             onSecondsChange={onTimerSecondsChange}
           />
-          <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
-          <CompactBotPace value={botPace} onChange={onBotPaceChange} />
+          <CompactBotDifficulty
+            disabled={!isHost}
+            value={botDifficulty}
+            onChange={onBotDifficultyChange}
+          />
+          <CompactBotPace disabled={!isHost} value={botPace} onChange={onBotPaceChange} />
           <CompactRuleToggle
             label="Bomb ends trick"
             description="A bomb immediately wins the trick."
             enabled={bombEndsTrick}
+            disabled={!isHost}
             onChange={onBombEndsTrickChange}
           />
           <CompactRuleToggle
             label="Card trade window"
             description="20 seconds · humans only · one trade each."
             enabled={tradingEnabled}
+            disabled={!isHost}
             onChange={onTradingEnabledChange}
           />
 
@@ -3068,10 +3160,18 @@ function OnlineWaitingRoom({
             <CheckCircle2 className="size-4" />
             {yourReady ? "Ready" : "Mark Ready"}
           </Button>
-          <Button className="h-12" disabled={!roomCanStart} onClick={onStart}>
-            <Play className="size-4" />
-            {botSeats > 0 ? `Start With ${botSeats} Bot${botSeats === 1 ? "" : "s"}` : "Start Game"}
-          </Button>
+          {isHost ? (
+            <Button className="h-12" disabled={!roomCanStart} onClick={onStart}>
+              <Play className="size-4" />
+              {botSeats > 0
+                ? `Start With ${botSeats} Bot${botSeats === 1 ? "" : "s"}`
+                : "Start Game"}
+            </Button>
+          ) : (
+            <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-center text-xs font-bold text-zinc-300">
+              Waiting for the host to start the table.
+            </p>
+          )}
           <Button className="h-12" variant="secondary" onClick={onLeave}>
             <LogOut className="size-4" />
             Leave Table
