@@ -189,6 +189,11 @@ const COSMETIC_UNLOCK_RULES: readonly {
     isUnlocked: (stats) => stats.wins >= 40
   },
   {
+    slug: "orchard-salon-card-back",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 65
+  },
+  {
     slug: "blackberry-bandit-avatar",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 45

@@ -4345,6 +4345,7 @@ function getCosmeticMilestone(slug: string): string | null {
     "pool-shark-card-back": "finish 30 matches",
     "koi-current-card-back": "win 40 matches",
     "koi-garden-table": "win 55 matches",
+    "orchard-salon-card-back": "win 65 matches",
     "bengal-bloom-card-back": "win 70 matches",
     "jungle-club-table": "win 80 matches",
     "arena-six-crest-card-back": "win 75 matches",
@@ -6143,6 +6144,10 @@ function getCardBackClass(cosmetic: PublicCosmetic | null): string {
     return "card-back-koi-current";
   }
 
+  if (cosmetic?.slug === "orchard-salon-card-back") {
+    return "card-back-orchard-salon";
+  }
+
   if (cosmetic?.slug === "bengal-bloom-card-back") {
     return "card-back-bengal-bloom";
   }
@@ -6173,6 +6178,7 @@ function getCardFaceClass(cosmetic: PublicCosmetic | null): string {
     "ember-court-card-back": "card-face-ember-court",
     "pool-shark-card-back": "card-face-pool-shark",
     "koi-current-card-back": "card-face-koi-current",
+    "orchard-salon-card-back": "card-face-orchard-salon",
     "bengal-bloom-card-back": "card-face-bengal-bloom",
     "arena-six-crest-card-back": "card-face-arena-six",
     "celestial-vault-card-back": "card-face-celestial-vault",

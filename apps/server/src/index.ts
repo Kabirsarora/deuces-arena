@@ -419,6 +419,17 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: "/art/koi-current-card-back.jpg"
   },
   {
+    id: "orchard-salon-card-back",
+    slug: "orchard-salon-card-back",
+    kind: "CARD_BACK",
+    name: "Orchard Salon",
+    description: "Public-domain gallery florals paired with orchard suits and gilded royals.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 5000,
+    previewUrl: "/art/orchard-salon-card-back.jpg"
+  },
+  {
     id: "bengal-bloom-card-back",
     slug: "bengal-bloom-card-back",
     kind: "CARD_BACK",

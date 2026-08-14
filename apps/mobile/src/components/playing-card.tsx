@@ -21,6 +21,8 @@ type CardFaceTheme = {
   readonly motifBackground: string;
   readonly motif: string;
   readonly motifColor: string;
+  readonly suitMotifs?: Partial<Record<Suit, string>>;
+  readonly royalMotifs?: Partial<Record<Card["rank"], string>>;
 };
 
 const defaultFaceTheme: CardFaceTheme = {
@@ -72,6 +74,27 @@ const cardFaceThemes: Readonly<Record<string, CardFaceTheme>> = {
     motifBackground: "rgba(219, 234, 254, 0.72)",
     motif: "≈",
     motifColor: "rgba(30, 64, 175, 0.42)"
+  },
+  "orchard-salon-card-back": {
+    paper: "#fffaf0",
+    border: "#a67c3f",
+    inset: "rgba(120, 53, 15, 0.38)",
+    motifBackground: "rgba(255, 251, 235, 0.7)",
+    motif: "✿",
+    motifColor: "rgba(120, 53, 15, 0.42)",
+    suitMotifs: {
+      diamonds: "🍐",
+      clubs: "🍇",
+      hearts: "🍎",
+      spades: "🫐",
+      stars: "🍊",
+      crowns: "🍒"
+    },
+    royalMotifs: {
+      J: "⚜",
+      Q: "♕",
+      K: "♔"
+    }
   },
   "bengal-bloom-card-back": {
     paper: "#fff9df",
@@ -137,6 +160,8 @@ export function PlayingCard({
   const red = card.suit === "diamonds" || card.suit === "hearts";
   const arena = card.suit === "stars" || card.suit === "crowns";
   const color = red ? "#d92929" : arena ? palette.felt : "#111111";
+  const themedMotif =
+    theme.royalMotifs?.[card.rank] ?? theme.suitMotifs?.[card.suit] ?? theme.motif;
   const body = (
     <View
       accessible={accessible && onPress === undefined}
@@ -158,7 +183,7 @@ export function PlayingCard({
           { backgroundColor: theme.motifBackground, borderColor: theme.inset }
         ]}
       >
-        <Text style={[styles.faceMotifText, { color: theme.motifColor }]}>{theme.motif}</Text>
+        <Text style={[styles.faceMotifText, { color: theme.motifColor }]}>{themedMotif}</Text>
       </View>
       <View style={styles.cornerMark}>
         <Text style={[styles.rank, compact && styles.compactRank, { color }]}>{card.rank}</Text>
