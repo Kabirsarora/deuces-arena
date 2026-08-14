@@ -78,7 +78,6 @@ import {
   createPersistedTournament,
   equipPersistedAdminCosmetic,
   equipPersistedCosmetic,
-  getPersistedCosmetics,
   getPersistedBlockedGuestIds,
   getPersistedGuestProfile,
   getPersistedAdminModerationQueue,
@@ -95,6 +94,7 @@ import {
   savePersistedPushSubscription,
   savePersistedReplayLabel,
   setPersistedUserBlock,
+  syncPersistedCosmetics,
   deletePersistedPushSubscription,
   updatePersistedGuestProfile,
   updatePersistedPlayerReportStatus,
@@ -496,6 +496,39 @@ const STARTER_COSMETICS: readonly PublicCosmetic[] = [
     previewUrl: null
   },
   {
+    id: "blackberry-bandit-avatar",
+    slug: "blackberry-bandit-avatar",
+    kind: "AVATAR",
+    name: "Blackberry Bandit",
+    description: "A bright berry rogue with a leaf cap and fearless arcade energy.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 3800,
+    previewUrl: "/art/blackberry-bandit-avatar.png"
+  },
+  {
+    id: "koi-guardian-avatar",
+    slug: "koi-guardian-avatar",
+    kind: "AVATAR",
+    name: "Koi Guardian",
+    description: "A moonlit porcelain guardian carried by koi currents and jade light.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 7200,
+    previewUrl: "/art/koi-guardian-avatar.png"
+  },
+  {
+    id: "ember-regent-avatar",
+    slug: "ember-regent-avatar",
+    kind: "AVATAR",
+    name: "Ember Regent",
+    description: "An obsidian sovereign crowned in living forge light.",
+    rarity: "mythic",
+    isSupporter: false,
+    coinPrice: 15000,
+    previewUrl: "/art/ember-regent-avatar.png"
+  },
+  {
     id: "starter-aqua-profile-border",
     slug: "aqua-profile-border",
     kind: "PROFILE_BORDER",
@@ -578,6 +611,7 @@ const guestProfiles = new Map<string, GuestProfile>();
 const guestEquippedCosmetics = new Map<string, readonly PublicEquippedCosmetic[]>();
 const guestReplayLabels = new Map<string, readonly string[]>();
 const blockedGuestIdsByGuestId = new Map<string, Set<string>>();
+let cosmeticCatalogPromise: Promise<readonly PublicCosmetic[] | null> | null = null;
 const socketRateLimitEvents = new Map<
   string,
   Partial<Record<RateLimitBucket, readonly number[]>>
@@ -3548,7 +3582,8 @@ async function publicLeaderboard(
 }
 
 async function publicCosmetics(): Promise<readonly PublicCosmetic[]> {
-  return (await getPersistedCosmetics()) ?? STARTER_COSMETICS;
+  cosmeticCatalogPromise ??= syncPersistedCosmetics(STARTER_COSMETICS);
+  return (await cosmeticCatalogPromise) ?? STARTER_COSMETICS;
 }
 
 async function equipAdminCosmetic(

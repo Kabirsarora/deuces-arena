@@ -4339,6 +4339,7 @@ function getCosmeticMilestone(slug: string): string | null {
     "neon-grid-card-back": "finish 20 matches",
     "aqua-profile-border": "win 15 matches",
     "crown-chip-avatar": "win 25 matches",
+    "blackberry-bandit-avatar": "win 45 matches",
     "obsidian-table": "win 50 matches",
     "ember-court-card-back": "finish 50 matches",
     "pool-shark-card-back": "finish 30 matches",
@@ -4348,10 +4349,12 @@ function getCosmeticMilestone(slug: string): string | null {
     "jungle-club-table": "win 80 matches",
     "arena-six-crest-card-back": "win 75 matches",
     "celestial-vault-card-back": "win 90 matches",
+    "koi-guardian-avatar": "win 100 matches",
     "celestial-observatory-table": "win 110 matches",
     "ember-sovereign-card-back": "win 125 matches",
     "voidglass-prism-card-back": "win 175 matches",
     "ember-throne-table": "win 200 matches",
+    "ember-regent-avatar": "win 225 matches",
     "gold-division-border": "reach Gold (1100)",
     "platinum-division-border": "reach Platinum (1300)",
     "diamond-division-border": "reach Diamond (1500)",
@@ -4567,15 +4570,20 @@ function CosmeticPreview({
           />
         </div>
         <div
+          data-rank="A"
+          data-royal="false"
           data-suit-symbol="♦"
           className={cn(
             "card-face absolute bottom-0 right-0 grid rotate-6 overflow-hidden rounded-md border shadow-lg",
             large ? "h-28 w-20" : "h-12 w-9",
-            getCardFaceClass(cosmetic)
+            getCardFaceClass(cosmetic),
+            getCardFaceRarityClass(cosmetic)
           )}
         >
           <span className="card-face-theme-art" aria-hidden="true" />
           <span className="card-face-theme-rail" aria-hidden="true" />
+          <span className="card-face-theme-suit" aria-hidden="true" />
+          <span className="card-face-royal-mark" aria-hidden="true" />
           <span
             className={cn(
               "card-face-corner relative z-10 pl-1 pt-1 font-black leading-none text-red-600",
@@ -4586,11 +4594,11 @@ function CosmeticPreview({
           </span>
           <span
             className={cn(
-              "relative z-10 self-end justify-self-center pb-1 leading-none text-red-600",
+              "card-face-emblem relative z-10 self-center justify-self-center leading-none text-red-600",
               large ? "text-3xl" : "text-lg"
             )}
           >
-            ♦
+            <span>♦</span>
           </span>
         </div>
       </div>
@@ -4624,15 +4632,24 @@ function CosmeticPreview({
   }
 
   if (cosmetic.kind === "AVATAR") {
+    const imageUrl = getAvatarCosmeticImage(cosmetic);
+
     return (
       <div
         className={cn(
-          "grid shrink-0 place-items-center rounded-full border font-black shadow-lg",
+          "relative grid shrink-0 place-items-center overflow-hidden rounded-full border font-black shadow-lg",
           large ? "h-20 w-20 text-xl" : "h-11 w-11 text-sm",
           getAvatarCosmeticClass(cosmetic)
         )}
       >
-        {getAvatarCosmeticSymbol(cosmetic)}
+        {imageUrl === null ? (
+          getAvatarCosmeticSymbol(cosmetic)
+        ) : (
+          <span
+            className="size-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${imageUrl})` }}
+          />
+        )}
       </div>
     );
   }
@@ -5752,6 +5769,7 @@ function OnlineSeat({
 }) {
   const profileBorder = getEquippedCosmetic(player, "PROFILE_BORDER");
   const avatarCosmetic = getEquippedCosmetic(player, "AVATAR");
+  const avatarCosmeticImage = getAvatarCosmeticImage(avatarCosmetic);
   const cardBack = getEquippedCosmetic(player, "CARD_BACK");
   const seatPosition = getSeatPositionClass(position, seatCount);
   const handOrientation = getSeatHandOrientation(position, seatCount);
@@ -5788,7 +5806,14 @@ function OnlineSeat({
               : getAvatarCosmeticClass(avatarCosmetic)
           )}
         >
-          {avatarCosmetic === null && player.imageUrl !== null && player.imageUrl !== undefined ? (
+          {avatarCosmeticImage !== null ? (
+            <span
+              className="size-full rounded-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${avatarCosmeticImage})` }}
+            />
+          ) : avatarCosmetic === null &&
+            player.imageUrl !== null &&
+            player.imageUrl !== undefined ? (
             <span
               className="size-full rounded-full bg-cover bg-center"
               style={{ backgroundImage: `url(${player.imageUrl})` }}
@@ -6158,6 +6183,14 @@ function getCardFaceClass(cosmetic: PublicCosmetic | null): string {
   return cosmetic === null ? "" : (faceClasses[cosmetic.slug] ?? "");
 }
 
+function getCardFaceRarityClass(cosmetic: PublicCosmetic | null): string {
+  if (cosmetic === null) {
+    return "card-face-rarity-common";
+  }
+
+  return `card-face-rarity-${cosmetic.rarity}`;
+}
+
 function getProfileBorderClass(cosmetic: PublicCosmetic | null): string {
   if (cosmetic?.slug === "aqua-profile-border") {
     return "profile-border-aqua";
@@ -6199,7 +6232,27 @@ function getAvatarCosmeticClass(cosmetic: PublicCosmetic | null): string {
     return "avatar-cosmetic-crown";
   }
 
+  if (cosmetic?.slug === "koi-guardian-avatar") {
+    return "avatar-cosmetic-koi";
+  }
+
+  if (cosmetic?.slug === "blackberry-bandit-avatar") {
+    return "avatar-cosmetic-blackberry";
+  }
+
+  if (cosmetic?.slug === "ember-regent-avatar") {
+    return "avatar-cosmetic-ember";
+  }
+
   return "border-emerald-200/35 bg-emerald-400/12 text-emerald-100";
+}
+
+function getAvatarCosmeticImage(cosmetic: PublicCosmetic | null): string | null {
+  if (cosmetic?.kind !== "AVATAR") {
+    return null;
+  }
+
+  return cosmetic.previewUrl;
 }
 
 function getAvatarCosmeticSymbol(cosmetic: PublicCosmetic | null): string {
@@ -6546,10 +6599,13 @@ function OnlineCard({
 
   return (
     <div
+      data-rank={card.rank}
+      data-royal={card.rank === "J" || card.rank === "Q" || card.rank === "K"}
       data-suit-symbol={suitSymbol(card.suit)}
       className={cn(
         "card-face relative grid overflow-hidden rounded-md border shadow-xl transition",
         getCardFaceClass(cardTheme),
+        getCardFaceRarityClass(cardTheme),
         compact ? "h-20 w-14" : "h-24 w-16 sm:h-28 sm:w-20",
         selected
           ? "border-[var(--gold)] ring-2 ring-[var(--gold)]"
@@ -6560,6 +6616,8 @@ function OnlineCard({
     >
       <span className="card-face-theme-art" aria-hidden="true" />
       <span className="card-face-theme-rail" aria-hidden="true" />
+      <span className="card-face-theme-suit" aria-hidden="true" />
+      <span className="card-face-royal-mark" aria-hidden="true" />
       <div
         className={cn(
           "card-face-corner absolute left-1.5 top-1.5 z-10 text-left font-black leading-none",

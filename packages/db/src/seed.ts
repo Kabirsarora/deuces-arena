@@ -186,6 +186,36 @@ const starterCosmetics = [
     coinPrice: 2200
   },
   {
+    slug: "blackberry-bandit-avatar",
+    kind: "AVATAR" as const,
+    name: "Blackberry Bandit",
+    description: "A bright berry rogue with a leaf cap and fearless arcade energy.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 3800,
+    previewUrl: "/art/blackberry-bandit-avatar.png"
+  },
+  {
+    slug: "koi-guardian-avatar",
+    kind: "AVATAR" as const,
+    name: "Koi Guardian",
+    description: "A moonlit porcelain guardian carried by koi currents and jade light.",
+    rarity: "legendary",
+    isSupporter: false,
+    coinPrice: 7200,
+    previewUrl: "/art/koi-guardian-avatar.png"
+  },
+  {
+    slug: "ember-regent-avatar",
+    kind: "AVATAR" as const,
+    name: "Ember Regent",
+    description: "An obsidian sovereign crowned in living forge light.",
+    rarity: "mythic",
+    isSupporter: false,
+    coinPrice: 15000,
+    previewUrl: "/art/ember-regent-avatar.png"
+  },
+  {
     slug: "aqua-profile-border",
     kind: "PROFILE_BORDER" as const,
     name: "Aqua Rail",

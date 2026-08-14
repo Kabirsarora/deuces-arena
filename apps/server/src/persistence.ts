@@ -189,6 +189,11 @@ const COSMETIC_UNLOCK_RULES: readonly {
     isUnlocked: (stats) => stats.wins >= 40
   },
   {
+    slug: "blackberry-bandit-avatar",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 45
+  },
+  {
     slug: "koi-garden-table",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 55
@@ -214,6 +219,11 @@ const COSMETIC_UNLOCK_RULES: readonly {
     isUnlocked: (stats) => stats.wins >= 90
   },
   {
+    slug: "koi-guardian-avatar",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 100
+  },
+  {
     slug: "celestial-observatory-table",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 110
@@ -232,6 +242,11 @@ const COSMETIC_UNLOCK_RULES: readonly {
     slug: "ember-throne-table",
     source: "EARNED",
     isUnlocked: (stats) => stats.wins >= 200
+  },
+  {
+    slug: "ember-regent-avatar",
+    source: "EARNED",
+    isUnlocked: (stats) => stats.wins >= 225
   },
   {
     slug: "gold-division-border",
@@ -954,6 +969,51 @@ export async function getPersistedCosmetics(): Promise<readonly PublicCosmetic[]
     return cosmetics;
   } catch (error) {
     console.error("Unable to read cosmetics.", error);
+    return null;
+  }
+}
+
+export async function syncPersistedCosmetics(
+  catalog: readonly PublicCosmetic[]
+): Promise<readonly PublicCosmetic[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  try {
+    await db.prisma.$transaction(
+      catalog.map((cosmetic) =>
+        db.prisma.cosmetic.upsert({
+          where: { slug: cosmetic.slug },
+          create: {
+            slug: cosmetic.slug,
+            kind: cosmetic.kind,
+            name: cosmetic.name,
+            description: cosmetic.description,
+            rarity: cosmetic.rarity,
+            isSupporter: cosmetic.isSupporter,
+            coinPrice: cosmetic.coinPrice,
+            previewUrl: cosmetic.previewUrl
+          },
+          update: {
+            kind: cosmetic.kind,
+            name: cosmetic.name,
+            description: cosmetic.description,
+            rarity: cosmetic.rarity,
+            isSupporter: cosmetic.isSupporter,
+            coinPrice: cosmetic.coinPrice,
+            previewUrl: cosmetic.previewUrl,
+            isActive: true
+          }
+        })
+      )
+    );
+
+    return getPersistedCosmetics();
+  } catch (error) {
+    console.error("Unable to sync cosmetic catalog.", error);
     return null;
   }
 }
