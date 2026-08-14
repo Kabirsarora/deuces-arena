@@ -43,7 +43,13 @@ import type {
   ServerAck,
   ServerToClientEvents
 } from "@deuces-arena/shared";
-import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  type MotionStyle,
+  type PanInfo
+} from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -53,9 +59,11 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  ChevronDown,
   ChevronsLeft,
   ChevronsRight,
   CircleDot,
+  CircleHelp,
   Copy,
   Crown,
   DoorOpen,
@@ -65,11 +73,13 @@ import {
   ListOrdered,
   LogOut,
   MessageCircle,
+  MoreHorizontal,
   Palette,
   Play,
   RotateCcw,
   Send,
   ShieldAlert,
+  ShoppingBag,
   Sparkles,
   Swords,
   Trophy,
@@ -94,7 +104,9 @@ import { SignInWithGoogleButton, SignOutButton } from "@/components/auth-buttons
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type OnlineHubMode = "bots" | "casual" | "ranked" | "tournament";
+type OnlineHubMode = "bots" | "casual" | "ranked" | "tournament" | "cosmetics";
+type HubOverlay = "learn" | "profile" | "more" | null;
+type FirstVisitStage = "welcome" | "guide" | null;
 type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
 type RealtimeConnectionStatus = "waking" | "online" | "offline";
@@ -116,6 +128,7 @@ const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4000"
 const ROOM_SESSION_KEY = "deuces-arena-room-session";
 const GUEST_ID_KEY = "deuces-arena-guest-id";
 const HAND_SORT_STORAGE_KEY = "deuces-arena-hand-sort";
+const BEGINNER_WELCOME_SESSION_KEY = "deuces-arena-beginner-welcome-v1";
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
 const DEFAULT_RANKED_TIMER_SECONDS = 45;
@@ -1576,7 +1589,7 @@ export function OnlineRoomPanel({
 
             <div className="table-hand-scroll flex min-h-28 items-end overflow-x-auto px-1 pb-1 pt-5 sm:min-h-32">
               <div className="player-hand-fan mx-auto flex min-w-max items-end px-3 sm:px-4">
-                <AnimatePresence initial={false} mode="popLayout">
+                <AnimatePresence initial={false} mode="sync">
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
                     const selected = selectedCardIds.includes(getCardId(card));
                     const playable = isYourTurn && playableCardIds.has(getCardId(card));
@@ -1586,6 +1599,7 @@ export function OnlineRoomPanel({
                       <motion.button
                         key={getCardId(card)}
                         layout="position"
+                        layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
                         type="button"
                         className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
                         aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
@@ -1637,11 +1651,11 @@ export function OnlineRoomPanel({
                           ...(shouldReduceMotion
                             ? { duration: 0 }
                             : {
-                                delay: dealAnimationKey === null ? 0 : Math.min(0.65, index * 0.05),
+                                delay: dealAnimationKey === null ? 0 : Math.min(0.52, index * 0.04),
                                 type: "spring",
-                                stiffness: 230,
-                                damping: 27,
-                                mass: 0.82
+                                stiffness: 205,
+                                damping: 25,
+                                mass: 0.78
                               })
                         }}
                         drag="x"
@@ -1795,225 +1809,264 @@ function OnlineLobbyHub({
   const openRooms = lobby?.openRooms ?? [];
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
   const maximumPlayerCount = getMaxPlayersForSetup(deckType, cardsPerPlayer);
+  const [activeOverlay, setActiveOverlay] = useState<HubOverlay>(null);
+  const [firstVisitStage, setFirstVisitStage] = useState<FirstVisitStage>(null);
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem(BEGINNER_WELCOME_SESSION_KEY) !== "seen") {
+      setFirstVisitStage("welcome");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeOverlay === null && firstVisitStage === null) {
+      return;
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (firstVisitStage !== null) {
+        finishFirstVisit();
+      } else {
+        setActiveOverlay(null);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [activeOverlay, firstVisitStage]);
+
+  function finishFirstVisit() {
+    window.sessionStorage.setItem(BEGINNER_WELCOME_SESSION_KEY, "seen");
+    setFirstVisitStage(null);
+  }
+
+  function startPracticeGameSetup() {
+    finishFirstVisit();
+    setActiveOverlay(null);
+    onHubModeChange("bots");
+  }
 
   return (
-    <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="online-hub mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[92rem] flex-col overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl">
-        <div className="grid flex-1 gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-8">
-          <section className="flex min-h-0 flex-col">
-            <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-[var(--aqua)]">
-                  Deuces Arena
-                </p>
-                <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
-                <p className="mt-2 text-sm font-semibold text-zinc-400">
-                  {connectionStatus === "online"
-                    ? `${activity?.connectedUsers ?? 0} online · ${activity?.openRooms ?? 0} open rooms · ${activity?.activeRooms ?? 0} active rooms`
-                    : connectionStatus === "waking"
-                      ? "Connecting to live tables..."
-                      : "Live tables are temporarily unavailable"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={cn(
-                    "hidden rounded-full px-3 py-1 text-xs font-black sm:inline-flex",
-                    getConnectionBadgeClass(connectionStatus)
-                  )}
-                >
-                  {getConnectionLabel(connectionStatus)}
-                </span>
-                <HeaderAccountControl
-                  authUser={authUser}
-                  profile={profile}
-                  profileAvatarKey={profileAvatarKey}
-                  playerName={playerName}
-                />
-              </div>
-            </header>
-
-            <div className="mb-5 grid grid-cols-4 gap-1 rounded-full border border-white/10 bg-black/30 p-1.5 sm:gap-2">
-              <HubModeButton
-                mode="bots"
-                activeMode={hubMode}
-                icon={<Bot className="size-6" />}
-                label="Bots"
-                onSelect={onHubModeChange}
-              />
-              <HubModeButton
-                mode="casual"
-                activeMode={hubMode}
-                icon={<Users className="size-6" />}
-                label="Casual"
-                onSelect={onHubModeChange}
-              />
-              <HubModeButton
-                mode="ranked"
-                activeMode={hubMode}
-                icon={<Trophy className="size-6" />}
-                label="Ranked"
-                onSelect={onHubModeChange}
-              />
-              <HubModeButton
-                mode="tournament"
-                activeMode={hubMode}
-                icon={<Swords className="size-6" />}
-                label="Cups"
-                onSelect={onHubModeChange}
+    <main className="min-h-screen px-3 py-4 text-white sm:px-5 sm:py-6 lg:px-8">
+      <section className="online-hub mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[92rem] flex-col overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl sm:min-h-[calc(100vh-3rem)]">
+        <div className="flex flex-1 flex-col p-5 sm:p-7 lg:p-8">
+          <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-wide text-[var(--aqua)]">
+                Deuces Arena
+              </p>
+              <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
+              <p className="mt-2 text-sm font-semibold text-zinc-400">
+                {connectionStatus === "online"
+                  ? `${activity?.connectedUsers ?? 0} online · ${activity?.openRooms ?? 0} open rooms · ${activity?.activeRooms ?? 0} active rooms`
+                  : connectionStatus === "waking"
+                    ? "Connecting to live tables..."
+                    : "Live tables are temporarily unavailable"}
+              </p>
+            </div>
+            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
+              <Button
+                aria-label="How to play"
+                className="h-10 rounded-full px-3"
+                size="sm"
+                title="How to play"
+                variant="secondary"
+                onClick={() => setActiveOverlay("learn")}
+              >
+                <CircleHelp className="size-4" />
+                <span className="hidden md:inline">How to Play</span>
+              </Button>
+              <Button
+                aria-label="More"
+                className="h-10 w-10 rounded-full px-0"
+                size="sm"
+                title="Leaderboard, history, and feedback"
+                variant="secondary"
+                onClick={() => setActiveOverlay("more")}
+              >
+                <MoreHorizontal className="size-5" />
+              </Button>
+              <HeaderAccountControl
+                authUser={authUser}
+                profile={profile}
+                profileAvatarKey={profileAvatarKey}
+                playerName={playerName}
+                onOpenProfile={() => setActiveOverlay("profile")}
               />
             </div>
+          </header>
 
-            <div className="grid gap-4">
-              {hubMode === "bots" ? (
-                <HubPlayCard
-                  icon={<Bot className="size-12" />}
-                  title="Play vs. Bots"
-                  meta={`${playerCount} seats · ${selectedBotSeats} bots · ${cardsPerPlayer} cards each`}
-                  actionLabel="Start Bot Game"
-                  disabled={!connected}
-                  onAction={onCreateBotGame}
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <CompactRange
-                      label="Table seats"
-                      value={playerCount}
-                      min={2}
-                      max={maximumPlayerCount}
-                      disabled={!connected}
-                      onChange={onPlayerCountChange}
-                    />
-                    <CompactRange
-                      label="Bot seats"
-                      value={selectedBotSeats}
-                      min={1}
-                      max={Math.max(1, maxBotSeats)}
-                      disabled={!connected}
-                      onChange={onBotSeatsChange}
-                    />
-                    <CompactDeckControl value={deckType} onChange={onDeckTypeChange} />
-                    <CompactRange
-                      label="Cards each"
-                      value={cardsPerPlayer}
-                      min={DEFAULT_CARDS_PER_PLAYER}
-                      max={getMaxCardsPerPlayer(deckType, playerCount)}
-                      disabled={!connected}
-                      onChange={onCardsPerPlayerChange}
-                    />
-                    <CompactTimerControl
-                      enabled={timerEnabled}
-                      seconds={timerSeconds}
-                      onEnabledChange={onTimerEnabledChange}
-                      onSecondsChange={onTimerSecondsChange}
-                    />
-                    <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
-                    <CompactBotPace value={botPace} onChange={onBotPaceChange} />
-                    <CompactRuleToggle
-                      label="Bomb ends trick"
-                      enabled={bombEndsTrick}
-                      onChange={onBombEndsTrickChange}
-                    />
-                  </div>
-                </HubPlayCard>
-              ) : null}
+          <div className="mb-5 grid grid-cols-5 gap-1 rounded-full border border-white/10 bg-black/30 p-1.5 sm:gap-2">
+            <HubModeButton
+              mode="bots"
+              activeMode={hubMode}
+              icon={<Bot className="size-6" />}
+              label="Bots"
+              onSelect={onHubModeChange}
+            />
+            <HubModeButton
+              mode="casual"
+              activeMode={hubMode}
+              icon={<Users className="size-6" />}
+              label="Casual"
+              onSelect={onHubModeChange}
+            />
+            <HubModeButton
+              mode="ranked"
+              activeMode={hubMode}
+              icon={<Trophy className="size-6" />}
+              label="Ranked"
+              onSelect={onHubModeChange}
+            />
+            <HubModeButton
+              mode="tournament"
+              activeMode={hubMode}
+              icon={<Swords className="size-6" />}
+              label="Cups"
+              onSelect={onHubModeChange}
+            />
+            <HubModeButton
+              mode="cosmetics"
+              activeMode={hubMode}
+              icon={<ShoppingBag className="size-6" />}
+              label="Shop & Locker"
+              onSelect={onHubModeChange}
+            />
+          </div>
 
-              {hubMode === "casual" ? (
-                <HubPlayCard
-                  icon={<Users className="size-12" />}
-                  title="Casual Rooms"
-                  meta={`${activity?.openRooms ?? 0} open · ${
-                    activity?.playersInActiveGames ?? 0
-                  } humans playing`}
-                  actionLabel="Create Room"
-                  disabled={!connected}
-                  onAction={onCreateRoom}
-                >
-                  <div className="flex gap-2">
-                    <input
-                      className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-black/25 px-4 text-sm font-bold uppercase outline-none placeholder:text-zinc-500 focus:border-[var(--gold)]"
-                      placeholder="Room code"
-                      value={joinCode}
-                      onChange={(event) => onJoinCodeChange(event.target.value)}
-                    />
-                    <Button
-                      className="h-12 px-5"
-                      variant="secondary"
-                      disabled={!connected || joinCode.trim() === ""}
-                      onClick={onJoinRoom}
-                    >
-                      Join
-                    </Button>
-                  </div>
-                  <OpenRoomStrip
-                    rooms={openRooms}
-                    openRoomCount={activity?.openRooms ?? 0}
-                    playingCount={activity?.playersInActiveGames ?? 0}
-                    connected={connected}
-                    onJoinOpenRoom={onJoinOpenRoom}
-                    onCreateRoom={onCreateRoom}
+          <motion.div
+            key={hubMode}
+            className="grid gap-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {hubMode === "bots" ? (
+              <HubPlayCard
+                icon={<Bot className="size-12" />}
+                title="Play vs. Bots"
+                meta={`${playerCount} seats · ${selectedBotSeats} bots · ${cardsPerPlayer} cards each`}
+                actionLabel="Start Bot Game"
+                disabled={!connected}
+                onAction={onCreateBotGame}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <CompactRange
+                    label="Table seats"
+                    value={playerCount}
+                    min={2}
+                    max={maximumPlayerCount}
+                    disabled={!connected}
+                    onChange={onPlayerCountChange}
                   />
-                </HubPlayCard>
-              ) : null}
+                  <CompactRange
+                    label="Bot seats"
+                    value={selectedBotSeats}
+                    min={1}
+                    max={Math.max(1, maxBotSeats)}
+                    disabled={!connected}
+                    onChange={onBotSeatsChange}
+                  />
+                  <CompactDeckControl value={deckType} onChange={onDeckTypeChange} />
+                  <CompactRange
+                    label="Cards each"
+                    value={cardsPerPlayer}
+                    min={DEFAULT_CARDS_PER_PLAYER}
+                    max={getMaxCardsPerPlayer(deckType, playerCount)}
+                    disabled={!connected}
+                    onChange={onCardsPerPlayerChange}
+                  />
+                  <CompactTimerControl
+                    enabled={timerEnabled}
+                    seconds={timerSeconds}
+                    onEnabledChange={onTimerEnabledChange}
+                    onSecondsChange={onTimerSecondsChange}
+                  />
+                  <CompactBotDifficulty value={botDifficulty} onChange={onBotDifficultyChange} />
+                  <CompactBotPace value={botPace} onChange={onBotPaceChange} />
+                  <CompactRuleToggle
+                    label="Bomb ends trick"
+                    enabled={bombEndsTrick}
+                    onChange={onBombEndsTrickChange}
+                  />
+                </div>
+              </HubPlayCard>
+            ) : null}
 
-              {hubMode === "ranked" ? (
-                <HubRankedCard
-                  queue={rankedQueue}
-                  profile={profile}
+            {hubMode === "casual" ? (
+              <HubPlayCard
+                icon={<Users className="size-12" />}
+                title="Casual Rooms"
+                meta={`${activity?.openRooms ?? 0} open · ${
+                  activity?.playersInActiveGames ?? 0
+                } humans playing`}
+                actionLabel="Create Room"
+                disabled={!connected}
+                onAction={onCreateRoom}
+              >
+                <div className="flex gap-2">
+                  <input
+                    className="h-12 min-w-0 flex-1 rounded-full border border-white/10 bg-black/25 px-4 text-sm font-bold uppercase outline-none placeholder:text-zinc-500 focus:border-[var(--gold)]"
+                    placeholder="Room code"
+                    value={joinCode}
+                    onChange={(event) => onJoinCodeChange(event.target.value)}
+                  />
+                  <Button
+                    className="h-12 px-5"
+                    variant="secondary"
+                    disabled={!connected || joinCode.trim() === ""}
+                    onClick={onJoinRoom}
+                  >
+                    Join
+                  </Button>
+                </div>
+                <OpenRoomStrip
+                  rooms={openRooms}
+                  openRoomCount={activity?.openRooms ?? 0}
+                  playingCount={activity?.playersInActiveGames ?? 0}
                   connected={connected}
-                  signedIn={authUser !== null}
-                  onJoin={onJoinRanked}
-                  onLeave={onLeaveRanked}
+                  onJoinOpenRoom={onJoinOpenRoom}
+                  onCreateRoom={onCreateRoom}
                 />
-              ) : null}
+              </HubPlayCard>
+            ) : null}
 
-              {hubMode === "tournament" ? (
-                <HubTournamentCard
-                  queue={tournamentQueue}
-                  connected={connected}
-                  signedIn={authUser !== null}
-                  onJoin={onJoinTournament}
-                  onLeave={onLeaveTournament}
-                />
-              ) : null}
-            </div>
+            {hubMode === "ranked" ? (
+              <HubRankedCard
+                queue={rankedQueue}
+                profile={profile}
+                connected={connected}
+                signedIn={authUser !== null}
+                onJoin={onJoinRanked}
+                onLeave={onLeaveRanked}
+              />
+            ) : null}
 
-            <p className="mt-auto pt-5 text-sm font-semibold text-zinc-300">{message}</p>
-          </section>
+            {hubMode === "tournament" ? (
+              <HubTournamentCard
+                queue={tournamentQueue}
+                connected={connected}
+                signedIn={authUser !== null}
+                onJoin={onJoinTournament}
+                onLeave={onLeaveTournament}
+              />
+            ) : null}
+            {hubMode === "cosmetics" ? (
+              <CosmeticsSummary
+                standalone
+                cosmetics={cosmetics}
+                profile={profile}
+                onEquip={onEquipCosmetic}
+                onPurchase={onPurchaseCosmetic}
+              />
+            ) : null}
+          </motion.div>
 
-          <aside className="grid content-start gap-4">
-            <MinimalProfileCard
-              playerName={playerName}
-              authUser={authUser}
-              profile={profile}
-              matchHistory={matchHistory}
-              profileDisplayName={profileDisplayName}
-              profileAvatarKey={profileAvatarKey}
-              onPlayerNameChange={onPlayerNameChange}
-              onProfileDisplayNameChange={onProfileDisplayNameChange}
-              onProfileAvatarKeyChange={onProfileAvatarKeyChange}
-              onProfileSave={onProfileSave}
-            />
-
-            <CosmeticsSummary
-              cosmetics={cosmetics}
-              profile={profile}
-              onEquip={onEquipCosmetic}
-              onPurchase={onPurchaseCosmetic}
-            />
-
-            <details className="online-panel p-4">
-              <summary className="cursor-pointer list-none text-sm font-black">More</summary>
-              <div className="mt-3 grid gap-3">
-                <LeaderboardSummary entries={leaderboard} />
-                <MatchHistorySummary entries={matchHistory} onLabelReplay={onLabelReplay} />
-                <FeedbackSummary
-                  defaultEmail={authUser?.email ?? ""}
-                  onSubmitFeedback={onSubmitFeedback}
-                />
-                <RulesSummary />
-              </div>
-            </details>
-          </aside>
+          <p className="mt-auto pt-5 text-sm font-semibold text-zinc-300">{message}</p>
         </div>
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-xs font-bold text-zinc-500 sm:px-7 lg:px-8">
           <span>Deuces Arena · fair play, no pay-to-win advantages</span>
@@ -2027,6 +2080,54 @@ function OnlineLobbyHub({
           </span>
         </footer>
       </section>
+
+      <AnimatePresence>
+        {activeOverlay === "learn" ? (
+          <HubOverlayDialog title="How to Play" onClose={() => setActiveOverlay(null)}>
+            <BeginnerGuide onPractice={startPracticeGameSetup} />
+          </HubOverlayDialog>
+        ) : null}
+        {activeOverlay === "profile" ? (
+          <HubOverlayDialog title="Profile & Settings" onClose={() => setActiveOverlay(null)}>
+            <MinimalProfileCard
+              embedded
+              playerName={playerName}
+              authUser={authUser}
+              profile={profile}
+              matchHistory={matchHistory}
+              profileDisplayName={profileDisplayName}
+              profileAvatarKey={profileAvatarKey}
+              onPlayerNameChange={onPlayerNameChange}
+              onProfileDisplayNameChange={onProfileDisplayNameChange}
+              onProfileAvatarKeyChange={onProfileAvatarKeyChange}
+              onProfileSave={onProfileSave}
+            />
+          </HubOverlayDialog>
+        ) : null}
+        {activeOverlay === "more" ? (
+          <HubOverlayDialog title="Arena Menu" onClose={() => setActiveOverlay(null)}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <LeaderboardSummary entries={leaderboard} />
+              <MatchHistorySummary entries={matchHistory} onLabelReplay={onLabelReplay} />
+              <div className="md:col-span-2">
+                <FeedbackSummary
+                  defaultEmail={authUser?.email ?? ""}
+                  onSubmitFeedback={onSubmitFeedback}
+                />
+              </div>
+            </div>
+          </HubOverlayDialog>
+        ) : null}
+        {firstVisitStage !== null ? (
+          <FirstVisitExperience
+            stage={firstVisitStage}
+            onEnter={finishFirstVisit}
+            onLearn={() => setFirstVisitStage("guide")}
+            onBack={() => setFirstVisitStage("welcome")}
+            onPractice={startPracticeGameSetup}
+          />
+        ) : null}
+      </AnimatePresence>
     </main>
   );
 }
@@ -2062,6 +2163,287 @@ function HubModeButton({
       {icon}
       <span className="hidden sm:inline">{label}</span>
     </button>
+  );
+}
+
+function HubOverlayDialog({
+  title,
+  children,
+  onClose
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+  readonly onClose: () => void;
+}) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto px-3 py-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+    >
+      <button
+        aria-label="Close dialog"
+        className="absolute inset-0 cursor-default bg-black/72 backdrop-blur-md"
+        type="button"
+        onClick={onClose}
+      />
+      <motion.section
+        aria-label={title}
+        aria-modal="true"
+        className="online-hub relative z-10 my-auto w-full max-w-3xl overflow-hidden rounded-[1.1rem] border border-white/12 shadow-2xl"
+        role="dialog"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 280, damping: 28 }}
+      >
+        <header className="flex items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
+          <h2 className="text-lg font-black sm:text-xl">{title}</h2>
+          <Button
+            aria-label="Close"
+            className="h-9 w-9 rounded-full px-0"
+            size="sm"
+            title="Close"
+            variant="secondary"
+            onClick={onClose}
+          >
+            <X className="size-4" />
+          </Button>
+        </header>
+        <div className="max-h-[min(80vh,50rem)] overflow-y-auto p-5 sm:p-6">{children}</div>
+      </motion.section>
+    </motion.div>
+  );
+}
+
+function FirstVisitExperience({
+  stage,
+  onEnter,
+  onLearn,
+  onBack,
+  onPractice
+}: {
+  readonly stage: Exclude<FirstVisitStage, null>;
+  readonly onEnter: () => void;
+  readonly onLearn: () => void;
+  readonly onBack: () => void;
+  readonly onPractice: () => void;
+}) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-[#050708]/92 px-4 py-8 backdrop-blur-xl"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.28 }}
+    >
+      <motion.section
+        aria-label={stage === "welcome" ? "Welcome to Deuces Arena" : "Learn Deuces"}
+        aria-modal="true"
+        className="relative my-auto w-full max-w-3xl overflow-hidden rounded-[1.25rem] border border-white/12 bg-[#0b1113] shadow-[0_40px_120px_rgba(0,0,0,0.65)]"
+        role="dialog"
+        initial={{ opacity: 0, y: 30, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 250, damping: 27 }}
+      >
+        {stage === "welcome" ? (
+          <div className="relative grid min-h-[32rem] place-items-center overflow-hidden px-6 py-12 text-center sm:px-12">
+            <div className="beginner-welcome-glow" aria-hidden="true" />
+            <div className="relative z-10">
+              <motion.div
+                className="relative mx-auto size-36 sm:size-44"
+                initial={{ opacity: 0, scale: 0.82, rotate: -4 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                transition={{ delay: 0.12, type: "spring", stiffness: 220, damping: 24 }}
+              >
+                <Image
+                  fill
+                  priority
+                  alt="Deuces Arena emblem"
+                  className="object-contain drop-shadow-[0_18px_38px_rgba(0,0,0,0.55)]"
+                  sizes="176px"
+                  src="/icon.png"
+                />
+              </motion.div>
+              <p className="mt-5 text-xs font-black uppercase text-[var(--aqua)]">Deuces Arena</p>
+              <h1 className="mt-2 text-4xl font-black sm:text-5xl">Take your seat.</h1>
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-300 sm:text-base">
+                Shed every card before your opponents. The lowest card opens the match; smart timing
+                closes it.
+              </p>
+              <div className="mx-auto mt-8 grid max-w-md gap-3 sm:grid-cols-2">
+                <Button className="h-12 text-base" onClick={onEnter}>
+                  <Play className="size-4" />
+                  Enter Arena
+                </Button>
+                <Button className="h-12 text-base" variant="secondary" onClick={onLearn}>
+                  <BookOpen className="size-4" />
+                  Learn the Game
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <header className="flex items-center gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
+              <Button
+                aria-label="Back"
+                className="h-9 w-9 rounded-full px-0"
+                size="sm"
+                title="Back"
+                variant="secondary"
+                onClick={onBack}
+              >
+                <ArrowLeft className="size-4" />
+              </Button>
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--gold)]">Quick start</p>
+                <h2 className="text-xl font-black">Learn Deuces in 60 seconds</h2>
+              </div>
+            </header>
+            <div className="max-h-[80vh] overflow-y-auto p-5 sm:p-6">
+              <BeginnerGuide onEnter={onEnter} onPractice={onPractice} />
+            </div>
+          </div>
+        )}
+      </motion.section>
+    </motion.div>
+  );
+}
+
+function BeginnerGuide({
+  onPractice,
+  onEnter
+}: {
+  readonly onPractice: () => void;
+  readonly onEnter?: () => void;
+}) {
+  return (
+    <div>
+      <section className="beginner-demo-table relative mx-auto h-52 w-full max-w-xl overflow-hidden">
+        <motion.div
+          className="absolute left-[12%] top-1/2 -translate-y-1/2"
+          animate={{ x: [0, 90, 90, 0], opacity: [0.35, 1, 1, 0.35] }}
+          transition={{ duration: 4.8, times: [0, 0.18, 0.7, 1], repeat: Infinity }}
+        >
+          <BeginnerDemoCard rank="3" suit="♦" red />
+        </motion.div>
+        <motion.div
+          className="absolute right-[12%] top-1/2 -translate-y-1/2"
+          animate={{ x: [0, 0, -90, -90], opacity: [0.35, 0.35, 1, 0.35] }}
+          transition={{ duration: 4.8, times: [0, 0.35, 0.58, 1], repeat: Infinity }}
+        >
+          <BeginnerDemoCard rank="4" suit="♦" red />
+        </motion.div>
+        <motion.div
+          className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[11px] font-black uppercase text-zinc-300"
+          animate={{ opacity: [0, 1, 1, 0] }}
+          transition={{ duration: 4.8, times: [0, 0.12, 0.8, 1], repeat: Infinity }}
+        >
+          Lead, beat, or pass
+        </motion.div>
+        <div className="absolute inset-x-0 bottom-5 text-center text-xs font-bold text-zinc-300">
+          The next play must use the same hand type and rank higher.
+        </div>
+      </section>
+
+      <ol className="mt-6 divide-y divide-white/10 border-y border-white/10">
+        <BeginnerRuleStep
+          number="1"
+          title="Start with the 3 of diamonds"
+          body="Whoever holds 3♦ leads the first trick, and that opening play must include it."
+        />
+        <BeginnerRuleStep
+          number="2"
+          title="Match the hand type"
+          body="A single answers a single, a pair answers a pair, and a straight must match the exact length. You may always pass."
+        />
+        <BeginnerRuleStep
+          number="3"
+          title="Win the trick, then lead"
+          body="When everyone else passes, the last player who played controls the next trick and may choose a new hand type."
+        />
+        <BeginnerRuleStep
+          number="4"
+          title="Empty your hand first"
+          body="The first player with no cards remaining wins. Bombs can interrupt normal hands and are explained in the full rules below."
+        />
+      </ol>
+
+      <details className="mt-5 border-b border-white/10 pb-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black">
+          Full rules
+          <ChevronDown className="size-4 text-zinc-400" />
+        </summary>
+        <ul className="mt-3 grid gap-2 text-sm leading-6 text-zinc-300">
+          {DEUCES_RULES.map((rule) => (
+            <li key={rule} className="flex gap-2">
+              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--aqua)]" />
+              <span>{rule}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Button className="h-12" onClick={onPractice}>
+          <Bot className="size-4" />
+          Set Up a Practice Game
+        </Button>
+        {onEnter === undefined ? null : (
+          <Button className="h-12" variant="secondary" onClick={onEnter}>
+            Enter Lobby
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BeginnerDemoCard({
+  rank,
+  suit,
+  red = false
+}: {
+  readonly rank: string;
+  readonly suit: string;
+  readonly red?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid h-24 w-16 place-content-center rounded-md border border-white/70 bg-[#f7f7f4] text-center shadow-2xl sm:h-28 sm:w-20",
+        red ? "text-red-600" : "text-zinc-950"
+      )}
+    >
+      <span className="text-2xl font-black sm:text-3xl">{rank}</span>
+      <span className="text-2xl leading-none sm:text-3xl">{suit}</span>
+    </div>
+  );
+}
+
+function BeginnerRuleStep({
+  number,
+  title,
+  body
+}: {
+  readonly number: string;
+  readonly title: string;
+  readonly body: string;
+}) {
+  return (
+    <li className="grid grid-cols-[2.25rem_1fr] gap-3 py-4">
+      <span className="grid size-8 place-items-center rounded-full border border-[var(--gold)]/40 text-sm font-black text-[var(--gold)]">
+        {number}
+      </span>
+      <div>
+        <h3 className="font-black">{title}</h3>
+        <p className="mt-1 text-sm leading-6 text-zinc-400">{body}</p>
+      </div>
+    </li>
   );
 }
 
@@ -2613,34 +2995,38 @@ function HeaderAccountControl({
   authUser,
   profile,
   profileAvatarKey,
-  playerName
+  playerName,
+  onOpenProfile
 }: {
   readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
   readonly profileAvatarKey: ProfileAvatarKey;
   readonly playerName: string;
+  readonly onOpenProfile: () => void;
 }) {
   const displayName = profile?.displayName ?? authUser?.name ?? playerName;
 
   return (
     <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/25 p-1.5 shadow-lg backdrop-blur">
-      <AccountAvatar
-        imageUrl={authUser?.image ?? null}
-        fallback={authUser === null ? getAvatarSymbol(profileAvatarKey) : getInitial(displayName)}
-      />
+      <button
+        aria-label="Open profile and settings"
+        className="flex items-center gap-1 rounded-full transition hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]"
+        title="Profile and settings"
+        type="button"
+        onClick={onOpenProfile}
+      >
+        <AccountAvatar
+          imageUrl={authUser?.image ?? null}
+          fallback={authUser === null ? getAvatarSymbol(profileAvatarKey) : getInitial(displayName)}
+        />
+        <ChevronDown className="mr-1 size-3.5 text-zinc-400" />
+      </button>
       {authUser === null ? (
-        <SignInWithGoogleButton className="h-9 rounded-full px-3 text-xs sm:text-sm" />
-      ) : (
-        <div className="flex items-center gap-1">
-          <Link
-            className="hidden h-9 items-center rounded-full px-3 text-sm font-black text-white transition hover:bg-white/10 sm:inline-flex"
-            href="/profile"
-          >
-            Profile
-          </Link>
-          <SignOutButton className="h-9 rounded-full px-3 text-xs sm:text-sm" />
-        </div>
-      )}
+        <SignInWithGoogleButton
+          compactOnMobile
+          className="h-9 rounded-full px-3 text-xs sm:text-sm"
+        />
+      ) : null}
     </div>
   );
 }
@@ -2668,6 +3054,7 @@ function getInitial(value: string): string {
 }
 
 function MinimalProfileCard({
+  embedded = false,
   playerName,
   authUser,
   profile,
@@ -2679,6 +3066,7 @@ function MinimalProfileCard({
   onProfileAvatarKeyChange,
   onProfileSave
 }: {
+  readonly embedded?: boolean;
   readonly playerName: string;
   readonly authUser: AuthUser | null;
   readonly profile: PublicGuestProfile | null;
@@ -2693,7 +3081,7 @@ function MinimalProfileCard({
   const accountName = authUser?.name ?? authUser?.email ?? null;
 
   return (
-    <section className="online-panel p-5">
+    <section className={cn(embedded ? "px-1 pb-1" : "online-panel p-5")}>
       <div className="flex items-center gap-3">
         <AccountAvatar
           imageUrl={profile?.imageUrl ?? authUser?.image ?? null}
@@ -2772,6 +3160,21 @@ function MinimalProfileCard({
         </form>
       </details>
       <ProfileDetails profile={profile} matchHistory={matchHistory} />
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {authUser === null ? (
+          <SignInWithGoogleButton className="h-10 sm:col-span-2" />
+        ) : (
+          <>
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-md border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
+              href="/profile"
+            >
+              Open full profile
+            </Link>
+            <SignOutButton className="h-10" />
+          </>
+        )}
+      </div>
     </section>
   );
 }
@@ -3668,33 +4071,6 @@ function LeaderboardSummary({ entries }: { readonly entries: readonly PublicLead
   );
 }
 
-function RulesSummary() {
-  return (
-    <details className="mb-3 rounded-[1.1rem] border border-white/10 bg-black/20 p-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
-        <span className="flex items-center gap-2">
-          <BookOpen className="size-4 text-[var(--gold)]" />
-          Rules
-        </span>
-        <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-xs font-normal text-zinc-300">
-          Deuces
-        </span>
-      </summary>
-
-      <ul className="mt-3 grid gap-2">
-        {DEUCES_RULES.map((rule) => (
-          <li
-            key={rule}
-            className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"
-          >
-            {rule}
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
-}
-
 function FeedbackSummary({
   defaultEmail,
   onSubmitFeedback
@@ -3798,11 +4174,13 @@ function FeedbackSummary({
 }
 
 function CosmeticsSummary({
+  standalone = false,
   cosmetics,
   profile,
   onEquip,
   onPurchase
 }: {
+  readonly standalone?: boolean;
   readonly cosmetics: readonly PublicCosmetic[];
   readonly profile: PublicGuestProfile | null;
   readonly onEquip: (cosmetic: PublicCosmetic) => void;
@@ -3827,6 +4205,117 @@ function CosmeticsSummary({
       (view === "locker" ? unlockedIds.has(cosmetic.id) : !unlockedIds.has(cosmetic.id))
   );
 
+  const content = (
+    <div className="mt-3 grid gap-3">
+      <div className="grid grid-cols-2 rounded-full border border-white/10 bg-black/24 p-1">
+        {(["shop", "locker"] as const).map((option) => (
+          <button
+            key={option}
+            className={cn(
+              "h-8 rounded-full text-xs font-black capitalize transition",
+              view === option ? "bg-[var(--gold)] text-black" : "text-zinc-400 hover:text-white"
+            )}
+            type="button"
+            onClick={() => setView(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400">
+        <span>
+          {ownedCount}/{cosmetics.length} owned
+        </span>
+        <span>{equippedCount} equipped</span>
+      </div>
+
+      <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
+        {unlimitedCoins
+          ? "Creator access: every cosmetic is owned and coin costs are bypassed."
+          : "Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a placement bonus. Cosmetics never change gameplay."}
+      </p>
+
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+        {COSMETIC_FILTERS.map((filter) => (
+          <button
+            key={filter.kind}
+            className={cn(
+              "rounded-full border px-2 py-1.5 text-[10px] font-black uppercase transition",
+              activeFilter === filter.kind
+                ? "border-[var(--gold)] bg-[var(--gold)] text-black"
+                : "border-white/10 bg-white/7 text-zinc-300 hover:border-white/20 hover:bg-white/10"
+            )}
+            type="button"
+            onClick={() => setActiveFilter(filter.kind)}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      {visibleCosmetics.length === 0 ? (
+        <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
+          {cosmetics.length === 0
+            ? "Cosmetic catalog loads from the realtime server."
+            : view === "locker"
+              ? "No owned cosmetics in this category yet."
+              : "You own every cosmetic in this category."}
+        </p>
+      ) : (
+        visibleCosmetics.map((cosmetic) => (
+          <div
+            key={cosmetic.id}
+            className="flex items-center gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
+          >
+            <CosmeticPreview cosmetic={cosmetic} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold">{cosmetic.name}</p>
+              <p className="text-[11px] text-zinc-400">
+                {formatCosmeticKind(cosmetic.kind)} ·{" "}
+                {getCosmeticOwnershipLabel(cosmetic, unlocksByCosmeticId.get(cosmetic.id))}
+              </p>
+              {!unlockedIds.has(cosmetic.id) && getCosmeticMilestone(cosmetic.slug) !== null ? (
+                <p className="mt-0.5 text-[10px] text-[var(--aqua)]">
+                  Or earn: {getCosmeticMilestone(cosmetic.slug)}
+                </p>
+              ) : null}
+            </div>
+            <CosmeticAction
+              cosmetic={cosmetic}
+              owned={unlockedIds.has(cosmetic.id)}
+              equipped={equippedIds.has(cosmetic.id)}
+              coinBalance={coinBalance}
+              unlimitedCoins={unlimitedCoins}
+              onEquip={onEquip}
+              onPurchase={onPurchase}
+            />
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  if (standalone) {
+    return (
+      <section className="online-panel p-5 sm:p-7">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-[var(--gold)]">Collection</p>
+            <h2 className="mt-1 flex items-center gap-2 text-2xl font-black">
+              <Palette className="size-6" />
+              Shop & Locker
+            </h2>
+          </div>
+          <span className="rounded-full border border-white/10 bg-white/7 px-3 py-1.5 text-sm font-bold text-zinc-200">
+            {unlimitedCoins ? "∞" : coinBalance} coins
+          </span>
+        </div>
+        {content}
+      </section>
+    );
+  }
+
   return (
     <details className="online-panel p-4">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-bold">
@@ -3838,95 +4327,7 @@ function CosmeticsSummary({
           {unlimitedCoins ? "∞" : coinBalance} coins
         </span>
       </summary>
-
-      <div className="mt-3 grid gap-3">
-        <div className="grid grid-cols-2 rounded-full border border-white/10 bg-black/24 p-1">
-          {(["shop", "locker"] as const).map((option) => (
-            <button
-              key={option}
-              className={cn(
-                "h-8 rounded-full text-xs font-black capitalize transition",
-                view === option ? "bg-[var(--gold)] text-black" : "text-zinc-400 hover:text-white"
-              )}
-              type="button"
-              onClick={() => setView(option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400">
-          <span>
-            {ownedCount}/{cosmetics.length} owned
-          </span>
-          <span>{equippedCount} equipped</span>
-        </div>
-
-        <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
-          {unlimitedCoins
-            ? "Creator access: every cosmetic is owned and coin costs are bypassed."
-            : "Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a placement bonus. Cosmetics never change gameplay."}
-        </p>
-
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {COSMETIC_FILTERS.map((filter) => (
-            <button
-              key={filter.kind}
-              className={cn(
-                "rounded-full border px-2 py-1.5 text-[10px] font-black uppercase transition",
-                activeFilter === filter.kind
-                  ? "border-[var(--gold)] bg-[var(--gold)] text-black"
-                  : "border-white/10 bg-white/7 text-zinc-300 hover:border-white/20 hover:bg-white/10"
-              )}
-              type="button"
-              onClick={() => setActiveFilter(filter.kind)}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {visibleCosmetics.length === 0 ? (
-          <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
-            {cosmetics.length === 0
-              ? "Cosmetic catalog loads from the realtime server."
-              : view === "locker"
-                ? "No owned cosmetics in this category yet."
-                : "You own every cosmetic in this category."}
-          </p>
-        ) : (
-          visibleCosmetics.map((cosmetic) => (
-            <div
-              key={cosmetic.id}
-              className="flex items-center gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
-            >
-              <CosmeticPreview cosmetic={cosmetic} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold">{cosmetic.name}</p>
-                <p className="text-[11px] text-zinc-400">
-                  {formatCosmeticKind(cosmetic.kind)} ·{" "}
-                  {getCosmeticOwnershipLabel(cosmetic, unlocksByCosmeticId.get(cosmetic.id))}
-                </p>
-                {!unlockedIds.has(cosmetic.id) && getCosmeticMilestone(cosmetic.slug) !== null ? (
-                  <p className="mt-0.5 text-[10px] text-[var(--aqua)]">
-                    Or earn: {getCosmeticMilestone(cosmetic.slug)}
-                  </p>
-                ) : null}
-              </div>
-              <CosmeticAction
-                cosmetic={cosmetic}
-                owned={unlockedIds.has(cosmetic.id)}
-                equipped={equippedIds.has(cosmetic.id)}
-                coinBalance={coinBalance}
-                unlimitedCoins={unlimitedCoins}
-                onEquip={onEquip}
-                onPurchase={onPurchase}
-              />
-            </div>
-          ))
-        )}
-      </div>
+      {content}
     </details>
   );
 }
@@ -4768,7 +5169,7 @@ function OnlineTable({
             </p>
           ) : null}
           <div className="mt-5 flex min-h-28 flex-wrap justify-center gap-2">
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="sync">
               {room?.currentTrick === null || room === null ? (
                 <motion.div
                   className="sr-only rounded-full border border-dashed border-white/18 bg-black/18 px-7 py-7 text-sm text-zinc-300 sm:not-sr-only"
@@ -4794,11 +5195,11 @@ function OnlineTable({
                     animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
                     exit={{ opacity: 0, y: -20, scale: 0.92 }}
                     transition={{
-                      delay: Math.min(0.28, index * 0.055),
+                      delay: Math.min(0.2, index * 0.04),
                       type: "spring",
-                      stiffness: 240,
-                      damping: 27,
-                      mass: 0.82
+                      stiffness: 205,
+                      damping: 25,
+                      mass: 0.78
                     }}
                   >
                     <OnlineCard card={card} cardTheme={trickCardTheme} compact />
@@ -5520,36 +5921,42 @@ function OnlineOpponentHand({
       }
       aria-label={`${count} face-down cards remaining`}
     >
-      {Array.from({ length: count }).map((_, index) => {
-        const centerDistance = Math.abs(index - (count - 1) / 2);
-        const rotationOffset = index - (count - 1) / 2;
+      <AnimatePresence initial={false}>
+        {Array.from({ length: count }).map((_, index) => {
+          const centerDistance = Math.abs(index - (count - 1) / 2);
+          const rotationOffset = index - (count - 1) / 2;
 
-        return (
-          <div
-            aria-hidden="true"
-            key={`online-opponent-card-back-${index}`}
-            className={cn(
-              "card-back opponent-card-back absolute rounded-[5px] border border-white/30 shadow-lg",
-              getCardBackClass(cardBack)
-            )}
-            style={
-              {
-                "--opponent-card-left": `${vertical ? centerDistance * 0.55 : index * cardStep}px`,
-                "--opponent-card-top": `${vertical ? index * cardStep : centerDistance * 0.9}px`,
-                "--opponent-card-rotation": `${rotationOffset * (vertical ? 0.55 : 1.15)}deg`,
-                "--opponent-card-compact-left": `${vertical ? centerDistance * 0.25 : index * compactCardStep}px`,
-                "--opponent-card-compact-top": `${vertical ? index * compactCardStep : centerDistance * 0.45}px`,
-                "--opponent-card-compact-rotation": `${rotationOffset * (vertical ? 0.3 : 0.72)}deg`,
-                transformOrigin: vertical
-                  ? orientation === "left"
-                    ? "125% 50%"
-                    : "-25% 50%"
-                  : "50% 120%"
-              } as CSSProperties
-            }
-          />
-        );
-      })}
+          return (
+            <motion.div
+              aria-hidden="true"
+              key={`online-opponent-card-back-${index}`}
+              className={cn(
+                "card-back opponent-card-back absolute rounded-[5px] border border-white/30 shadow-lg",
+                getCardBackClass(cardBack)
+              )}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22 }}
+              style={
+                {
+                  "--opponent-card-left": `${vertical ? centerDistance * 0.55 : index * cardStep}px`,
+                  "--opponent-card-top": `${vertical ? index * cardStep : centerDistance * 0.9}px`,
+                  "--opponent-card-rotation": `${rotationOffset * (vertical ? 0.55 : 1.15)}deg`,
+                  "--opponent-card-compact-left": `${vertical ? centerDistance * 0.25 : index * compactCardStep}px`,
+                  "--opponent-card-compact-top": `${vertical ? index * compactCardStep : centerDistance * 0.45}px`,
+                  "--opponent-card-compact-rotation": `${rotationOffset * (vertical ? 0.3 : 0.72)}deg`,
+                  transformOrigin: vertical
+                    ? orientation === "left"
+                      ? "125% 50%"
+                      : "-25% 50%"
+                    : "50% 120%"
+                } as MotionStyle & Record<`--${string}`, string>
+              }
+            />
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }
