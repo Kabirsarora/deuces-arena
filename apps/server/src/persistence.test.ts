@@ -53,6 +53,7 @@ describe("cosmetic progression rules", () => {
       "ember-court-card-back",
       "pool-shark-card-back",
       "koi-current-card-back",
+      "blackberry-bandit-avatar",
       "koi-garden-table",
       "bengal-bloom-card-back",
       "arena-six-crest-card-back"
@@ -71,6 +72,12 @@ describe("cosmetic progression rules", () => {
     expect(
       getEarnedCosmeticUnlockSlugs({ gamesPlayed: 199, wins: 199, rating: 1000 })
     ).not.toContain("ember-throne-table");
+    expect(
+      getEarnedCosmeticUnlockSlugs({ gamesPlayed: 225, wins: 224, rating: 1000 })
+    ).not.toContain("ember-regent-avatar");
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 225, wins: 225, rating: 1000 })).toContain(
+      "ember-regent-avatar"
+    );
   });
 
   it("unlocks ranked borders at rating thresholds", () => {
