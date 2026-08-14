@@ -368,6 +368,111 @@ textarea {
   --card-face-pattern-size: auto;
 }
 
+.card-face-orchard-salon {
+  --card-face-accent: rgba(146, 92, 48, 0.48);
+  --card-face-theme-color: #8b5a2b;
+  --card-face-art: url("/art/orchard-salon-card-back.jpg");
+  --card-face-art-opacity: 0.24;
+  --card-face-emblem: rgba(255, 250, 235, 0.84);
+  --card-face-watermark-opacity: 0.018;
+  --card-face-background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.9) 0 25%, transparent 26%),
+    linear-gradient(145deg, #fffdf4, #dfc89d);
+  --card-face-pattern:
+    repeating-linear-gradient(90deg, rgba(120, 53, 15, 0.035) 0 1px, transparent 1px 0.55rem),
+    repeating-linear-gradient(0deg, rgba(120, 53, 15, 0.025) 0 1px, transparent 1px 0.55rem);
+  --card-face-pattern-size: auto;
+}
+
+.card-face-orchard-salon[data-suit-symbol="♦"] {
+  --orchard-emblem: "🍐";
+}
+
+.card-face-orchard-salon[data-suit-symbol="♣"] {
+  --orchard-emblem: "🍇";
+}
+
+.card-face-orchard-salon[data-suit-symbol="♥"] {
+  --orchard-emblem: "🍎";
+}
+
+.card-face-orchard-salon[data-suit-symbol="♠"] {
+  --orchard-emblem: "🫐";
+}
+
+.card-face-orchard-salon[data-suit-symbol="★"] {
+  --orchard-emblem: "🍊";
+}
+
+.card-face-orchard-salon[data-suit-symbol="♛"] {
+  --orchard-emblem: "🍒";
+}
+
+.card-face-orchard-salon[data-rank="J"] {
+  --orchard-emblem: "⚜";
+}
+
+.card-face-orchard-salon[data-rank="Q"] {
+  --orchard-emblem: "♕";
+}
+
+.card-face-orchard-salon[data-rank="K"] {
+  --orchard-emblem: "♔";
+}
+
+.card-face-orchard-salon .card-face-theme-art {
+  background-position: 54% center;
+  filter: saturate(1.08) contrast(1.04) brightness(1.08);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 1%,
+    #000 24%,
+    #000 84%,
+    transparent 99%
+  );
+  mask-image: linear-gradient(to bottom, transparent 1%, #000 24%, #000 84%, transparent 99%);
+}
+
+.card-face-orchard-salon .card-face-theme-rail {
+  width: 0.16rem;
+  background: linear-gradient(to bottom, transparent, #a47738 18% 82%, transparent);
+  box-shadow: 0 0 0 1px rgba(255, 251, 235, 0.7);
+}
+
+.card-face-orchard-salon .card-face-emblem {
+  border-radius: 46% 46% 40% 40% / 52% 52% 40% 40%;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    inset 0 0 15px rgba(120, 53, 15, 0.08),
+    0 3px 8px rgba(68, 36, 18, 0.1);
+}
+
+.card-face-orchard-salon .card-face-emblem > span:first-child {
+  font-size: 0;
+}
+
+.card-face-orchard-salon .card-face-emblem > span:first-child::before {
+  color: #542f1d;
+  content: var(--orchard-emblem);
+  filter: drop-shadow(0 1px 0 #fff) drop-shadow(0 2px 2px rgba(68, 36, 18, 0.2));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.75rem;
+  line-height: 1;
+}
+
+.card-face-orchard-salon[data-royal="true"] .card-face-emblem {
+  min-height: 64%;
+  border-radius: 44% 44% 18% 18%;
+  clip-path: polygon(8% 16%, 25% 16%, 34% 0, 50% 13%, 66% 0, 75% 16%, 92% 16%, 100% 100%, 0 100%);
+  background:
+    linear-gradient(rgba(255, 250, 235, 0.84), rgba(246, 224, 178, 0.88)), var(--card-face-art);
+}
+
+.card-face-orchard-salon[data-royal="true"] .card-face-emblem > span:first-child::before {
+  color: #93662e;
+  font-size: 3rem;
+}
+
 .card-face-bengal-bloom {
   --card-face-accent: rgba(146, 64, 14, 0.38);
   --card-face-theme-color: #b45309;
@@ -1060,6 +1165,14 @@ textarea {
 .card-back-koi-current {
   background-image: url("/art/koi-current-card-back.jpg");
   background-position: center;
+  background-size: cover;
+}
+
+.card-back-orchard-salon {
+  background-image:
+    linear-gradient(rgba(40, 24, 12, 0.04), rgba(40, 24, 12, 0.22)),
+    url("/art/orchard-salon-card-back.jpg");
+  background-position: 54% center;
   background-size: cover;
 }
 

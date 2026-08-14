@@ -53,6 +53,7 @@ describe("cosmetic progression rules", () => {
       "ember-court-card-back",
       "pool-shark-card-back",
       "koi-current-card-back",
+      "orchard-salon-card-back",
       "blackberry-bandit-avatar",
       "koi-garden-table",
       "bengal-bloom-card-back",
@@ -72,6 +73,12 @@ describe("cosmetic progression rules", () => {
     expect(
       getEarnedCosmeticUnlockSlugs({ gamesPlayed: 199, wins: 199, rating: 1000 })
     ).not.toContain("ember-throne-table");
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 65, wins: 64, rating: 1000 })).not.toContain(
+      "orchard-salon-card-back"
+    );
+    expect(getEarnedCosmeticUnlockSlugs({ gamesPlayed: 65, wins: 65, rating: 1000 })).toContain(
+      "orchard-salon-card-back"
+    );
     expect(
       getEarnedCosmeticUnlockSlugs({ gamesPlayed: 225, wins: 224, rating: 1000 })
     ).not.toContain("ember-regent-avatar");

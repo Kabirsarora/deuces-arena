@@ -118,6 +118,16 @@ const starterCosmetics = [
     previewUrl: "/art/koi-current-card-back.jpg"
   },
   {
+    slug: "orchard-salon-card-back",
+    kind: "CARD_BACK" as const,
+    name: "Orchard Salon",
+    description: "Public-domain gallery florals paired with orchard suits and gilded royals.",
+    rarity: "epic",
+    isSupporter: false,
+    coinPrice: 5000,
+    previewUrl: "/art/orchard-salon-card-back.jpg"
+  },
+  {
     slug: "bengal-bloom-card-back",
     kind: "CARD_BACK" as const,
     name: "Bengal Bloom",

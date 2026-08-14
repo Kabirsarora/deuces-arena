@@ -364,6 +364,9 @@ describe("realtime rooms", () => {
         ?.coinPrice
     ).toBe(7500);
     expect(
+      socketCatalog.data.find((cosmetic) => cosmetic.slug === "orchard-salon-card-back")?.coinPrice
+    ).toBe(5000);
+    expect(
       socketCatalog.data.find((cosmetic) => cosmetic.slug === "ember-throne-table")?.coinPrice
     ).toBe(16000);
     expect(
