@@ -2744,7 +2744,7 @@ function OpenRoomStrip({
   }
 
   return (
-    <div className="mt-5">
+    <div className="mt-5 min-w-0">
       <div className="mb-3 flex items-center justify-between gap-3 text-sm text-zinc-400">
         <span>{openRoomCount} open tables</span>
         <span>{playingCount} players in games</span>
@@ -4199,52 +4199,56 @@ function CosmeticsSummary({
   const unlimitedCoins = profile?.isAdmin === true;
   const equippedCount = equippedIds.size;
   const ownedCount = unlockedIds.size;
-  const visibleCosmetics = cosmetics.filter(
-    (cosmetic) =>
-      (activeFilter === "ALL" || cosmetic.kind === activeFilter) &&
-      (view === "locker" ? unlockedIds.has(cosmetic.id) : !unlockedIds.has(cosmetic.id))
+  const viewCosmetics = cosmetics.filter((cosmetic) =>
+    view === "locker" ? unlockedIds.has(cosmetic.id) : !unlockedIds.has(cosmetic.id)
   );
+  const visibleCosmetics = [
+    ...viewCosmetics.filter((cosmetic) => activeFilter === "ALL" || cosmetic.kind === activeFilter)
+  ].sort((left, right) => {
+    if (view === "locker") {
+      const equippedDifference =
+        Number(equippedIds.has(right.id)) - Number(equippedIds.has(left.id));
+
+      if (equippedDifference !== 0) {
+        return equippedDifference;
+      }
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 
   const content = (
-    <div className="mt-3 grid gap-3">
-      <div className="grid grid-cols-2 rounded-full border border-white/10 bg-black/24 p-1">
-        {(["shop", "locker"] as const).map((option) => (
-          <button
-            key={option}
-            className={cn(
-              "h-8 rounded-full text-xs font-black capitalize transition",
-              view === option ? "bg-[var(--gold)] text-black" : "text-zinc-400 hover:text-white"
-            )}
-            type="button"
-            onClick={() => setView(option)}
-          >
-            {option}
-          </button>
-        ))}
+    <div className="mt-5">
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid w-full grid-cols-2 rounded-full border border-white/10 bg-black/24 p-1 sm:w-72">
+          {(["shop", "locker"] as const).map((option) => (
+            <button
+              key={option}
+              className={cn(
+                "h-9 rounded-full text-xs font-black capitalize transition",
+                view === option ? "bg-[var(--gold)] text-black" : "text-zinc-400 hover:text-white"
+              )}
+              type="button"
+              onClick={() => setView(option)}
+            >
+              {option} {option === "shop" ? cosmetics.length - ownedCount : ownedCount}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs font-semibold text-zinc-400">
+          {ownedCount} of {cosmetics.length} collected · {equippedCount} equipped
+        </p>
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-[11px] text-zinc-400">
-        <span>
-          {ownedCount}/{cosmetics.length} owned
-        </span>
-        <span>{equippedCount} equipped</span>
-      </div>
-
-      <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-[11px] leading-4 text-zinc-400">
-        {unlimitedCoins
-          ? "Creator access: every cosmetic is owned and coin costs are bypassed."
-          : "Match rewards: 1st +120, 2nd +80, 3rd +50, everyone else +25 Arena Coins. Ranked adds a placement bonus. Cosmetics never change gameplay."}
-      </p>
-
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {COSMETIC_FILTERS.map((filter) => (
           <button
             key={filter.kind}
             className={cn(
-              "rounded-full border px-2 py-1.5 text-[10px] font-black uppercase transition",
+              "shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase transition",
               activeFilter === filter.kind
-                ? "border-[var(--gold)] bg-[var(--gold)] text-black"
-                : "border-white/10 bg-white/7 text-zinc-300 hover:border-white/20 hover:bg-white/10"
+                ? "border-white/20 bg-white/14 text-white"
+                : "border-transparent bg-transparent text-zinc-500 hover:text-white"
             )}
             type="button"
             onClick={() => setActiveFilter(filter.kind)}
@@ -4255,34 +4259,22 @@ function CosmeticsSummary({
       </div>
 
       {visibleCosmetics.length === 0 ? (
-        <p className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-400">
-          {cosmetics.length === 0
-            ? "Cosmetic catalog loads from the realtime server."
-            : view === "locker"
-              ? "No owned cosmetics in this category yet."
-              : "You own every cosmetic in this category."}
-        </p>
+        <div className="mt-6 grid min-h-48 place-items-center rounded-[0.9rem] border border-dashed border-white/12 px-5 text-center">
+          <p className="max-w-sm text-sm text-zinc-400">
+            {cosmetics.length === 0
+              ? "Cosmetic catalog loads from the realtime server."
+              : view === "locker"
+                ? "No owned cosmetics in this category yet."
+                : "You own every cosmetic in this category."}
+          </p>
+        </div>
       ) : (
-        visibleCosmetics.map((cosmetic) => (
-          <div
-            key={cosmetic.id}
-            className="flex items-center gap-3 rounded-[0.9rem] border border-white/10 bg-white/7 px-2 py-2"
-          >
-            <CosmeticPreview cosmetic={cosmetic} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold">{cosmetic.name}</p>
-              <p className="text-[11px] text-zinc-400">
-                {formatCosmeticKind(cosmetic.kind)} ·{" "}
-                {getCosmeticOwnershipLabel(cosmetic, unlocksByCosmeticId.get(cosmetic.id))}
-              </p>
-              {!unlockedIds.has(cosmetic.id) && getCosmeticMilestone(cosmetic.slug) !== null ? (
-                <p className="mt-0.5 text-[10px] text-[var(--aqua)]">
-                  Or earn: {getCosmeticMilestone(cosmetic.slug)}
-                </p>
-              ) : null}
-            </div>
-            <CosmeticAction
+        <div className="mt-5 grid min-w-0 grid-cols-1 gap-3 min-[500px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {visibleCosmetics.map((cosmetic) => (
+            <CosmeticCatalogCard
+              key={cosmetic.id}
               cosmetic={cosmetic}
+              unlock={unlocksByCosmeticId.get(cosmetic.id)}
               owned={unlockedIds.has(cosmetic.id)}
               equipped={equippedIds.has(cosmetic.id)}
               coinBalance={coinBalance}
@@ -4290,17 +4282,23 @@ function CosmeticsSummary({
               onEquip={onEquip}
               onPurchase={onPurchase}
             />
-          </div>
-        ))
+          ))}
+        </div>
       )}
+
+      <p className="mt-5 border-t border-white/10 pt-4 text-[11px] leading-5 text-zinc-500">
+        {unlimitedCoins
+          ? "Creator access is active. Coin costs are bypassed and the complete collection is available in your locker."
+          : "Earn Arena Coins by finishing matches: 1st +120, 2nd +80, 3rd +50, everyone else +25. Ranked adds a placement bonus. Cosmetics never affect gameplay."}
+      </p>
     </div>
   );
 
   if (standalone) {
     return (
-      <section className="online-panel p-5 sm:p-7">
-        <div className="flex items-center justify-between gap-3">
-          <div>
+      <section className="online-panel min-w-0 p-5 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-xs font-black uppercase text-[var(--gold)]">Collection</p>
             <h2 className="mt-1 flex items-center gap-2 text-2xl font-black">
               <Palette className="size-6" />
@@ -4375,6 +4373,82 @@ const COSMETIC_FILTERS: readonly {
   { kind: "PROFILE_BORDER", label: "Borders" }
 ];
 
+function CosmeticCatalogCard({
+  cosmetic,
+  unlock,
+  owned,
+  equipped,
+  coinBalance,
+  unlimitedCoins,
+  onEquip,
+  onPurchase
+}: {
+  readonly cosmetic: PublicCosmetic;
+  readonly unlock: PublicGuestProfile["unlocks"][number] | undefined;
+  readonly owned: boolean;
+  readonly equipped: boolean;
+  readonly coinBalance: number;
+  readonly unlimitedCoins: boolean;
+  readonly onEquip: (cosmetic: PublicCosmetic) => void;
+  readonly onPurchase: (cosmetic: PublicCosmetic) => void;
+}) {
+  const milestone = getCosmeticMilestone(cosmetic.slug);
+
+  return (
+    <article
+      className={cn(
+        "group flex min-w-0 flex-col overflow-hidden rounded-[0.8rem] border bg-black/18 transition",
+        equipped
+          ? "border-[var(--gold)]/55 shadow-[0_10px_35px_rgba(242,193,78,0.08)]"
+          : "border-white/10 hover:border-white/20"
+      )}
+    >
+      <div className="relative grid min-h-40 place-items-center overflow-hidden border-b border-white/8 bg-white/[0.025] px-3 py-5">
+        <CosmeticPreview cosmetic={cosmetic} large />
+        <span
+          className={cn(
+            "absolute right-2 top-2 rounded-full px-2 py-1 text-[9px] font-black uppercase",
+            equipped
+              ? "bg-[var(--gold)] text-black"
+              : owned
+                ? "bg-emerald-400/15 text-emerald-200"
+                : "bg-black/45 text-zinc-300"
+          )}
+        >
+          {equipped ? "Equipped" : owned ? "Owned" : cosmetic.rarity}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-3">
+        <p className="truncate text-sm font-black" title={cosmetic.name}>
+          {cosmetic.name}
+        </p>
+        <p className="mt-1 text-[10px] font-bold uppercase text-zinc-500">
+          {formatCosmeticKind(cosmetic.kind)} · {getCosmeticOwnershipLabel(cosmetic, unlock)}
+        </p>
+        {!owned && milestone !== null ? (
+          <p className="mt-2 min-h-8 text-[10px] leading-4 text-[var(--aqua)]">
+            Earn by: {milestone}
+          </p>
+        ) : (
+          <div className="min-h-8" aria-hidden="true" />
+        )}
+        <div className="mt-auto pt-2">
+          <CosmeticAction
+            cosmetic={cosmetic}
+            owned={owned}
+            equipped={equipped}
+            coinBalance={coinBalance}
+            unlimitedCoins={unlimitedCoins}
+            onEquip={onEquip}
+            onPurchase={onPurchase}
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function CosmeticAction({
   cosmetic,
   owned,
@@ -4394,7 +4468,8 @@ function CosmeticAction({
 }) {
   if (equipped) {
     return (
-      <span className="shrink-0 rounded-full bg-emerald-400/15 px-2 py-1 text-[10px] font-black uppercase text-emerald-200">
+      <span className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-400/12 px-2 text-[10px] font-black uppercase text-emerald-200">
+        <CheckCircle2 className="size-3.5" />
         Equipped
       </span>
     );
@@ -4402,7 +4477,7 @@ function CosmeticAction({
 
   if (owned) {
     return (
-      <Button className="h-7 shrink-0 px-2 text-[10px]" size="sm" onClick={() => onEquip(cosmetic)}>
+      <Button className="h-9 w-full px-2 text-xs" size="sm" onClick={() => onEquip(cosmetic)}>
         Equip
       </Button>
     );
@@ -4411,19 +4486,15 @@ function CosmeticAction({
   if (!cosmetic.isSupporter && cosmetic.coinPrice !== null && cosmetic.coinPrice > 0) {
     if (unlimitedCoins || coinBalance >= cosmetic.coinPrice) {
       return (
-        <Button
-          className="h-7 shrink-0 px-2 text-[10px]"
-          size="sm"
-          onClick={() => onPurchase(cosmetic)}
-        >
-          Unlock
+        <Button className="h-9 w-full px-2 text-xs" size="sm" onClick={() => onPurchase(cosmetic)}>
+          Unlock · {cosmetic.coinPrice}
         </Button>
       );
     }
 
     return (
-      <span className="shrink-0 rounded-full bg-white/8 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
-        {cosmetic.coinPrice} coins
+      <span className="grid h-9 w-full place-items-center rounded-md bg-white/6 px-2 text-[10px] font-black uppercase text-zinc-400">
+        {cosmetic.coinPrice} coins needed
       </span>
     );
   }
@@ -4431,7 +4502,7 @@ function CosmeticAction({
   return (
     <span
       className={cn(
-        "shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase",
+        "grid h-9 w-full place-items-center rounded-md px-2 text-[10px] font-black uppercase",
         cosmetic.isSupporter ? "bg-[var(--gold)]/18 text-[var(--gold)]" : "bg-white/8 text-zinc-300"
       )}
     >
@@ -4471,31 +4542,54 @@ function getCosmeticOwnershipLabel(
   return cosmetic.rarity;
 }
 
-function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
+function CosmeticPreview({
+  cosmetic,
+  large = false
+}: {
+  readonly cosmetic: PublicCosmetic;
+  readonly large?: boolean;
+}) {
   if (cosmetic.kind === "CARD_BACK") {
     return (
-      <div className="relative h-14 w-14 shrink-0" aria-label={`${cosmetic.name} deck preview`}>
+      <div
+        className={cn("relative shrink-0", large ? "h-32 w-28" : "h-14 w-14")}
+        aria-label={`${cosmetic.name} deck preview`}
+      >
         <div
           className={cn(
-            "card-back absolute left-0 top-1 grid h-12 w-9 -rotate-6 place-items-center rounded-md border border-white/20 shadow-lg",
+            "card-back absolute left-0 top-1 grid -rotate-6 place-items-center rounded-md border border-white/20 shadow-lg",
+            large ? "h-28 w-20" : "h-12 w-9",
             getCardBackClass(cosmetic)
           )}
         >
-          <div className="h-7 w-4 rounded-sm border border-white/45" />
+          <div
+            className={cn("rounded-sm border border-white/45", large ? "h-16 w-10" : "h-7 w-4")}
+          />
         </div>
         <div
           data-suit-symbol="♦"
           className={cn(
-            "card-face absolute bottom-0 right-0 grid h-12 w-9 rotate-6 overflow-hidden rounded-md border shadow-lg",
+            "card-face absolute bottom-0 right-0 grid rotate-6 overflow-hidden rounded-md border shadow-lg",
+            large ? "h-28 w-20" : "h-12 w-9",
             getCardFaceClass(cosmetic)
           )}
         >
           <span className="card-face-theme-art" aria-hidden="true" />
           <span className="card-face-theme-rail" aria-hidden="true" />
-          <span className="card-face-corner relative z-10 pl-1 pt-1 text-[10px] font-black leading-none text-red-600">
+          <span
+            className={cn(
+              "card-face-corner relative z-10 pl-1 pt-1 font-black leading-none text-red-600",
+              large ? "text-base" : "text-[10px]"
+            )}
+          >
             A<br />♦
           </span>
-          <span className="relative z-10 self-end justify-self-center pb-1 text-lg leading-none text-red-600">
+          <span
+            className={cn(
+              "relative z-10 self-end justify-self-center pb-1 leading-none text-red-600",
+              large ? "text-3xl" : "text-lg"
+            )}
+          >
             ♦
           </span>
         </div>
@@ -4507,7 +4601,8 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
     return (
       <div
         className={cn(
-          "table-felt relative h-10 w-12 shrink-0 overflow-hidden rounded-[50%] border border-emerald-200/25 shadow-lg",
+          "table-felt relative shrink-0 overflow-hidden rounded-[50%] border border-emerald-200/25 shadow-lg",
+          large ? "h-24 w-full max-w-44" : "h-10 w-12",
           getTableThemeClass(cosmetic)
         )}
       />
@@ -4518,11 +4613,12 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
     return (
       <div
         className={cn(
-          "grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 bg-black/30 shadow-lg",
+          "grid shrink-0 place-items-center rounded-full border-2 bg-black/30 shadow-lg",
+          large ? "h-20 w-20" : "h-11 w-11",
           getProfileBorderClass(cosmetic)
         )}
       >
-        <Sparkles className="size-4 text-[var(--gold)]" />
+        <Sparkles className={cn("text-[var(--gold)]", large ? "size-7" : "size-4")} />
       </div>
     );
   }
@@ -4531,7 +4627,8 @@ function CosmeticPreview({ cosmetic }: { readonly cosmetic: PublicCosmetic }) {
     return (
       <div
         className={cn(
-          "grid h-11 w-11 shrink-0 place-items-center rounded-full border text-sm font-black shadow-lg",
+          "grid shrink-0 place-items-center rounded-full border font-black shadow-lg",
+          large ? "h-20 w-20 text-xl" : "h-11 w-11 text-sm",
           getAvatarCosmeticClass(cosmetic)
         )}
       >
