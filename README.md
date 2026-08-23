@@ -185,11 +185,10 @@ npm run test
 npm run build
 ```
 
-The repository currently contains 19 automated test files covering engine rules, legal moves, bots,
-simulations, ratings, replay reconstruction, chat moderation, persistence behavior, mobile auth,
-notifications, and Socket.IO room, ranked, tournament, trade, replay, moderation, and cosmetic flows.
-GitHub Actions runs the complete verification suite on pull requests and pushes to `main` and
-`codex/**` branches.
+Automated tests cover engine rules, legal moves, bots, simulations, ratings, replay reconstruction,
+chat moderation, persistence behavior, mobile auth, notifications, and Socket.IO room, ranked,
+tournament, trade, replay, moderation, and cosmetic flows. GitHub Actions runs the complete
+verification suite on pull requests and pushes to `main` and `codex/**` branches.
 
 ## Data and AI Direction
 
