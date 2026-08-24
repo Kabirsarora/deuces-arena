@@ -2728,7 +2728,7 @@ function CompactRange({
   readonly onChange: (value: number) => void;
 }) {
   return (
-    <label className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <label className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <span className="mb-2 flex justify-between gap-2">
         {label}
         <span>{value}</span>
@@ -2760,11 +2760,11 @@ function CompactTimerControl({
   readonly onSecondsChange: (seconds: number) => void;
 }) {
   return (
-    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <label className="flex items-center justify-between gap-3">
         Timer
         <input
-          className="size-4 accent-[var(--gold)]"
+          className="size-5 accent-[var(--gold)]"
           type="checkbox"
           checked={enabled}
           disabled={disabled}
@@ -2781,7 +2781,7 @@ function CompactTimerControl({
         disabled={disabled || !enabled}
         onChange={(event) => onSecondsChange(Number(event.target.value))}
       />
-      <p className="mt-2 text-xs leading-5 text-zinc-400">
+      <p className="mt-2 text-sm leading-5 text-zinc-400">
         {enabled
           ? `${seconds}s countdown shown at the table. Timing out passes when a pass is legal.`
           : "Optional. Enable this to show a turn countdown during the match."}
@@ -2800,14 +2800,14 @@ function CompactBotDifficulty({
   readonly onChange: (difficulty: PublicBotDifficulty) => void;
 }) {
   return (
-    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <p className="mb-2">Bot difficulty</p>
       <div className="grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
         {BOT_DIFFICULTY_OPTIONS.map((option) => (
           <button
             key={option.value}
             className={cn(
-              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              "rounded-full px-2 py-2 text-sm font-black transition",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2820,7 +2820,7 @@ function CompactBotDifficulty({
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs font-semibold text-zinc-400">
+      <p className="mt-2 text-sm font-semibold leading-5 text-zinc-400">
         {value === "easy"
           ? "Random legal choices, including optional passes."
           : value === "normal"
@@ -2841,14 +2841,14 @@ function CompactBotPace({
   readonly onChange: (pace: PublicBotPace) => void;
 }) {
   return (
-    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <p className="mb-2">Bot pace</p>
       <div className="grid grid-cols-3 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
         {BOT_PACE_OPTIONS.map((option) => (
           <button
             key={option.value}
             className={cn(
-              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              "rounded-full px-2 py-2 text-sm font-black transition",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2861,7 +2861,7 @@ function CompactBotPace({
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs font-semibold text-zinc-400">
+      <p className="mt-2 text-sm font-semibold leading-5 text-zinc-400">
         {value === "quick"
           ? "About 2–3 seconds before each bot move."
           : value === "normal"
@@ -2882,7 +2882,7 @@ function CompactDeckControl({
   readonly onChange: (deckType: DeckType) => void;
 }) {
   return (
-    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <div className="rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <p className="mb-2">Deck</p>
       <div className="grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
         {[
@@ -2892,7 +2892,7 @@ function CompactDeckControl({
           <button
             key={option.value}
             className={cn(
-              "rounded-full px-2 py-1.5 text-xs font-black transition",
+              "rounded-full px-2 py-2 text-sm font-black transition",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2905,7 +2905,7 @@ function CompactDeckControl({
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs font-semibold text-zinc-400">
+      <p className="mt-2 text-sm font-semibold leading-5 text-zinc-400">
         {value === "arena-six"
           ? "78 cards: Stars rank above spades; Crowns are highest."
           : "52 cards: diamonds, clubs, hearts, then spades."}
@@ -2928,13 +2928,15 @@ function CompactRuleToggle({
   readonly onChange: (enabled: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-20 items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-sm font-bold">
+    <label className="flex min-h-24 items-center justify-between gap-3 rounded-[1.1rem] border border-white/10 bg-black/22 p-4 text-base font-bold">
       <span>
         {label}
-        <span className="mt-1 block text-xs font-semibold text-zinc-400">{description}</span>
+        <span className="mt-1 block text-sm font-semibold leading-5 text-zinc-400">
+          {description}
+        </span>
       </span>
       <input
-        className="size-4 shrink-0 accent-[var(--gold)]"
+        className="size-5 shrink-0 accent-[var(--gold)]"
         type="checkbox"
         checked={enabled}
         disabled={disabled}
@@ -3681,20 +3683,20 @@ function OnlineWaitingRoom({
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] gap-5 lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[100rem] gap-5 lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
         <section
           className={cn(
-            "table-felt table-oval relative grid min-h-[38rem] place-items-center overflow-hidden px-5 py-10 text-center lg:min-h-0",
+            "table-felt table-oval relative grid min-h-[42rem] place-items-center overflow-hidden px-5 py-10 text-center lg:min-h-0",
             getTableThemeClass(tableTheme)
           )}
         >
           <div className="absolute left-1/2 top-5 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur">
-            <span className="flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase text-zinc-300">
-              <CircleDot className="size-3 text-[var(--aqua)]" />
+            <span className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-black uppercase text-zinc-300">
+              <CircleDot className="size-4 text-[var(--aqua)]" />
               Casual table
             </span>
             <button
-              className="rounded-full bg-white/8 px-3 py-1 font-mono text-xs font-black tracking-wider text-[var(--gold)] transition hover:bg-white/12"
+              className="rounded-full bg-white/8 px-4 py-1.5 font-mono text-sm font-black tracking-wider text-[var(--gold)] transition hover:bg-white/12"
               type="button"
               onClick={onCopyRoomCode}
             >
@@ -3710,48 +3712,48 @@ function OnlineWaitingRoom({
             yourPlayerId={room.yourPlayerId}
           />
 
-          <div className="relative z-10 hidden w-[min(28rem,70%)] rounded-[1.25rem] border border-white/12 bg-black/55 px-5 py-5 text-white shadow-2xl backdrop-blur-md sm:block">
-            <p className="text-2xl font-black text-white">Waiting for players</p>
-            <p className="mt-1 text-sm font-bold text-zinc-300">
+          <div className="relative z-10 hidden w-[min(30rem,58%)] rounded-[1.25rem] border border-white/12 bg-black/55 px-6 py-6 text-white shadow-2xl backdrop-blur-md sm:block">
+            <p className="text-3xl font-black text-white">Waiting for players</p>
+            <p className="mt-2 text-base font-bold text-zinc-300">
               {seatedHumans} human{seatedHumans === 1 ? "" : "s"} seated ·{" "}
               {botSeats > 0
                 ? `${botSeats} bot${botSeats === 1 ? "" : "s"} selected`
                 : `${seatsNeeded} seats open`}
             </p>
             <button
-              className="mt-4 flex w-full items-center justify-between gap-3 rounded-full border border-white/12 bg-white/8 py-2 pl-4 pr-2 text-left font-mono text-sm font-black text-zinc-100 transition hover:border-[var(--gold)]"
+              className="mt-5 flex w-full items-center justify-between gap-3 rounded-full border border-white/12 bg-white/8 py-2.5 pl-5 pr-2 text-left font-mono text-base font-black text-zinc-100 transition hover:border-[var(--gold)]"
               type="button"
               onClick={onCopyInvite}
             >
               <span className="truncate">{inviteUrl}</span>
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--gold)] text-black">
-                <Copy className="size-4" />
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--gold)] text-black">
+                <Copy className="size-5" />
               </span>
             </button>
-            <p className="mt-3 text-xs font-semibold text-zinc-300">{message}</p>
+            <p className="mt-4 text-sm font-semibold text-zinc-300">{message}</p>
           </div>
 
-          <div className="relative z-10 grid w-32 justify-items-center gap-2 rounded-2xl border border-white/12 bg-black/55 px-3 py-4 shadow-2xl backdrop-blur-md sm:hidden">
-            <p className="text-lg font-black leading-tight">Waiting</p>
-            <p className="text-[11px] font-semibold text-zinc-300">
+          <div className="relative z-10 grid w-36 justify-items-center gap-2.5 rounded-2xl border border-white/12 bg-black/55 px-4 py-5 shadow-2xl backdrop-blur-md sm:hidden">
+            <p className="text-xl font-black leading-tight">Waiting</p>
+            <p className="text-xs font-semibold text-zinc-300">
               {seatedHumans} human · {botSeats} bots
             </p>
-            <Button className="h-9 px-3" size="sm" onClick={onCopyInvite}>
-              <Copy className="size-3.5" />
+            <Button className="h-10 px-4 text-sm" size="sm" onClick={onCopyInvite}>
+              <Copy className="size-4" />
               Invite
             </Button>
           </div>
         </section>
 
-        <aside className="online-panel grid content-start gap-3 p-4 lg:max-h-full lg:overflow-y-auto">
+        <aside className="online-panel grid content-start gap-4 p-5 lg:max-h-full lg:overflow-y-auto">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase text-[var(--aqua)]">Room Setup</p>
-              <h1 className="text-xl font-black">Casual Table</h1>
+              <p className="text-sm font-black uppercase text-[var(--aqua)]">Room Setup</p>
+              <h1 className="text-2xl font-black">Casual Table</h1>
             </div>
             <span
               className={cn(
-                "rounded-full px-2 py-1 text-xs font-black",
+                "rounded-full px-3 py-1.5 text-sm font-black",
                 getConnectionBadgeClass(connectionStatus)
               )}
             >
@@ -3821,13 +3823,17 @@ function OnlineWaitingRoom({
             onChange={onTradingEnabledChange}
           />
 
-          <Button className="h-12" variant={yourReady ? "secondary" : "primary"} onClick={onReady}>
-            <CheckCircle2 className="size-4" />
+          <Button
+            className="h-14 text-base"
+            variant={yourReady ? "secondary" : "primary"}
+            onClick={onReady}
+          >
+            <CheckCircle2 className="size-5" />
             {yourReady ? "Ready" : "Mark Ready"}
           </Button>
           {isHost ? (
-            <Button className="h-12" disabled={!roomCanStart} onClick={onStart}>
-              <Play className="size-4" />
+            <Button className="h-14 text-base" disabled={!roomCanStart} onClick={onStart}>
+              <Play className="size-5" />
               {botSeats > 0
                 ? `Start With ${botSeats} Bot${botSeats === 1 ? "" : "s"}`
                 : "Start Game"}
@@ -3837,8 +3843,8 @@ function OnlineWaitingRoom({
               Waiting for the host to start the table.
             </p>
           )}
-          <Button className="h-12" variant="secondary" onClick={onLeave}>
-            <LogOut className="size-4" />
+          <Button className="h-14 text-base" variant="secondary" onClick={onLeave}>
+            <LogOut className="size-5" />
             Leave Table
           </Button>
         </aside>
@@ -3909,17 +3915,17 @@ function WaitingSeats({
               isYourSeat
                 ? "flex-col-reverse items-center"
                 : handOrientation === "top"
-                  ? "flex-col items-center"
+                  ? "flex-col items-center max-sm:translate-y-12"
                   : handOrientation === "left"
-                    ? "flex-row items-center"
-                    : "flex-row-reverse items-center",
+                    ? "flex-row-reverse items-center max-sm:left-2 sm:-translate-x-6 sm:flex-col-reverse"
+                    : "flex-row items-center max-sm:right-2 sm:translate-x-6 sm:flex-col-reverse",
               getSeatPositionClass(index, visibleSeats.length)
             )}
           >
             <div
               className={cn(
-                "seat-panel relative flex items-center gap-2 border px-2 py-2 text-left sm:w-36 sm:px-2.5",
-                isYourSeat ? "w-32" : "w-24",
+                "seat-panel relative flex items-center gap-2.5 border px-2.5 py-2.5 text-left sm:w-40 sm:px-3 sm:py-3 xl:w-44",
+                isYourSeat ? "w-36" : "w-28",
                 seat.kind === "open"
                   ? "border-dashed border-white/20 opacity-75"
                   : profileBorder === null
@@ -3929,7 +3935,7 @@ function WaitingSeats({
             >
               <div
                 className={cn(
-                  "grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border text-xs font-black sm:size-9",
+                  "grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border text-sm font-black sm:size-11",
                   avatarCosmetic === null
                     ? "border-white/15 bg-black/30"
                     : getAvatarCosmeticClass(avatarCosmetic)
@@ -3956,13 +3962,13 @@ function WaitingSeats({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-black">{seat.label}</p>
-                <p className="text-xs text-zinc-300">{seat.detail}</p>
+                <p className="truncate text-base font-black">{seat.label}</p>
+                <p className="text-sm text-zinc-300">{seat.detail}</p>
               </div>
               {seat.kind !== "open" && handOrientation !== "top" ? (
                 <span
                   className={cn(
-                    "card-back absolute -top-5 left-1/2 h-7 w-5 -translate-x-1/2 rounded border border-white/25 shadow-lg sm:hidden",
+                    "card-back absolute -top-6 left-1/2 h-8 w-6 -translate-x-1/2 rounded border border-white/25 shadow-lg sm:hidden",
                     getCardBackClass(cardBack)
                   )}
                   aria-hidden="true"
