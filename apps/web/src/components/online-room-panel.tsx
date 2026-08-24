@@ -1571,7 +1571,7 @@ export function OnlineRoomPanel({
                   <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
                   {isYourTurn && room.tradePhase.status !== "open" ? (
                     <motion.span
-                      className="inline-flex items-center gap-1 rounded-full bg-[var(--gold)] px-2 py-0.5 text-[9px] font-black uppercase text-black shadow-[0_0_18px_rgba(242,193,78,0.24)]"
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--gold)] px-2 py-0.5 text-[10px] font-black uppercase text-black shadow-[0_0_18px_rgba(242,193,78,0.24)]"
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                     >
@@ -1580,12 +1580,13 @@ export function OnlineRoomPanel({
                     </motion.span>
                   ) : null}
                 </div>
-                <p className="max-w-56 truncate text-[10px] text-zinc-400">
+                <p className="max-w-64 truncate text-xs text-zinc-300" aria-live="polite">
+                  {yourPlayer?.cardsRemaining ?? displayedHand.length} cards left ·{" "}
                   {room.tradePhase.status === "open"
                     ? getTradeHandPrompt(room, selectedCards)
                     : isYourTurn
                       ? playableCardCount === 0 && canPass
-                        ? "No legal play available · pass to continue"
+                        ? "no legal play · pass to continue"
                         : `${selectedCards.length} selected · ${legalMoves.length} legal options`
                       : turnStatus}
                 </p>
@@ -2508,7 +2509,7 @@ function BeginnerGuide({
         <BeginnerRuleStep
           number="4"
           title="Win the trick, then the match"
-          body="When everyone else passes, the last player who played leads a fresh trick. The first player to get rid of every card wins the match."
+          body="When everyone else passes, the last player who played leads a fresh trick. There is no score for an individual turn: progress is measured by cards left, and the first player to reach zero wins."
         />
       </ol>
 
@@ -2780,7 +2781,11 @@ function CompactTimerControl({
         disabled={disabled || !enabled}
         onChange={(event) => onSecondsChange(Number(event.target.value))}
       />
-      <p className="mt-1 text-zinc-400">{seconds}s per turn</p>
+      <p className="mt-2 text-xs leading-5 text-zinc-400">
+        {enabled
+          ? `${seconds}s countdown shown in the center each turn.`
+          : "Optional. Enable this to show a turn countdown during the match."}
+      </p>
     </div>
   );
 }
@@ -2857,7 +2862,11 @@ function CompactBotPace({
         ))}
       </div>
       <p className="mt-2 text-xs font-semibold text-zinc-400">
-        Relaxed adds a longer pause before each bot move.
+        {value === "quick"
+          ? "About 2–3 seconds before each bot move."
+          : value === "normal"
+            ? "About 4–5 seconds before each bot move."
+            : "About 6–8 seconds before each bot move."}
       </p>
     </div>
   );
@@ -3422,13 +3431,13 @@ function ProfileDetails({
   const equippedCount = profile?.equippedCosmetics.length ?? 0;
 
   return (
-    <details className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-black text-zinc-300">
-        Profile details
+    <section className="mt-3 rounded-[1rem] border border-white/10 bg-black/20 p-3">
+      <div className="flex items-center justify-between gap-2 text-sm font-black text-zinc-200">
+        Career stats
         <span className="rounded-full border border-white/10 bg-white/7 px-2 py-1 text-[10px] font-black uppercase text-zinc-400">
           {gamesPlayed} games
         </span>
-      </summary>
+      </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <ProfileMetric label="Wins" value={wins} />
@@ -3469,7 +3478,7 @@ function ProfileDetails({
             : `${recentMatch.placement === null ? "Unplaced" : ordinal(recentMatch.placement)} · ${formatRatingDelta(recentMatch.ratingDelta)} · ${recentMatch.movesPlayed ?? 0} moves`}
         </p>
       </div>
-    </details>
+    </section>
   );
 }
 
@@ -3513,7 +3522,9 @@ function ActiveRoomBar({
           <p className="truncate text-sm font-black">
             {room === null ? "Realtime Table" : `${formatMatchMode(room.mode)} Table`}
           </p>
-          <p className="truncate text-xs text-zinc-400">{room === null ? message : turnStatus}</p>
+          <p className="truncate text-sm font-semibold text-zinc-300">
+            {room === null ? message : turnStatus}
+          </p>
         </div>
       </div>
 
@@ -5476,10 +5487,16 @@ function OnlineTable({
         getTableThemeClass(tableTheme)
       )}
     >
-      <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[11px] font-bold uppercase text-zinc-300 backdrop-blur">
+      <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold uppercase text-zinc-200 backdrop-blur">
         <CircleDot className="size-3 text-[var(--aqua)]" />
         {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
       </div>
+
+      {timerLabel !== null ? (
+        <p className="absolute right-3 top-3 z-30 rounded-full border border-white/10 bg-black/55 px-3 py-1 text-xs font-black text-[var(--gold)] shadow-lg backdrop-blur sm:hidden">
+          {timerLabel}
+        </p>
+      ) : null}
 
       <AnimatePresence>
         {dealAnimationKey !== null ? (
@@ -5540,8 +5557,8 @@ function OnlineTable({
       </AnimatePresence>
 
       <div className="relative z-10 grid h-full min-h-[42rem] translate-y-14 place-items-center pb-44 text-center sm:min-h-[46rem] sm:pb-48 lg:min-h-0">
-        <div className="trick-island w-[min(32rem,86vw)] px-5 py-6">
-          <p className="text-xs font-semibold uppercase text-zinc-400">
+        <div className="trick-island w-[min(32rem,86vw)] px-5 pb-6 pt-24">
+          <p className="text-sm font-semibold uppercase text-zinc-300">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
           </p>
           <h2 className="mt-1 text-2xl font-black">
@@ -5550,7 +5567,7 @@ function OnlineTable({
               : formatHandType(room.currentTrick.hand.type)}
           </h2>
           {timerLabel !== null ? (
-            <p className="mx-auto mt-2 w-fit rounded-full border border-white/10 bg-black/24 px-3 py-1 text-xs font-bold text-[var(--gold)]">
+            <p className="mx-auto mt-2 hidden w-fit rounded-full border border-white/10 bg-black/24 px-3 py-1 text-sm font-black text-[var(--gold)] sm:block">
               {timerLabel}
             </p>
           ) : null}
@@ -5559,7 +5576,7 @@ function OnlineTable({
               {room?.currentTrick === null || room === null ? (
                 <motion.div
                   className={cn(
-                    "rounded-full border px-5 py-3 text-sm font-semibold backdrop-blur",
+                    "rounded-full border px-5 py-3 text-base font-semibold backdrop-blur",
                     isYourTurn && room?.tradePhase.status !== "open"
                       ? "border-[var(--gold)]/45 bg-[var(--gold)]/12 text-amber-50 shadow-[0_0_28px_rgba(242,193,78,0.12)]"
                       : "border-white/12 bg-black/18 text-zinc-300"
@@ -6077,7 +6094,7 @@ function OnlineSeat({
         <AnimatePresence>
           {active ? (
             <motion.span
-              className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-amber-100/30 bg-[var(--gold)] px-2 py-0.5 text-[9px] font-black uppercase text-black shadow-lg"
+              className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-amber-100/30 bg-[var(--gold)] px-2 py-0.5 text-[10px] font-black uppercase text-black shadow-lg"
               initial={{ opacity: 0, y: 4, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 3, scale: 0.9 }}
@@ -6118,13 +6135,13 @@ function OnlineSeat({
         </div>
         <div className="min-w-0 flex-1">
           <button
-            className="block max-w-full truncate text-left text-xs font-bold underline-offset-4 transition hover:text-[var(--gold)] hover:underline sm:text-sm"
+            className="block max-w-full truncate text-left text-sm font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
             type="button"
             onClick={onOpenStats}
           >
             {player.name}
           </button>
-          <p className="text-[10px] text-zinc-400 sm:text-xs">{player.cardsRemaining} cards</p>
+          <p className="text-xs font-semibold text-zinc-300">{player.cardsRemaining} cards left</p>
           <span className="sr-only">{player.connected ? "online" : "away"}</span>
         </div>
       </div>
