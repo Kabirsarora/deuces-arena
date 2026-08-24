@@ -3674,11 +3674,20 @@ function OnlineWaitingRoom({
   const seatsNeeded = Math.max(0, playerCount - room.players.length - botSeats);
   const inviteUrl = getRoomInviteUrl(room.roomCode);
   const maximumPlayerCount = getMaxPlayersForSetup(deckType, cardsPerPlayer);
+  const yourPlayer =
+    room.players.find((player) => player.id === room.yourPlayerId) ?? room.players[0];
+  const tableTheme =
+    yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
 
   return (
     <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="waiting-room-table relative grid min-h-[38rem] place-items-center overflow-hidden px-5 py-10 text-center">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[92rem] gap-5 lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <section
+          className={cn(
+            "table-felt table-oval relative grid min-h-[38rem] place-items-center overflow-hidden px-5 py-10 text-center lg:min-h-0",
+            getTableThemeClass(tableTheme)
+          )}
+        >
           <div className="absolute left-1/2 top-5 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur">
             <span className="flex items-center gap-2 rounded-full px-3 py-1 text-xs font-black uppercase text-zinc-300">
               <CircleDot className="size-3 text-[var(--aqua)]" />
@@ -3693,9 +3702,15 @@ function OnlineWaitingRoom({
             </button>
           </div>
 
-          <WaitingSeats players={room.players} botSeats={botSeats} />
+          <WaitingSeats
+            players={room.players}
+            botSeats={botSeats}
+            playerCount={playerCount}
+            cardsPerPlayer={cardsPerPlayer}
+            yourPlayerId={room.yourPlayerId}
+          />
 
-          <div className="relative z-10 w-[min(38rem,92vw)] rounded-[1.5rem] border border-white/12 bg-black/42 px-5 py-5 text-white shadow-2xl backdrop-blur">
+          <div className="relative z-10 hidden w-[min(28rem,70%)] rounded-[1.25rem] border border-white/12 bg-black/55 px-5 py-5 text-white shadow-2xl backdrop-blur-md sm:block">
             <p className="text-2xl font-black text-white">Waiting for players</p>
             <p className="mt-1 text-sm font-bold text-zinc-300">
               {seatedHumans} human{seatedHumans === 1 ? "" : "s"} seated ·{" "}
@@ -3713,14 +3728,22 @@ function OnlineWaitingRoom({
                 <Copy className="size-4" />
               </span>
             </button>
+            <p className="mt-3 text-xs font-semibold text-zinc-300">{message}</p>
           </div>
 
-          <p className="absolute bottom-6 left-1/2 z-10 w-[min(40rem,90vw)] -translate-x-1/2 text-sm font-semibold text-zinc-300">
-            {message}
-          </p>
+          <div className="relative z-10 grid w-32 justify-items-center gap-2 rounded-2xl border border-white/12 bg-black/55 px-3 py-4 shadow-2xl backdrop-blur-md sm:hidden">
+            <p className="text-lg font-black leading-tight">Waiting</p>
+            <p className="text-[11px] font-semibold text-zinc-300">
+              {seatedHumans} human · {botSeats} bots
+            </p>
+            <Button className="h-9 px-3" size="sm" onClick={onCopyInvite}>
+              <Copy className="size-3.5" />
+              Invite
+            </Button>
+          </div>
         </section>
 
-        <aside className="online-panel grid content-start gap-3 p-4">
+        <aside className="online-panel grid content-start gap-3 p-4 lg:max-h-full lg:overflow-y-auto">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase text-[var(--aqua)]">Room Setup</p>
@@ -3826,55 +3849,138 @@ function OnlineWaitingRoom({
 
 function WaitingSeats({
   players,
-  botSeats
+  botSeats,
+  playerCount,
+  cardsPerPlayer,
+  yourPlayerId
 }: {
   readonly players: readonly PublicRoomPlayer[];
   readonly botSeats: number;
+  readonly playerCount: number;
+  readonly cardsPerPlayer: number;
+  readonly yourPlayerId: string | null;
 }) {
+  const anchoredPlayers = getClockwiseSeatedPlayers(players, yourPlayerId);
   const visibleSeats = [
-    ...players.map((player) => ({
+    ...anchoredPlayers.map((player) => ({
       id: player.id,
       label: player.name,
-      detail: player.ready ? "ready" : player.kind,
-      kind: player.kind
+      detail: player.ready ? "ready" : player.id === yourPlayerId ? "you" : "waiting",
+      kind: player.kind as "human" | "bot" | "open",
+      player
     })),
     ...Array.from({ length: botSeats }).map((_, index) => ({
       id: `bot-preview-${index}`,
       label: `Bot ${index + 1}`,
       detail: "queued",
-      kind: "bot" as const
+      kind: "bot" as const,
+      player: null
+    })),
+    ...Array.from({
+      length: Math.max(0, playerCount - anchoredPlayers.length - botSeats)
+    }).map((_, index) => ({
+      id: `open-preview-${index}`,
+      label: "Open seat",
+      detail: "invite a player",
+      kind: "open" as const,
+      player: null
     }))
-  ].slice(0, 4);
-  const seatPositions = [
-    "left-1/2 top-[12%] -translate-x-1/2",
-    "right-[8%] top-1/2 -translate-y-1/2",
-    "left-1/2 bottom-[9%] -translate-x-1/2",
-    "left-[8%] top-1/2 -translate-y-1/2"
-  ];
+  ].slice(0, playerCount);
 
   return (
     <>
-      {visibleSeats.map((seat, index) => (
-        <div
-          key={seat.id}
-          className={cn(
-            "seat-panel absolute z-10 flex min-w-44 items-center gap-3 border px-3 py-2 text-left",
-            seatPositions[index]
-          )}
-        >
-          <div className="grid size-10 shrink-0 place-items-center rounded-full border border-white/15 bg-black/30 text-sm font-black">
-            {seat.kind === "bot" ? (
-              <Bot className="size-5 text-[var(--aqua)]" />
-            ) : (
-              seat.label.slice(0, 1).toUpperCase()
+      {visibleSeats.map((seat, index) => {
+        const isYourSeat = seat.player?.id === yourPlayerId;
+        const handOrientation =
+          isYourSeat && index === 0 ? "top" : getSeatHandOrientation(index, visibleSeats.length);
+        const cardBack =
+          seat.player === null ? null : getEquippedCosmetic(seat.player, "CARD_BACK");
+        const profileBorder =
+          seat.player === null ? null : getEquippedCosmetic(seat.player, "PROFILE_BORDER");
+        const avatarCosmetic =
+          seat.player === null ? null : getEquippedCosmetic(seat.player, "AVATAR");
+        const avatarImage = getAvatarCosmeticImage(avatarCosmetic);
+
+        return (
+          <div
+            key={seat.id}
+            className={cn(
+              "absolute z-20 flex gap-1 sm:gap-2",
+              isYourSeat
+                ? "flex-col-reverse items-center"
+                : handOrientation === "top"
+                  ? "flex-col items-center"
+                  : handOrientation === "left"
+                    ? "flex-row items-center"
+                    : "flex-row-reverse items-center",
+              getSeatPositionClass(index, visibleSeats.length)
+            )}
+          >
+            <div
+              className={cn(
+                "seat-panel relative flex items-center gap-2 border px-2 py-2 text-left sm:w-36 sm:px-2.5",
+                isYourSeat ? "w-32" : "w-24",
+                seat.kind === "open"
+                  ? "border-dashed border-white/20 opacity-75"
+                  : profileBorder === null
+                    ? "border-white/12"
+                    : getProfileBorderClass(profileBorder)
+              )}
+            >
+              <div
+                className={cn(
+                  "grid size-8 shrink-0 place-items-center overflow-hidden rounded-full border text-xs font-black sm:size-9",
+                  avatarCosmetic === null
+                    ? "border-white/15 bg-black/30"
+                    : getAvatarCosmeticClass(avatarCosmetic)
+                )}
+              >
+                {avatarImage !== null ? (
+                  <span
+                    className="size-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${avatarImage})` }}
+                  />
+                ) : seat.player?.imageUrl !== null && seat.player?.imageUrl !== undefined ? (
+                  <span
+                    className="size-full bg-cover bg-center"
+                    style={{ backgroundImage: `url(${seat.player.imageUrl})` }}
+                  />
+                ) : seat.kind === "bot" ? (
+                  <Bot className="size-4 text-[var(--aqua)]" />
+                ) : seat.kind === "open" ? (
+                  <Users className="size-4 text-zinc-400" />
+                ) : avatarCosmetic === null ? (
+                  seat.label.slice(0, 1).toUpperCase()
+                ) : (
+                  getAvatarCosmeticSymbol(avatarCosmetic)
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-black">{seat.label}</p>
+                <p className="text-xs text-zinc-300">{seat.detail}</p>
+              </div>
+              {seat.kind !== "open" && handOrientation !== "top" ? (
+                <span
+                  className={cn(
+                    "card-back absolute -top-5 left-1/2 h-7 w-5 -translate-x-1/2 rounded border border-white/25 shadow-lg sm:hidden",
+                    getCardBackClass(cardBack)
+                  )}
+                  aria-hidden="true"
+                />
+              ) : null}
+            </div>
+            {seat.kind === "open" ? null : (
+              <div className={cn(handOrientation !== "top" && "hidden sm:block")}>
+                <OnlineOpponentHand
+                  count={cardsPerPlayer}
+                  cardBack={cardBack}
+                  orientation={handOrientation}
+                />
+              </div>
             )}
           </div>
-          <div>
-            <p className="text-sm font-black">{seat.label}</p>
-            <p className="text-xs text-zinc-400">{seat.detail}</p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }
