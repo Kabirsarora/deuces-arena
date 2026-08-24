@@ -2068,6 +2068,21 @@ function OnlineLobbyHub({
 
           <p className="mt-auto pt-5 text-sm font-semibold text-zinc-300">{message}</p>
         </div>
+        <aside
+          aria-label="Indie game spotlight"
+          className="flex flex-col items-center gap-2 border-t border-white/10 px-5 py-4"
+        >
+          <p className="text-[10px] font-black uppercase tracking-wide text-zinc-500">
+            Indie spotlight
+          </p>
+          <iframe
+            className="h-[130px] w-[300px] max-w-full border-0"
+            loading="lazy"
+            sandbox="allow-scripts allow-popups"
+            src="https://ad-swap.web.app/frame.html?site=tuzlxLkDDryFSDt9G6cX&theme=dark"
+            title="Ad from another independent site"
+          />
+        </aside>
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 text-xs font-bold text-zinc-500 sm:px-7 lg:px-8">
           <span>Deuces Arena · fair play, no pay-to-win advantages</span>
           <span className="flex gap-4">

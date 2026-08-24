@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 export function PolicyPage({
   title,
   summary,
+  lastUpdated = "August 6, 2026",
   children
 }: {
   readonly title: string;
   readonly summary: string;
+  readonly lastUpdated?: string;
   readonly children: ReactNode;
 }) {
   return (
@@ -28,7 +30,7 @@ export function PolicyPage({
           <h1 className="mt-8 text-4xl font-black sm:text-5xl">{title}</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300">{summary}</p>
           <p className="mt-4 text-xs font-bold uppercase text-zinc-500">
-            Last updated August 6, 2026
+            Last updated {lastUpdated}
           </p>
         </header>
 

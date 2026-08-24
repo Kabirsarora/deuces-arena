@@ -12,6 +12,7 @@ export default function PrivacyPage() {
     <PolicyPage
       title="Privacy Policy"
       summary="This policy explains what Deuces Arena collects, why it is needed, and the choices available to players. The project does not sell personal information or use gameplay data for advertising."
+      lastUpdated="August 24, 2026"
     >
       <section>
         <h2>Information we collect</h2>
@@ -42,6 +43,11 @@ export default function PrivacyPage() {
           <li>
             <strong>Mobile notification data:</strong> an Expo push token and device platform when a
             signed-in app user chooses to enable table alerts.
+          </li>
+          <li>
+            <strong>Promotional widget data:</strong> normal network metadata, such as an IP address
+            and browser information, may be processed by Ad Swap when its sandboxed lobby widget
+            loads. Deuces Arena does not send account or gameplay data to the widget.
           </li>
         </ul>
       </section>
@@ -75,9 +81,10 @@ export default function PrivacyPage() {
         <p>
           Service providers process data only as needed to operate the app. Current infrastructure
           includes Google for authentication, Vercel for the web app, Render for realtime services,
-          Neon for PostgreSQL storage, and Expo for opted-in mobile notification delivery. These
-          providers may process normal network metadata such as IP addresses, request logs, device
-          push tokens, and delivery receipts under their own policies.
+          Neon for PostgreSQL storage, Expo for opted-in mobile notification delivery, and Ad Swap
+          for the reciprocal indie-site promotion shown in the lobby. These providers may process
+          normal network metadata such as IP addresses, request logs, device push tokens, and
+          delivery receipts under their own policies.
         </p>
       </section>
 
