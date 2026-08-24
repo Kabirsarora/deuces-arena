@@ -1474,7 +1474,19 @@ export function OnlineRoomPanel({
           >
             <div className="hand-control-rail mx-auto mb-1.5 flex w-fit max-w-full flex-col items-start gap-2 rounded-full border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-3">
               <div>
-                <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
+                  {isYourTurn && room.tradePhase.status !== "open" ? (
+                    <motion.span
+                      className="inline-flex items-center gap-1 rounded-full bg-[var(--gold)] px-2 py-0.5 text-[9px] font-black uppercase text-black shadow-[0_0_18px_rgba(242,193,78,0.24)]"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <Play className="size-2.5 fill-current" />
+                      Your turn
+                    </motion.span>
+                  ) : null}
+                </div>
                 <p className="max-w-56 truncate text-[10px] text-zinc-400">
                   {room.tradePhase.status === "open"
                     ? getTradeHandPrompt(room, selectedCards)
@@ -1486,24 +1498,23 @@ export function OnlineRoomPanel({
                 </p>
               </div>
               <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:justify-end">
-                <div className="flex rounded-full border border-white/10 bg-black/24 p-1">
-                  {HAND_SORT_OPTIONS.map((option) => (
-                    <button
-                      key={option.mode}
-                      className={cn(
-                        "rounded-full px-3 py-1.5 text-xs font-black transition",
-                        handSortMode === option.mode
-                          ? "bg-[var(--gold)] text-black"
-                          : "text-zinc-400 hover:bg-white/8 hover:text-white"
-                      )}
-                      type="button"
-                      aria-pressed={handSortMode === option.mode}
-                      onClick={() => setHandSortMode(option.mode)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <label className="relative flex h-9 items-center rounded-full border border-white/10 bg-black/24 text-zinc-300 transition focus-within:border-[var(--gold)]">
+                  <ListOrdered className="pointer-events-none absolute left-3 size-3.5" />
+                  <span className="sr-only">Sort hand</span>
+                  <select
+                    aria-label="Sort hand"
+                    className="h-full appearance-none bg-transparent py-0 pl-8 pr-8 text-xs font-black text-white outline-none"
+                    value={handSortMode}
+                    onChange={(event) => setHandSortMode(event.target.value as HandSortMode)}
+                  >
+                    {HAND_SORT_OPTIONS.map((option) => (
+                      <option key={option.mode} className="bg-zinc-950" value={option.mode}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-zinc-500" />
+                </label>
                 {selectedCards.length > 0 ? (
                   <Button
                     variant="secondary"
@@ -1593,6 +1604,7 @@ export function OnlineRoomPanel({
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
                     const selected = selectedCardIds.includes(getCardId(card));
                     const playable = isYourTurn && playableCardIds.has(getCardId(card));
+                    const disabled = room.tradePhase.status !== "open" && isYourTurn && !playable;
                     const cardName = formatCardName(card);
 
                     return (
@@ -1601,12 +1613,13 @@ export function OnlineRoomPanel({
                         layout="position"
                         layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
                         type="button"
-                        className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
+                        className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md disabled:cursor-not-allowed disabled:opacity-45 sm:h-28 sm:w-20"
                         aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
-                          playable ? ", legal option" : ""
+                          playable ? ", legal option" : disabled ? ", unavailable this turn" : ""
                         }`}
                         aria-pressed={selected}
-                        title={cardName}
+                        disabled={disabled}
+                        title={disabled ? `${cardName} cannot be used in a legal play` : cardName}
                         initial={
                           shouldReduceMotion
                             ? false
@@ -1658,13 +1671,13 @@ export function OnlineRoomPanel({
                                 mass: 0.78
                               })
                         }}
-                        drag="x"
+                        drag={disabled ? false : "x"}
                         dragSnapToOrigin
                         dragElastic={0.18}
                         dragMomentum={false}
                         onDragStart={() => setHandSortMode("manual")}
                         onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
-                        {...(isYourTurn && !shouldReduceMotion
+                        {...(isYourTurn && !disabled && !shouldReduceMotion
                           ? {
                               whileHover: {
                                 y: selected ? -20 : -8
@@ -5177,6 +5190,34 @@ function OnlineTable({
   const trickCardTheme =
     trickPlayer === undefined ? null : getEquippedCosmetic(trickPlayer, "CARD_BACK");
   const timerLabel = formatTurnTimer(room, timerNow);
+  const activePlayer = players.find((player) => player.id === room?.activePlayerId);
+  const isYourTurn =
+    room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
+  const isOpeningLead = room?.turnNumber === 0 && room.currentTrick === null;
+  const openTableTitle =
+    room === null
+      ? "Open table"
+      : room.status === "waiting"
+        ? "Waiting for players"
+        : room.tradePhase.status === "open"
+          ? "Trade window open"
+          : isYourTurn
+            ? isOpeningLead
+              ? "Lead with 3♦"
+              : "Your lead"
+            : "Open table";
+  const openTablePrompt =
+    room === null
+      ? "Create or join a room to take a seat."
+      : room.status === "waiting"
+        ? "The host can begin when the table is ready."
+        : room.tradePhase.status === "open"
+          ? "Complete any trades before normal play begins."
+          : isYourTurn
+            ? isOpeningLead
+              ? "Your opening play must include the 3 of diamonds."
+              : "Play any legal hand to start the next trick."
+            : `${activePlayer?.name ?? "The active player"} is choosing the next lead.`;
   const currentLeadName =
     room?.currentTrick === null || room === null
       ? null
@@ -5290,7 +5331,7 @@ function OnlineTable({
           </p>
           <h2 className="mt-1 text-2xl font-black">
             {room?.currentTrick === null || room === null
-              ? "Open table"
+              ? openTableTitle
               : formatHandType(room.currentTrick.hand.type)}
           </h2>
           {timerLabel !== null ? (
@@ -5302,12 +5343,17 @@ function OnlineTable({
             <AnimatePresence mode="sync">
               {room?.currentTrick === null || room === null ? (
                 <motion.div
-                  className="sr-only rounded-full border border-dashed border-white/18 bg-black/18 px-7 py-7 text-sm text-zinc-300 sm:not-sr-only"
+                  className={cn(
+                    "rounded-full border px-5 py-3 text-sm font-semibold backdrop-blur",
+                    isYourTurn && room?.tradePhase.status !== "open"
+                      ? "border-[var(--gold)]/45 bg-[var(--gold)]/12 text-amber-50 shadow-[0_0_28px_rgba(242,193,78,0.12)]"
+                      : "border-white/12 bg-black/18 text-zinc-300"
+                  )}
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
                 >
-                  Waiting for the next lead.
+                  {openTablePrompt}
                 </motion.div>
               ) : (
                 room.currentTrick.hand.cards.map((card, index) => (
@@ -5804,14 +5850,29 @@ function OnlineSeat({
     >
       <div
         className={cn(
-          "seat-panel flex w-28 items-center gap-2 border px-2.5 py-2 sm:w-36",
+          "seat-panel relative flex w-28 items-center gap-2 border px-2.5 py-2 sm:w-36",
           active
             ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
             : profileBorder !== null
               ? getProfileBorderClass(profileBorder)
               : "border-white/10"
         )}
+        aria-current={active ? "true" : undefined}
       >
+        <AnimatePresence>
+          {active ? (
+            <motion.span
+              className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-amber-100/30 bg-[var(--gold)] px-2 py-0.5 text-[9px] font-black uppercase text-black shadow-lg"
+              initial={{ opacity: 0, y: 4, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 3, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            >
+              <Play className="size-2.5 fill-current" />
+              Turn
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
         <div
           className={cn(
             "grid size-8 shrink-0 place-items-center rounded-full border text-xs font-black sm:size-9",
