@@ -161,12 +161,105 @@ const BOT_PACE_OPTIONS: readonly {
   { value: "quick", label: "Quick" }
 ];
 const DEUCES_RULES: readonly string[] = [
-  "3 of diamonds starts and must be included in the first play.",
-  "Follow the lead type: single, pair, trips, full house, or exact-length straight.",
-  "Straights must match the exact length that opened the trick.",
-  "Players may pass even when they have a legal higher play.",
-  "A bomb is four of a kind plus one off-rank kicker and can beat normal hands.",
-  "When everyone else passes, the last player to make a valid play leads the next trick."
+  "A match is made of tricks. A new trick begins whenever the center of the table is empty.",
+  "The player holding 3 of diamonds leads the first trick, and the opening play must include that card.",
+  "The leader may play any supported combination. That choice sets the hand type for the trick.",
+  "After the lead, play a higher hand of the same type or pass. Straight responses must use exactly the same number of cards.",
+  "A bomb is the exception: it may interrupt any normal hand.",
+  "When nobody beats the last play, that player wins the trick, clears the center, and chooses the next hand type.",
+  "The first player to empty their hand wins the match."
+];
+type RuleExampleCard = {
+  readonly rank: string;
+  readonly suit: "♦" | "♣" | "♥" | "♠";
+};
+type RuleHandExample = {
+  readonly type: HandType;
+  readonly label: string;
+  readonly cards: readonly RuleExampleCard[];
+  readonly formation: string;
+  readonly response: string;
+};
+const RULE_HAND_EXAMPLES: readonly RuleHandExample[] = [
+  {
+    type: "single",
+    label: "Single",
+    cards: [{ rank: "7", suit: "♣" }],
+    formation: "Any one card.",
+    response: "Beat it with one higher card."
+  },
+  {
+    type: "pair",
+    label: "Pair (double)",
+    cards: [
+      { rank: "9", suit: "♦" },
+      { rank: "9", suit: "♠" }
+    ],
+    formation: "Two cards of the same rank.",
+    response: "Beat it with a higher pair."
+  },
+  {
+    type: "trips",
+    label: "Trips",
+    cards: [
+      { rank: "J", suit: "♦" },
+      { rank: "J", suit: "♣" },
+      { rank: "J", suit: "♥" }
+    ],
+    formation: "Three cards of the same rank.",
+    response: "Beat it with higher trips."
+  },
+  {
+    type: "quad",
+    label: "Quad",
+    cards: [
+      { rank: "5", suit: "♦" },
+      { rank: "5", suit: "♣" },
+      { rank: "5", suit: "♥" },
+      { rank: "5", suit: "♠" }
+    ],
+    formation: "All four suits of one rank.",
+    response: "Beat it with a higher quad."
+  },
+  {
+    type: "full-house",
+    label: "Full house",
+    cards: [
+      { rank: "8", suit: "♦" },
+      { rank: "8", suit: "♣" },
+      { rank: "8", suit: "♥" },
+      { rank: "K", suit: "♦" },
+      { rank: "K", suit: "♠" }
+    ],
+    formation: "Trips plus a pair.",
+    response: "Beat it with a higher set of trips."
+  },
+  {
+    type: "straight",
+    label: "Straight",
+    cards: [
+      { rank: "3", suit: "♦" },
+      { rank: "4", suit: "♣" },
+      { rank: "5", suit: "♥" },
+      { rank: "6", suit: "♠" },
+      { rank: "7", suit: "♦" }
+    ],
+    formation: "Five or more consecutive ranks. A 2 cannot be used.",
+    response: "Beat it with a higher straight of the exact same length."
+  },
+  {
+    type: "bomb",
+    label: "Bomb",
+    cards: [
+      { rank: "Q", suit: "♦" },
+      { rank: "Q", suit: "♣" },
+      { rank: "Q", suit: "♥" },
+      { rank: "Q", suit: "♠" },
+      { rank: "4", suit: "♦" }
+    ],
+    formation: "Four of a kind plus one extra card.",
+    response: "Beats any normal hand; only a higher four-of-a-kind rank beats it."
+  }
 ];
 const MANUAL_CARD_DRAG_STEP_PX = 58;
 const FEEDBACK_KIND_OPTIONS: readonly { readonly value: FeedbackKind; readonly label: string }[] = [
@@ -2378,32 +2471,62 @@ function BeginnerGuide({
         </div>
       </section>
 
+      <section className="mt-6 overflow-hidden border-y border-white/10 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-white/10">
+        <RuleFlowItem
+          eyebrow="Center is empty"
+          title="Lead any valid hand"
+          body="You choose whether this trick uses singles, pairs, trips, quads, a full house, or a straight."
+        />
+        <RuleFlowItem
+          eyebrow="Cards are in the center"
+          title="Match it or pass"
+          body="Play a higher hand of the same type. A bomb is the only hand that may break the pattern."
+        />
+        <RuleFlowItem
+          eyebrow="Everyone else passes"
+          title="Clear and lead again"
+          body="The last player to play wins that trick. The center clears and they choose the next type."
+        />
+      </section>
+
       <ol className="mt-6 divide-y divide-white/10 border-y border-white/10">
         <BeginnerRuleStep
           number="1"
-          title="Start with the 3 of diamonds"
-          body="Whoever holds 3♦ leads the first trick, and that opening play must include it."
+          title="The match starts with 3♦"
+          body="Whoever holds the 3 of diamonds takes the first turn. They may lead a single, pair, straight, or another valid combination, but it must contain 3♦."
         />
         <BeginnerRuleStep
           number="2"
-          title="Match the hand type"
-          body="A single answers a single, a pair answers a pair, and a straight must match the exact length. You may always pass."
+          title="The lead sets the type"
+          body="If the leader plays one card, everyone must answer with one higher card. If they play a pair, everyone must answer with a higher pair. The same rule applies to every normal hand type."
         />
         <BeginnerRuleStep
           number="3"
-          title="Win the trick, then lead"
-          body="When everyone else passes, the last player who played controls the next trick and may choose a new hand type."
+          title="Play higher or pass"
+          body="Passing is always allowed, even when you can play. If someone plays a higher hand after you pass, your turn may come around again before the trick ends."
         />
         <BeginnerRuleStep
           number="4"
-          title="Empty your hand first"
-          body="The first player with no cards remaining wins. Bombs can interrupt normal hands and are explained in the full rules below."
+          title="Win the trick, then the match"
+          body="When everyone else passes, the last player who played leads a fresh trick. The first player to get rid of every card wins the match."
         />
       </ol>
 
+      <section className="mt-7">
+        <p className="text-xs font-black uppercase text-[var(--gold)]">Every legal combination</p>
+        <h3 className="mt-1 text-xl font-black">What you can play</h3>
+        <p className="mt-1 text-sm leading-6 text-zinc-400">
+          You may lead with any hand below. Once led, everyone must use that same row until the
+          trick ends, except when a bomb is played.
+        </p>
+        <div className="mt-4">
+          <HandCombinationGuide />
+        </div>
+      </section>
+
       <details className="mt-5 border-b border-white/10 pb-4">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black">
-          Full rules
+          Complete turn rules
           <ChevronDown className="size-4 text-zinc-400" />
         </summary>
         <ul className="mt-3 grid gap-2 text-sm leading-6 text-zinc-300">
@@ -2473,6 +2596,83 @@ function BeginnerRuleStep({
       </div>
     </li>
   );
+}
+
+function RuleFlowItem({
+  eyebrow,
+  title,
+  body
+}: {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly body: string;
+}) {
+  return (
+    <div className="border-b border-white/10 px-4 py-4 last:border-b-0 sm:border-b-0">
+      <p className="text-[10px] font-black uppercase text-[var(--aqua)]">{eyebrow}</p>
+      <h3 className="mt-1 text-sm font-black text-white">{title}</h3>
+      <p className="mt-1 text-xs leading-5 text-zinc-400">{body}</p>
+    </div>
+  );
+}
+
+function HandCombinationGuide({ compact = false }: { readonly compact?: boolean }) {
+  return (
+    <ol className="divide-y divide-white/10 border-y border-white/10">
+      {RULE_HAND_EXAMPLES.map((hand) => (
+        <li
+          key={hand.type}
+          className={cn(
+            "grid items-center gap-3 py-3",
+            compact ? "grid-cols-[6.25rem_1fr]" : "sm:grid-cols-[9rem_9rem_1fr]"
+          )}
+        >
+          <RuleCardFan cards={hand.cards} />
+          <div>
+            <p className="text-sm font-black text-white">{hand.label}</p>
+            <p className="mt-0.5 text-xs leading-5 text-zinc-400">{hand.formation}</p>
+            {compact ? (
+              <p className="mt-1 text-[11px] leading-4 text-zinc-300">{hand.response}</p>
+            ) : null}
+          </div>
+          {compact ? null : (
+            <p className="text-xs leading-5 text-zinc-300 sm:border-l sm:border-white/10 sm:pl-4">
+              {hand.response}
+            </p>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function RuleCardFan({ cards }: { readonly cards: readonly RuleExampleCard[] }) {
+  return (
+    <div
+      className="flex min-h-12 items-center pl-1"
+      aria-label={cards.map(formatRuleCard).join(", ")}
+    >
+      {cards.map((card, index) => (
+        <span
+          key={`${card.rank}-${card.suit}`}
+          aria-hidden="true"
+          className={cn(
+            "relative grid h-11 w-8 shrink-0 place-content-center rounded border border-zinc-300 bg-zinc-50 text-[10px] font-black shadow-md",
+            index > 0 ? "-ml-3" : "",
+            card.suit === "♦" || card.suit === "♥" ? "text-red-600" : "text-zinc-950"
+          )}
+          style={{ zIndex: index + 1 }}
+        >
+          <span>{card.rank}</span>
+          <span className="text-xs leading-none">{card.suit}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function formatRuleCard(card: RuleExampleCard): string {
+  return `${card.rank}${card.suit}`;
 }
 
 function HubPlayCard({
@@ -4831,6 +5031,16 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
 
   return (
     <div className="grid gap-3">
+      <div className="border-y border-white/10 py-3">
+        <p className="text-xs font-black uppercase text-[var(--aqua)]">How a trick works</p>
+        <p className="mt-2 text-xs leading-5 text-zinc-300">
+          <strong className="text-white">Empty center:</strong> the active player leads any valid
+          combination. <strong className="text-white">Cards in the center:</strong> play a higher
+          hand of the same type or pass. When nobody beats the last play, its player clears the
+          center and leads again.
+        </p>
+      </div>
+
       <div className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
         <p className="text-xs font-black uppercase text-[var(--gold)]">Rank order</p>
         <p className="mt-2 text-sm font-bold text-zinc-100">3 4 5 6 7 8 9 10 J Q K A 2</p>
@@ -4839,7 +5049,12 @@ function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
         </p>
       </div>
 
-      <ol className="grid gap-2">
+      <div>
+        <p className="mb-1 text-xs font-black uppercase text-[var(--gold)]">Legal combinations</p>
+        <HandCombinationGuide compact />
+      </div>
+
+      <ol className="mt-1 grid gap-2">
         {[...DEUCES_RULES, ...arenaRules, bombRule, ...tradeRule].map((rule, index) => (
           <li
             key={rule}
