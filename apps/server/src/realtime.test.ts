@@ -1187,6 +1187,110 @@ describe("realtime rooms", () => {
     expect(startedRoom.data.turnTimer?.deadlineAt).not.toBeNull();
   });
 
+  it("passes for a connected human who times out during an active trick", async () => {
+    const players = await Promise.all([
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket(),
+      connectTestSocket()
+    ]);
+    const [host, second, third, fourth] = players;
+
+    if (host === undefined || second === undefined || third === undefined || fourth === undefined) {
+      throw new Error("Unable to create timer test sockets.");
+    }
+
+    const createdRoom = await createRoom(host, {
+      playerName: "Timer Host",
+      guestId: "guest-timeout-host"
+    });
+
+    expect(createdRoom.ok).toBe(true);
+
+    if (!createdRoom.ok) {
+      return;
+    }
+
+    for (const [socket, playerName, guestId] of [
+      [second, "Timer Second", "guest-timeout-second"],
+      [third, "Timer Third", "guest-timeout-third"],
+      [fourth, "Timer Fourth", "guest-timeout-fourth"]
+    ] as const) {
+      const joinedRoom = await joinRoom(socket, {
+        roomCode: createdRoom.data.roomCode,
+        playerName,
+        guestId
+      });
+
+      expect(joinedRoom.ok).toBe(true);
+    }
+
+    for (const socket of players) {
+      const readyRoom = await setReady(socket, {
+        roomCode: createdRoom.data.roomCode,
+        ready: true
+      });
+
+      expect(readyRoom.ok).toBe(true);
+    }
+
+    const startedStates = players.map((socket) =>
+      waitForRoomStateMatching(
+        socket,
+        (state) => state.status === "in-progress" && state.turnTimer?.secondsPerTurn === 1
+      )
+    );
+    const startedRoom = await startRoom(host, {
+      roomCode: createdRoom.data.roomCode,
+      botCount: 0,
+      timer: {
+        enabled: true,
+        secondsPerTurn: 1
+      }
+    });
+    const playerStates = await Promise.all(startedStates);
+
+    expect(startedRoom.ok).toBe(true);
+
+    if (!startedRoom.ok) {
+      return;
+    }
+
+    const activeIndex = playerStates.findIndex(
+      (state) => state.yourPlayerId === state.activePlayerId
+    );
+    const activeSocket = players[activeIndex];
+    const activeState = playerStates[activeIndex];
+    const observer = players[(activeIndex + 1) % players.length];
+
+    if (activeSocket === undefined || activeState === undefined || observer === undefined) {
+      throw new Error("Unable to resolve the opening player for the timer test.");
+    }
+
+    const openingMove = generateLegalMoves(activeState.yourHand, {
+      isFirstMove: true,
+      currentTrick: null
+    })[0];
+
+    if (openingMove === undefined) {
+      throw new Error("Expected a legal opening move for the timer test.");
+    }
+
+    const timedOutStatePromise = waitForRoomStateMatching(
+      observer,
+      (state) => state.recentEvents.length === 2 && state.recentEvents[1]?.wasPass === true
+    );
+    const openingAck = await submitMove(activeSocket, {
+      roomCode: createdRoom.data.roomCode,
+      move: openingMove
+    });
+    const timedOutState = await timedOutStatePromise;
+
+    expect(openingAck.ok).toBe(true);
+    expect(timedOutState.recentEvents[1]?.move).toEqual({ type: "pass" });
+    expect(timedOutState.turnNumber).toBe(2);
+  });
+
   it("keeps a started room moving when the active player disconnects", async () => {
     const players = await Promise.all([
       connectTestSocket(),

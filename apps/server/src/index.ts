@@ -2450,7 +2450,7 @@ function scheduleAutomatedTurn(room: Room): void {
   }
 
   room.timerTimeout = setTimeout(
-    () => applyAutomatedMove(room, activePlayer.id, "lowest-legal"),
+    () => applyTimedOutHumanTurn(room, activePlayer.id),
     Math.max(0, room.turnDeadlineAt.getTime() - Date.now())
   );
   room.timerTimeout.unref();
@@ -2460,6 +2460,30 @@ function botMoveDelayMs(pace: PublicBotPace): number {
   const range = BOT_MOVE_DELAY_RANGES[pace];
 
   return range.minMs + Math.floor(Math.random() * (range.maxMs - range.minMs + 1));
+}
+
+function applyTimedOutHumanTurn(room: Room, playerId: string): void {
+  if (room.game === null || room.trade.status === "open" || room.game.activePlayerId !== playerId) {
+    return;
+  }
+
+  const result = applyMove(room.game, playerId, { type: "pass" }, room.rules);
+
+  if (!result.ok) {
+    // Opening and fresh-trick leads cannot legally pass. Restart the clock without
+    // choosing a card for the player, so the server never makes a strategic move for them.
+    resetTurnTimer(room);
+    emitRoomState(room);
+    scheduleAutomatedTurn(room);
+    return;
+  }
+
+  room.game = result.state;
+  persistLastMove(room);
+  resetTurnTimer(room);
+  emitRoomState(room);
+  emitLobbyState();
+  scheduleAutomatedTurn(room);
 }
 
 function applyAutomatedMove(room: Room, playerId: string, strategy: BotStrategy): void {

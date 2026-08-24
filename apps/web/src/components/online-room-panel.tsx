@@ -2783,7 +2783,7 @@ function CompactTimerControl({
       />
       <p className="mt-2 text-xs leading-5 text-zinc-400">
         {enabled
-          ? `${seconds}s countdown shown in the center each turn.`
+          ? `${seconds}s countdown shown at the table. Timing out passes when a pass is legal.`
           : "Optional. Enable this to show a turn countdown during the match."}
       </p>
     </div>
