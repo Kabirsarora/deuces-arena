@@ -3915,11 +3915,12 @@ function WaitingSeats({
               isYourSeat
                 ? "flex-col-reverse items-center"
                 : handOrientation === "top"
-                  ? "flex-col items-center max-sm:translate-y-12"
+                  ? "flex-col items-center max-sm:translate-y-12 sm:flex-row"
                   : handOrientation === "left"
                     ? "flex-row-reverse items-center max-sm:left-2 sm:-translate-x-6 sm:flex-col-reverse"
                     : "flex-row items-center max-sm:right-2 sm:translate-x-6 sm:flex-col-reverse",
-              getSeatPositionClass(index, visibleSeats.length)
+              getSeatPositionClass(index, visibleSeats.length),
+              visibleSeats.length <= 4 && handOrientation !== "top" && "max-sm:top-[34%]"
             )}
           >
             <div

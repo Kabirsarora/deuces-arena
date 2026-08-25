@@ -23,7 +23,7 @@ body {
 }
 
 html {
-  font-size: 17px;
+  font-size: 19.5px;
 }
 
 body {
@@ -969,11 +969,11 @@ textarea {
 
 @media (min-width: 1024px) {
   .player-hand-fan {
-    padding-right: 0.5rem;
+    padding-right: 1.5rem;
   }
 
   .hand-card-slot + .hand-card-slot {
-    margin-left: -0.5rem;
+    margin-left: -1.5rem;
   }
 }
 
