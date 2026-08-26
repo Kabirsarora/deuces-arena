@@ -278,7 +278,7 @@ const ARENA_COIN_REWARDS: Readonly<Record<"first" | "second" | "third" | "other"
 const BOT_MOVE_DELAY_RANGES: Readonly<
   Record<PublicBotPace, { readonly minMs: number; readonly maxMs: number }>
 > = {
-  quick: { minMs: 2_200, maxMs: 3_400 },
+  quick: { minMs: 1_800, maxMs: 2_300 },
   normal: { minMs: 3_800, maxMs: 5_400 },
   relaxed: { minMs: 5_800, maxMs: 8_000 }
 };
@@ -2093,7 +2093,7 @@ function createEmptyRoom(mode: MatchMode = "CASUAL"): Room {
       cardsPerPlayer: DEFAULT_CARDS_PER_PLAYER
     },
     botDifficulty: "normal",
-    botPace: "relaxed",
+    botPace: "quick",
     tradeEnabled: false,
     configuredBotCount: CLASSIC_PLAYER_COUNT - 1,
     turnDeadlineAt: null,
@@ -2318,7 +2318,7 @@ function normalizeBotDifficulty(difficulty: PublicBotDifficulty | undefined): Pu
 }
 
 function normalizeBotPace(pace: PublicBotPace | undefined): PublicBotPace {
-  return pace === "quick" || pace === "normal" ? pace : "relaxed";
+  return pace === "relaxed" || pace === "normal" ? pace : "quick";
 }
 
 function createDisabledTradeState(): RoomTradeState {

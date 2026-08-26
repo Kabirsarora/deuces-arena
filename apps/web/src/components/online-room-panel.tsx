@@ -310,7 +310,7 @@ export function OnlineRoomPanel({
   const [manualCardOrderIds, setManualCardOrderIds] = useState<readonly string[]>([]);
   const [botSeats, setBotSeats] = useState(3);
   const [botDifficulty, setBotDifficulty] = useState<PublicBotDifficulty>("normal");
-  const [botPace, setBotPace] = useState<PublicBotPace>("relaxed");
+  const [botPace, setBotPace] = useState<PublicBotPace>("quick");
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [playerCount, setPlayerCount] = useState(4);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(DEFAULT_CARDS_PER_PLAYER);
@@ -2853,7 +2853,7 @@ function CompactBotPace({
       </div>
       <p className="mt-2 text-sm font-semibold leading-5 text-zinc-400">
         {value === "quick"
-          ? "About 2–3 seconds before each bot move."
+          ? "About 2 seconds before each bot move."
           : value === "normal"
             ? "About 4–5 seconds before each bot move."
             : "About 6–8 seconds before each bot move."}

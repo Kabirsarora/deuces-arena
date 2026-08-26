@@ -23,7 +23,7 @@ export default function PlayScreen() {
   const [cardsPerPlayer, setCardsPerPlayer] = useState(13);
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [difficulty, setDifficulty] = useState<PublicBotDifficulty>("normal");
-  const [pace, setPace] = useState<PublicBotPace>("relaxed");
+  const [pace, setPace] = useState<PublicBotPace>("quick");
   const [starting, setStarting] = useState(false);
   const maximumCards = useMemo(
     () => Math.floor((deckType === "arena-six" ? 78 : 52) / playerCount),

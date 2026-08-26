@@ -88,7 +88,7 @@ export default function TableScreen() {
   const [cardsPerPlayer, setCardsPerPlayer] = useState(13);
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [difficulty, setDifficulty] = useState<PublicBotDifficulty>("normal");
-  const [pace, setPace] = useState<PublicBotPace>("relaxed");
+  const [pace, setPace] = useState<PublicBotPace>("quick");
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [secondsPerTurn, setSecondsPerTurn] = useState(45);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
