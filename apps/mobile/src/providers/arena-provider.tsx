@@ -587,7 +587,7 @@ export function ArenaProvider({ children }: { readonly children: ReactNode }) {
             playerCount: options.playerCount,
             cardsPerPlayer: options.cardsPerPlayer
           },
-          timer: { enabled: false, secondsPerTurn: 45 },
+          timer: { enabled: false, secondsPerTurn: 20 },
           trade: { enabled: false }
         },
         callback

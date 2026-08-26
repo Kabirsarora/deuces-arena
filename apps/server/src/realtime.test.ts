@@ -605,6 +605,7 @@ describe("realtime rooms", () => {
     expect(createdRoom.data.yourPlayerId).toBe("player-1");
     expect(createdRoom.data.yourHand).toHaveLength(0);
     expect(createdRoom.data.botPace).toBe("quick");
+    expect(createdRoom.data.timerSettings).toEqual({ enabled: false, secondsPerTurn: 20 });
     expect(createdRoom.data.players[0]?.equippedCosmetics).toEqual([]);
 
     const lobby = await emitLobbyGet(host);
@@ -1622,7 +1623,7 @@ describe("realtime rooms", () => {
     expect(states[0]?.mode).toBe("RANKED");
     expect(states[0]?.players).toHaveLength(4);
     expect(states[0]?.players.every((player) => player.kind === "human")).toBe(true);
-    expect(states[0]?.turnTimer?.secondsPerTurn).toBe(45);
+    expect(states[0]?.turnTimer?.secondsPerTurn).toBe(20);
   });
 
   it("starts two tournament semifinals for eight authenticated humans", async () => {
@@ -1647,7 +1648,7 @@ describe("realtime rooms", () => {
     expect(states.every((state) => state.players.every((player) => player.kind === "human"))).toBe(
       true
     );
-    expect(states.every((state) => state.turnTimer?.secondsPerTurn === 45)).toBe(true);
+    expect(states.every((state) => state.turnTimer?.secondsPerTurn === 20)).toBe(true);
   });
 
   it("reports ranked queue position before a match starts", async () => {

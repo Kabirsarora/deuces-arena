@@ -39,7 +39,7 @@ export default function RankedScreen() {
       <QueueSection
         icon={<Trophy color={palette.gold} size={27} />}
         title="Ranked queue"
-        detail="4 players · 45 second turns · no bots"
+        detail="4 players · 20 second turns · no bots"
         queued={rankedQueue?.queuedPlayers ?? 0}
         required={rankedQueue?.requiredPlayers ?? 4}
         eta={rankedQueue?.etaSeconds ?? null}

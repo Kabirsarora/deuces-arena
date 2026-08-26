@@ -90,7 +90,7 @@ export default function TableScreen() {
   const [difficulty, setDifficulty] = useState<PublicBotDifficulty>("normal");
   const [pace, setPace] = useState<PublicBotPace>("quick");
   const [timerEnabled, setTimerEnabled] = useState(false);
-  const [secondsPerTurn, setSecondsPerTurn] = useState(45);
+  const [secondsPerTurn, setSecondsPerTurn] = useState(20);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
   const [tradeEnabled, setTradeEnabled] = useState(false);
   const [tradeTargetPlayerId, setTradeTargetPlayerId] = useState("");

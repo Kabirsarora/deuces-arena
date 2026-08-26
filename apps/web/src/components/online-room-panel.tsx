@@ -132,7 +132,7 @@ const HAND_SORT_STORAGE_KEY = "deuces-arena-hand-sort";
 const BEGINNER_WELCOME_SESSION_KEY = "deuces-arena-beginner-welcome-v1";
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
-const DEFAULT_RANKED_TIMER_SECONDS = 45;
+const DEFAULT_RANKED_TIMER_SECONDS = 20;
 const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label: string }[] = [
   { key: "diamond", label: "Diamonds" },
   { key: "club", label: "Clubs" },
@@ -314,7 +314,7 @@ export function OnlineRoomPanel({
   const [deckType, setDeckType] = useState<DeckType>("classic");
   const [playerCount, setPlayerCount] = useState(4);
   const [cardsPerPlayer, setCardsPerPlayer] = useState(DEFAULT_CARDS_PER_PLAYER);
-  const [turnTimerSeconds, setTurnTimerSeconds] = useState(45);
+  const [turnTimerSeconds, setTurnTimerSeconds] = useState(20);
   const [lobbyTimerEnabled, setLobbyTimerEnabled] = useState(false);
   const [bombEndsTrick, setBombEndsTrick] = useState(false);
   const [tradingEnabled, setTradingEnabled] = useState(false);
