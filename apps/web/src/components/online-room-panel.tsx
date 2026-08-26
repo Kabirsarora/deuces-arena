@@ -101,6 +101,7 @@ import {
 import { io, type Socket } from "socket.io-client";
 
 import { SignInWithGoogleButton, SignOutButton } from "@/components/auth-buttons";
+import { LanguageSelector, useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -159,15 +160,6 @@ const BOT_PACE_OPTIONS: readonly {
   { value: "relaxed", label: "Relaxed" },
   { value: "normal", label: "Normal" },
   { value: "quick", label: "Quick" }
-];
-const DEUCES_RULES: readonly string[] = [
-  "A match is made of tricks. A new trick begins whenever the center of the table is empty.",
-  "The player holding 3 of diamonds leads the first trick, and the opening play must include that card.",
-  "The leader may play any supported combination. That choice sets the hand type for the trick.",
-  "After the lead, play a higher hand of the same type or pass. Straight responses must use exactly the same number of cards.",
-  "A bomb is the exception: it may interrupt any normal hand.",
-  "When nobody beats the last play, that player wins the trick, clears the center, and chooses the next hand type.",
-  "The first player to empty their hand wins the match."
 ];
 type RuleExampleCard = {
   readonly rank: string;
@@ -334,6 +326,7 @@ export function OnlineRoomPanel({
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [mutedPlayerIds, setMutedPlayerIds] = useState<ReadonlySet<string>>(new Set());
   const [message, setMessage] = useState("Create a room, invite a friend, or start with bots.");
+  const [moveFeedback, setMoveFeedback] = useState<string | null>(null);
   const connected = connectionStatus === "online";
 
   const selectedCards = useMemo(
@@ -384,14 +377,7 @@ export function OnlineRoomPanel({
     selectedManualCardIndex >= 0 &&
     selectedManualCardIndex < displayedHand.length - 1;
   const canMoveManualCardToEdge = handSortMode === "manual" && selectedManualCardIndex >= 0;
-  const canPlaySelected =
-    selectedCards.length > 0 &&
-    legalMoves.some(
-      (move) =>
-        move.type === "play" &&
-        move.cards.length === selectedCards.length &&
-        move.cards.every((card) => selectedCardIds.includes(getCardId(card)))
-    );
+  const canAttemptSelected = selectedCards.length > 0;
   const isYourTurn =
     room !== null && room.yourPlayerId !== null && room.activePlayerId === room.yourPlayerId;
   const yourPlayer = room?.players.find((candidate) => candidate.id === room.yourPlayerId) ?? null;
@@ -1000,6 +986,7 @@ export function OnlineRoomPanel({
         if (ack.ok) {
           setRoom(ack.data);
           setSelectedCardIds([]);
+          setMoveFeedback(null);
           setMessage(
             move.type === "pass"
               ? "You passed."
@@ -1007,6 +994,7 @@ export function OnlineRoomPanel({
           );
         } else {
           setMessage(ack.error);
+          setMoveFeedback(ack.error);
         }
       }
     );
@@ -1286,6 +1274,7 @@ export function OnlineRoomPanel({
 
   function toggleCard(card: Card) {
     const cardId = getCardId(card);
+    setMoveFeedback(null);
     setSelectedCardIds((current) =>
       current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]
     );
@@ -1581,14 +1570,20 @@ export function OnlineRoomPanel({
                   ) : null}
                 </div>
                 <p className="max-w-64 truncate text-xs text-zinc-300" aria-live="polite">
-                  {yourPlayer?.cardsRemaining ?? displayedHand.length} cards left ·{" "}
-                  {room.tradePhase.status === "open"
-                    ? getTradeHandPrompt(room, selectedCards)
-                    : isYourTurn
-                      ? playableCardCount === 0 && canPass
-                        ? "no legal play · pass to continue"
-                        : `${selectedCards.length} selected · ${legalMoves.length} legal options`
-                      : turnStatus}
+                  {moveFeedback === null ? (
+                    <>
+                      {yourPlayer?.cardsRemaining ?? displayedHand.length} cards left ·{" "}
+                      {room.tradePhase.status === "open"
+                        ? getTradeHandPrompt(room, selectedCards)
+                        : isYourTurn
+                          ? playableCardCount === 0 && canPass
+                            ? "no legal play · pass to continue"
+                            : `${selectedCards.length} selected · ${legalMoves.length} legal options`
+                          : turnStatus}
+                    </>
+                  ) : (
+                    <span className="font-bold text-red-300">{moveFeedback}</span>
+                  )}
                 </p>
               </div>
               <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:justify-end">
@@ -1616,7 +1611,10 @@ export function OnlineRoomPanel({
                     className="w-9 px-0"
                     aria-label="Clear selected cards"
                     title="Clear selected cards"
-                    onClick={() => setSelectedCardIds([])}
+                    onClick={() => {
+                      setSelectedCardIds([]);
+                      setMoveFeedback(null);
+                    }}
                   >
                     <X className="size-4" />
                   </Button>
@@ -1685,7 +1683,7 @@ export function OnlineRoomPanel({
                 <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
                   Pass
                 </Button>
-                <Button onClick={playSelected} disabled={!isYourTurn || !canPlaySelected}>
+                <Button onClick={playSelected} disabled={!isYourTurn || !canAttemptSelected}>
                   <Send className="size-4" />
                   Play
                 </Button>
@@ -1698,7 +1696,6 @@ export function OnlineRoomPanel({
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
                     const selected = selectedCardIds.includes(getCardId(card));
                     const playable = isYourTurn && playableCardIds.has(getCardId(card));
-                    const disabled = room.tradePhase.status !== "open" && isYourTurn && !playable;
                     const cardName = formatCardName(card);
 
                     return (
@@ -1707,13 +1704,12 @@ export function OnlineRoomPanel({
                         layout="position"
                         layoutId={`table-card-${room.roomCode}-${getCardId(card)}`}
                         type="button"
-                        className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md disabled:cursor-not-allowed disabled:opacity-45 sm:h-28 sm:w-20"
+                        className="hand-card-slot relative h-24 w-16 shrink-0 rounded-md sm:h-28 sm:w-20"
                         aria-label={`${selected ? "Deselect" : "Select"} ${cardName}${
-                          playable ? ", legal option" : disabled ? ", unavailable this turn" : ""
+                          playable ? ", legal option" : ""
                         }`}
                         aria-pressed={selected}
-                        disabled={disabled}
-                        title={disabled ? `${cardName} cannot be used in a legal play` : cardName}
+                        title={cardName}
                         initial={
                           shouldReduceMotion
                             ? false
@@ -1765,13 +1761,13 @@ export function OnlineRoomPanel({
                                 mass: 0.78
                               })
                         }}
-                        drag={disabled ? false : "x"}
+                        drag="x"
                         dragSnapToOrigin
                         dragElastic={0.18}
                         dragMomentum={false}
                         onDragStart={() => setHandSortMode("manual")}
                         onDragEnd={(_event, info) => handleManualCardDrag(card, info)}
-                        {...(isYourTurn && !disabled && !shouldReduceMotion
+                        {...(isYourTurn && !shouldReduceMotion
                           ? {
                               whileHover: {
                                 y: selected ? -20 : -8
@@ -1912,6 +1908,7 @@ function OnlineLobbyHub({
     readonly contactEmail: string;
   }) => Promise<ServerAck<PublicFeedbackReceipt>>;
 }) {
+  const { copy } = useLanguage();
   const activity = lobby?.activity;
   const openRooms = lobby?.openRooms ?? [];
   const selectedBotSeats = Math.min(botSeats, maxBotSeats);
@@ -1966,7 +1963,7 @@ function OnlineLobbyHub({
               <p className="text-xs font-black uppercase tracking-wide text-[var(--aqua)]">
                 Deuces Arena
               </p>
-              <h1 className="text-3xl font-black sm:text-4xl">Choose a Table</h1>
+              <h1 className="text-3xl font-black sm:text-4xl">{copy.hub.title}</h1>
               <p className="mt-2 text-sm font-semibold text-zinc-400">
                 {connectionStatus === "online"
                   ? `${activity?.connectedUsers ?? 0} online · ${activity?.openRooms ?? 0} open rooms · ${activity?.activeRooms ?? 0} active rooms`
@@ -1976,6 +1973,7 @@ function OnlineLobbyHub({
               </p>
             </div>
             <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
+              <LanguageSelector className="max-w-36" />
               <Button
                 aria-label="How to play"
                 className="h-10 rounded-full px-3"
@@ -1985,7 +1983,7 @@ function OnlineLobbyHub({
                 onClick={() => setActiveOverlay("learn")}
               >
                 <CircleHelp className="size-4" />
-                <span className="hidden md:inline">How to Play</span>
+                <span className="hidden md:inline">{copy.howToPlay}</span>
               </Button>
               <Button
                 aria-label="More"
@@ -2012,35 +2010,35 @@ function OnlineLobbyHub({
               mode="bots"
               activeMode={hubMode}
               icon={<Bot className="size-6" />}
-              label="Bots"
+              label={copy.hub.bots}
               onSelect={onHubModeChange}
             />
             <HubModeButton
               mode="casual"
               activeMode={hubMode}
               icon={<Users className="size-6" />}
-              label="Casual"
+              label={copy.hub.casual}
               onSelect={onHubModeChange}
             />
             <HubModeButton
               mode="ranked"
               activeMode={hubMode}
               icon={<Trophy className="size-6" />}
-              label="Ranked"
+              label={copy.hub.ranked}
               onSelect={onHubModeChange}
             />
             <HubModeButton
               mode="tournament"
               activeMode={hubMode}
               icon={<Swords className="size-6" />}
-              label="Cups"
+              label={copy.hub.cups}
               onSelect={onHubModeChange}
             />
             <HubModeButton
               mode="cosmetics"
               activeMode={hubMode}
               icon={<ShoppingBag className="size-6" />}
-              label="Shop & Locker"
+              label={copy.hub.cosmetics}
               onSelect={onHubModeChange}
             />
           </div>
@@ -2205,7 +2203,7 @@ function OnlineLobbyHub({
 
       <AnimatePresence>
         {activeOverlay === "learn" ? (
-          <HubOverlayDialog title="How to Play" onClose={() => setActiveOverlay(null)}>
+          <HubOverlayDialog title={copy.howToPlay} onClose={() => setActiveOverlay(null)}>
             <BeginnerGuide onPractice={startPracticeGameSetup} />
           </HubOverlayDialog>
         ) : null}
@@ -2353,6 +2351,8 @@ function FirstVisitExperience({
   readonly onBack: () => void;
   readonly onPractice: () => void;
 }) {
+  const { copy } = useLanguage();
+
   return (
     <motion.div
       className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-[#050708]/92 px-4 py-8 backdrop-blur-xl"
@@ -2371,6 +2371,7 @@ function FirstVisitExperience({
         exit={{ opacity: 0, y: 18, scale: 0.98 }}
         transition={{ type: "spring", stiffness: 250, damping: 27 }}
       >
+        <LanguageSelector className="absolute right-4 top-4 z-30 max-w-36" />
         {stage === "welcome" ? (
           <div className="relative grid min-h-[32rem] place-items-center overflow-hidden px-6 py-12 text-center sm:px-12">
             <div className="beginner-welcome-glow" aria-hidden="true" />
@@ -2391,19 +2392,18 @@ function FirstVisitExperience({
                 />
               </motion.div>
               <p className="mt-5 text-xs font-black uppercase text-[var(--aqua)]">Deuces Arena</p>
-              <h1 className="mt-2 text-4xl font-black sm:text-5xl">Take your seat.</h1>
+              <h1 className="mt-2 text-4xl font-black sm:text-5xl">{copy.welcome.headline}</h1>
               <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-zinc-300 sm:text-base">
-                Shed every card before your opponents. The lowest card opens the match; smart timing
-                closes it.
+                {copy.welcome.body}
               </p>
               <div className="mx-auto mt-8 grid max-w-md gap-3 sm:grid-cols-2">
                 <Button className="h-12 text-base" onClick={onEnter}>
                   <Play className="size-4" />
-                  Enter Arena
+                  {copy.welcome.enter}
                 </Button>
                 <Button className="h-12 text-base" variant="secondary" onClick={onLearn}>
                   <BookOpen className="size-4" />
-                  Learn the Game
+                  {copy.welcome.learn}
                 </Button>
               </div>
             </div>
@@ -2422,8 +2422,10 @@ function FirstVisitExperience({
                 <ArrowLeft className="size-4" />
               </Button>
               <div>
-                <p className="text-xs font-black uppercase text-[var(--gold)]">Quick start</p>
-                <h2 className="text-xl font-black">Learn Deuces in 60 seconds</h2>
+                <p className="text-xs font-black uppercase text-[var(--gold)]">
+                  {copy.guide.quickStart}
+                </p>
+                <h2 className="text-xl font-black">{copy.guide.title}</h2>
               </div>
             </header>
             <div className="max-h-[80vh] overflow-y-auto p-5 sm:p-6">
@@ -2443,6 +2445,8 @@ function BeginnerGuide({
   readonly onPractice: () => void;
   readonly onEnter?: () => void;
 }) {
+  const { copy } = useLanguage();
+
   return (
     <div>
       <section className="beginner-demo-table relative mx-auto h-52 w-full max-w-xl overflow-hidden">
@@ -2465,61 +2469,41 @@ function BeginnerGuide({
           animate={{ opacity: [0, 1, 1, 0] }}
           transition={{ duration: 4.8, times: [0, 0.12, 0.8, 1], repeat: Infinity }}
         >
-          Lead, beat, or pass
+          {copy.guide.demoLabel}
         </motion.div>
         <div className="absolute inset-x-0 bottom-5 text-center text-xs font-bold text-zinc-300">
-          The next play must use the same hand type and rank higher.
+          {copy.guide.demoBody}
         </div>
       </section>
 
       <section className="mt-6 overflow-hidden border-y border-white/10 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-white/10">
-        <RuleFlowItem
-          eyebrow="Center is empty"
-          title="Lead any valid hand"
-          body="You choose whether this trick uses singles, pairs, trips, quads, a full house, or a straight."
-        />
-        <RuleFlowItem
-          eyebrow="Cards are in the center"
-          title="Match it or pass"
-          body="Play a higher hand of the same type. A bomb is the only hand that may break the pattern."
-        />
-        <RuleFlowItem
-          eyebrow="Everyone else passes"
-          title="Clear and lead again"
-          body="The last player to play wins that trick. The center clears and they choose the next type."
-        />
+        {copy.guide.flows.map((flow) => (
+          <RuleFlowItem
+            key={flow.title}
+            eyebrow={flow.eyebrow}
+            title={flow.title}
+            body={flow.body}
+          />
+        ))}
       </section>
 
       <ol className="mt-6 divide-y divide-white/10 border-y border-white/10">
-        <BeginnerRuleStep
-          number="1"
-          title="The match starts with 3♦"
-          body="Whoever holds the 3 of diamonds takes the first turn. They may lead a single, pair, straight, or another valid combination, but it must contain 3♦."
-        />
-        <BeginnerRuleStep
-          number="2"
-          title="The lead sets the type"
-          body="If the leader plays one card, everyone must answer with one higher card. If they play a pair, everyone must answer with a higher pair. The same rule applies to every normal hand type."
-        />
-        <BeginnerRuleStep
-          number="3"
-          title="Play higher or pass"
-          body="Passing is always allowed, even when you can play. If someone plays a higher hand after you pass, your turn may come around again before the trick ends."
-        />
-        <BeginnerRuleStep
-          number="4"
-          title="Win the trick, then the match"
-          body="When everyone else passes, the last player who played leads a fresh trick. There is no score for an individual turn: progress is measured by cards left, and the first player to reach zero wins."
-        />
+        {copy.guide.steps.map((step, index) => (
+          <BeginnerRuleStep
+            key={step.title}
+            number={String(index + 1)}
+            title={step.title}
+            body={step.body}
+          />
+        ))}
       </ol>
 
       <section className="mt-7">
-        <p className="text-xs font-black uppercase text-[var(--gold)]">Every legal combination</p>
-        <h3 className="mt-1 text-xl font-black">What you can play</h3>
-        <p className="mt-1 text-sm leading-6 text-zinc-400">
-          You may lead with any hand below. Once led, everyone must use that same row until the
-          trick ends, except when a bomb is played.
+        <p className="text-xs font-black uppercase text-[var(--gold)]">
+          {copy.guide.combinationsEyebrow}
         </p>
+        <h3 className="mt-1 text-xl font-black">{copy.guide.combinationsTitle}</h3>
+        <p className="mt-1 text-sm leading-6 text-zinc-400">{copy.guide.combinationsBody}</p>
         <div className="mt-4">
           <HandCombinationGuide />
         </div>
@@ -2527,11 +2511,11 @@ function BeginnerGuide({
 
       <details className="mt-5 border-b border-white/10 pb-4">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black">
-          Complete turn rules
+          {copy.guide.completeRules}
           <ChevronDown className="size-4 text-zinc-400" />
         </summary>
         <ul className="mt-3 grid gap-2 text-sm leading-6 text-zinc-300">
-          {DEUCES_RULES.map((rule) => (
+          {copy.rules.core.map((rule) => (
             <li key={rule} className="flex gap-2">
               <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[var(--aqua)]" />
               <span>{rule}</span>
@@ -2543,11 +2527,11 @@ function BeginnerGuide({
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <Button className="h-12" onClick={onPractice}>
           <Bot className="size-4" />
-          Set Up a Practice Game
+          {copy.guide.practice}
         </Button>
         {onEnter === undefined ? null : (
           <Button className="h-12" variant="secondary" onClick={onEnter}>
-            Enter Lobby
+            {copy.guide.enterLobby}
           </Button>
         )}
       </div>
@@ -2618,31 +2602,37 @@ function RuleFlowItem({
 }
 
 function HandCombinationGuide({ compact = false }: { readonly compact?: boolean }) {
+  const { copy } = useLanguage();
+
   return (
     <ol className="divide-y divide-white/10 border-y border-white/10">
-      {RULE_HAND_EXAMPLES.map((hand) => (
-        <li
-          key={hand.type}
-          className={cn(
-            "grid items-center gap-3 py-3",
-            compact ? "grid-cols-[6.25rem_1fr]" : "sm:grid-cols-[9rem_9rem_1fr]"
-          )}
-        >
-          <RuleCardFan cards={hand.cards} />
-          <div>
-            <p className="text-sm font-black text-white">{hand.label}</p>
-            <p className="mt-0.5 text-xs leading-5 text-zinc-400">{hand.formation}</p>
-            {compact ? (
-              <p className="mt-1 text-[11px] leading-4 text-zinc-300">{hand.response}</p>
-            ) : null}
-          </div>
-          {compact ? null : (
-            <p className="text-xs leading-5 text-zinc-300 sm:border-l sm:border-white/10 sm:pl-4">
-              {hand.response}
-            </p>
-          )}
-        </li>
-      ))}
+      {RULE_HAND_EXAMPLES.map((hand) => {
+        const localizedHand = copy.rules.combinations[hand.type];
+
+        return (
+          <li
+            key={hand.type}
+            className={cn(
+              "grid items-center gap-3 py-3",
+              compact ? "grid-cols-[6.25rem_1fr]" : "sm:grid-cols-[9rem_9rem_1fr]"
+            )}
+          >
+            <RuleCardFan cards={hand.cards} />
+            <div>
+              <p className="text-sm font-black text-white">{localizedHand.label}</p>
+              <p className="mt-0.5 text-xs leading-5 text-zinc-400">{localizedHand.formation}</p>
+              {compact ? (
+                <p className="mt-1 text-[11px] leading-4 text-zinc-300">{localizedHand.response}</p>
+              ) : null}
+            </div>
+            {compact ? null : (
+              <p className="text-xs leading-5 text-zinc-300 sm:border-l sm:border-white/10 sm:pl-4">
+                {localizedHand.response}
+              </p>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -3507,6 +3497,8 @@ function ActiveRoomBar({
   readonly onCopyInvite: () => void;
   readonly onLeaveRoom: () => void;
 }) {
+  const { copy } = useLanguage();
+
   return (
     <header className="hud-glass flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-[1.25rem] border border-white/10 px-3 py-2 backdrop-blur sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
@@ -3531,6 +3523,7 @@ function ActiveRoomBar({
       </div>
 
       <div className="flex w-full min-w-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
+        <LanguageSelector className="w-32" />
         {room !== null ? (
           <button
             className="rounded-full border border-white/10 bg-white/7 px-3 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)]"
@@ -3544,7 +3537,7 @@ function ActiveRoomBar({
           panel="chat"
           activePanel={activePanel}
           icon={<MessageCircle className="size-4" />}
-          label="Chat"
+          label={copy.table.chat}
           badgeCount={unreadChatCount}
           onToggle={onTogglePanel}
         />
@@ -3552,16 +3545,16 @@ function ActiveRoomBar({
           panel="rules"
           activePanel={activePanel}
           icon={<BookOpen className="size-4" />}
-          label="Rules"
+          label={copy.table.rules}
           onToggle={onTogglePanel}
         />
         <Button size="sm" variant="secondary" onClick={onCopyInvite} disabled={room === null}>
           <Copy className="size-4" />
-          Invite
+          {copy.table.invite}
         </Button>
         <Button size="sm" variant="secondary" onClick={onLeaveRoom} disabled={room === null}>
           <DoorOpen className="size-4" />
-          Leave
+          {copy.table.leave}
         </Button>
       </div>
     </header>
@@ -3690,6 +3683,7 @@ function OnlineWaitingRoom({
             getTableThemeClass(tableTheme)
           )}
         >
+          <LanguageSelector className="absolute right-5 top-5 z-30 w-32" />
           <div className="absolute left-1/2 top-5 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur">
             <span className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-black uppercase text-zinc-300">
               <CircleDot className="size-4 text-[var(--aqua)]" />
@@ -5076,11 +5070,13 @@ function ActiveTableDrawer({
     input: ReportPlayerInput
   ) => Promise<ServerAck<PublicModerationReceipt>>;
 }) {
+  const { copy } = useLanguage();
+
   if (panel === null) {
     return null;
   }
 
-  const title = panel === "chat" ? "Table Chat" : "Rules";
+  const title = panel === "chat" ? copy.table.chat : copy.rules.title;
 
   return (
     <aside className="hud-glass absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[min(24rem,calc(100%-1.5rem))] overflow-y-auto rounded-[1.25rem] border border-white/10 p-3 shadow-2xl backdrop-blur-xl">
@@ -5088,11 +5084,11 @@ function ActiveTableDrawer({
         <div>
           <p className="text-sm font-black">{title}</p>
           <p className="text-xs text-zinc-400">
-            {room === null ? "No active room" : `${formatMatchMode(room.mode)} · ${room.status}`}
+            {room === null ? copy.rules.noRoom : `${formatMatchMode(room.mode)} · ${room.status}`}
           </p>
         </div>
         <Button size="sm" variant="secondary" onClick={onClose}>
-          Close
+          {copy.table.close}
         </Button>
       </div>
 
@@ -5130,56 +5126,39 @@ function getTradeHandPrompt(room: PublicRoomState, selectedCards: readonly Card[
 }
 
 function TableRulesPanel({ room }: { readonly room: PublicRoomState | null }) {
+  const { copy } = useLanguage();
   const bombRule =
-    room?.rules.bombEndsTrick === true
-      ? "Bombs immediately end the trick; no stronger bomb response is allowed."
-      : "After a bomb, only a stronger bomb can answer.";
+    room?.rules.bombEndsTrick === true ? copy.rules.bombEnds : copy.rules.bombContinues;
   const suitOrder =
-    room?.rules.deckType === "arena-six"
-      ? "Diamonds, clubs, hearts, spades, stars, crowns from low to high."
-      : "Diamonds, clubs, hearts, spades from low to high.";
-  const highestCard = room?.rules.deckType === "arena-six" ? "2 of crowns" : "2 of spades";
-  const arenaRules =
-    room?.rules.deckType === "arena-six"
-      ? [
-          "Arena 6 uses a 78-card deck. Pairs, trips, and quads may use any combination of its six suits.",
-          "Five or six cards of one rank are not a separate hand. Arena 6 bombs remain exactly four matching cards plus one off-rank kicker."
-        ]
-      : [];
-  const tradeRule =
-    room?.tradePhase.status === "disabled"
-      ? []
-      : [
-          "Casual trade variant: humans have 20 seconds before the first move to send one request and complete at most one one-for-one trade."
-        ];
+    room?.rules.deckType === "arena-six" ? copy.rules.arenaSuitOrder : copy.rules.classicSuitOrder;
+  const highestCard = room?.rules.deckType === "arena-six" ? "2♛" : "2♠";
+  const arenaRules = room?.rules.deckType === "arena-six" ? copy.rules.arena : [];
+  const tradeRule = room?.tradePhase.status === "disabled" ? [] : [copy.rules.trade];
 
   return (
     <div className="grid gap-3">
       <div className="border-y border-white/10 py-3">
-        <p className="text-xs font-black uppercase text-[var(--aqua)]">How a trick works</p>
-        <p className="mt-2 text-xs leading-5 text-zinc-300">
-          <strong className="text-white">Empty center:</strong> the active player leads any valid
-          combination. <strong className="text-white">Cards in the center:</strong> play a higher
-          hand of the same type or pass. When nobody beats the last play, its player clears the
-          center and leads again.
-        </p>
+        <p className="text-xs font-black uppercase text-[var(--aqua)]">{copy.rules.trickHeading}</p>
+        <p className="mt-2 text-xs leading-5 text-zinc-300">{copy.rules.trickExplanation}</p>
       </div>
 
       <div className="rounded-[1rem] border border-white/10 bg-black/20 p-3">
-        <p className="text-xs font-black uppercase text-[var(--gold)]">Rank order</p>
+        <p className="text-xs font-black uppercase text-[var(--gold)]">{copy.rules.rankOrder}</p>
         <p className="mt-2 text-sm font-bold text-zinc-100">3 4 5 6 7 8 9 10 J Q K A 2</p>
         <p className="mt-2 text-xs text-zinc-400">
-          {suitOrder} 3 of diamonds is lowest; {highestCard} is highest.
+          {suitOrder} {copy.rules.lowestHighest(highestCard)}
         </p>
       </div>
 
       <div>
-        <p className="mb-1 text-xs font-black uppercase text-[var(--gold)]">Legal combinations</p>
+        <p className="mb-1 text-xs font-black uppercase text-[var(--gold)]">
+          {copy.rules.combinationsHeading}
+        </p>
         <HandCombinationGuide compact />
       </div>
 
       <ol className="mt-1 grid gap-2">
-        {[...DEUCES_RULES, ...arenaRules, bombRule, ...tradeRule].map((rule, index) => (
+        {[...copy.rules.core, ...arenaRules, bombRule, ...tradeRule].map((rule, index) => (
           <li
             key={rule}
             className="rounded-[0.9rem] border border-white/10 bg-white/7 px-3 py-2 text-xs text-zinc-300"

@@ -1,6 +1,7 @@
 import { createRealtimeAuthToken } from "@deuces-arena/shared";
 
 import { auth } from "@/auth";
+import { LanguageProvider } from "@/components/language-provider";
 import { OnlineRoomPanel } from "@/components/online-room-panel";
 import { createAuthProfileId } from "@/lib/auth-profile";
 
@@ -21,5 +22,9 @@ export async function GameShell() {
       ? null
       : createRealtimeAuthToken({ profileId: authUser.profileId }, realtimeAuthSecret);
 
-  return <OnlineRoomPanel authUser={authUser} realtimeAuthToken={realtimeAuthToken} />;
+  return (
+    <LanguageProvider>
+      <OnlineRoomPanel authUser={authUser} realtimeAuthToken={realtimeAuthToken} />
+    </LanguageProvider>
+  );
 }
