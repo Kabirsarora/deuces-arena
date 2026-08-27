@@ -426,6 +426,12 @@ export function OnlineRoomPanel({
   }, [handSortMode]);
 
   useEffect(() => {
+    if (room?.status === "waiting" || room?.status === "in-progress") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [room?.roomCode, room?.status]);
+
+  useEffect(() => {
     mutedPlayerIdsRef.current = new Set(mutedPlayerIds);
   }, [mutedPlayerIds]);
 
@@ -1481,8 +1487,8 @@ export function OnlineRoomPanel({
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden px-3 py-3 text-white sm:px-5 lg:px-8">
-      <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)]">
+    <main className="min-h-screen overflow-x-hidden px-2 py-2 text-white sm:px-5 sm:py-3 lg:px-8">
+      <section className="mx-auto grid min-w-0 w-full max-w-[100rem] gap-2 sm:gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-rows-[auto_minmax(0,1fr)]">
         <ActiveRoomBar
           room={room}
           connectionStatus={connectionStatus}
@@ -1512,7 +1518,7 @@ export function OnlineRoomPanel({
           onLeaveRoom={leaveRoom}
         />
 
-        <section className="table-stage relative min-w-0 min-h-[44rem] sm:min-h-[48rem] lg:min-h-0">
+        <section className="table-stage relative h-[calc(100dvh-8.5rem)] min-h-[32rem] min-w-0 sm:h-auto sm:min-h-[48rem] lg:min-h-0">
           <OnlineTable
             room={room}
             timerNow={timerNow}
@@ -1550,12 +1556,12 @@ export function OnlineRoomPanel({
 
           <section
             className={cn(
-              "hand-dock-on-table absolute inset-x-2 bottom-3 z-30 min-w-0 px-2 pb-1 pt-3 sm:inset-x-8 sm:bottom-6 sm:px-3",
+              "hand-dock-on-table absolute inset-x-1 bottom-1 z-30 min-w-0 px-1 pb-1 pt-2 sm:inset-x-8 sm:bottom-6 sm:px-3 sm:pt-3",
               room.status === "complete" && "hidden"
             )}
           >
-            <div className="hand-control-rail mx-auto mb-1.5 flex w-fit max-w-full flex-col items-start gap-2 rounded-full border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-3">
-              <div>
+            <div className="hand-control-rail mx-auto mb-1.5 flex w-full max-w-3xl flex-col items-start gap-2 rounded-[1rem] border border-white/10 px-2.5 py-2 backdrop-blur-xl sm:w-fit sm:max-w-full sm:flex-row sm:items-center sm:justify-between sm:rounded-full sm:px-3">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-black text-white">{yourPlayer?.name ?? "Your hand"}</p>
                   {isYourTurn && room.tradePhase.status !== "open" ? (
@@ -1586,8 +1592,8 @@ export function OnlineRoomPanel({
                   )}
                 </p>
               </div>
-              <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:justify-end">
-                <label className="relative flex h-9 items-center rounded-full border border-white/10 bg-black/24 text-zinc-300 transition focus-within:border-[var(--gold)]">
+              <div className="table-action-scroll flex w-full flex-nowrap justify-end gap-1.5 overflow-x-auto sm:w-auto sm:overflow-visible">
+                <label className="relative flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-black/24 text-zinc-300 transition focus-within:border-[var(--gold)] sm:h-9">
                   <ListOrdered className="pointer-events-none absolute left-3 size-3.5" />
                   <span className="sr-only">Sort hand</span>
                   <select
@@ -1608,7 +1614,7 @@ export function OnlineRoomPanel({
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="w-9 px-0"
+                    className="hidden h-11 w-11 px-0 sm:inline-flex sm:h-9 sm:w-9"
                     aria-label="Clear selected cards"
                     title="Clear selected cards"
                     onClick={() => {
@@ -1620,7 +1626,7 @@ export function OnlineRoomPanel({
                   </Button>
                 ) : null}
                 {handSortMode === "manual" ? (
-                  <div className="flex rounded-md border border-white/10 bg-black/24 p-0.5">
+                  <div className="flex shrink-0 rounded-md border border-white/10 bg-black/24 p-0.5">
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1680,17 +1686,26 @@ export function OnlineRoomPanel({
                     </Button>
                   </div>
                 ) : null}
-                <Button variant="secondary" onClick={passTurn} disabled={!isYourTurn || !canPass}>
+                <Button
+                  className="h-11 sm:h-10"
+                  variant="secondary"
+                  onClick={passTurn}
+                  disabled={!isYourTurn || !canPass}
+                >
                   Pass
                 </Button>
-                <Button onClick={playSelected} disabled={!isYourTurn || !canAttemptSelected}>
+                <Button
+                  className="h-11 sm:h-10"
+                  onClick={playSelected}
+                  disabled={!isYourTurn || !canAttemptSelected}
+                >
                   <Send className="size-4" />
                   Play
                 </Button>
               </div>
             </div>
 
-            <div className="table-hand-scroll flex min-h-28 items-end overflow-x-auto px-1 pb-1 pt-5 sm:min-h-32">
+            <div className="table-hand-scroll flex min-h-28 touch-pan-x items-end overflow-x-auto px-1 pb-1 pt-4 sm:min-h-32 sm:pt-5">
               <div className="player-hand-fan mx-auto flex min-w-max items-end px-3 sm:px-4">
                 <AnimatePresence initial={false} mode="sync">
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
@@ -1972,8 +1987,8 @@ function OnlineLobbyHub({
                     : "Live tables are temporarily unavailable"}
               </p>
             </div>
-            <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto">
-              <LanguageSelector className="max-w-36" />
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
+              <LanguageSelector compact className="w-16 shrink-0 sm:w-36" />
               <Button
                 aria-label="How to play"
                 className="h-10 rounded-full px-3"
@@ -2685,13 +2700,13 @@ function HubPlayCard({
 }) {
   return (
     <section className="online-panel p-5 sm:p-7">
-      <div className="mb-5 flex items-center gap-5">
-        <div className="grid size-20 shrink-0 place-items-center rounded-full border border-white/10 bg-[var(--table)]/80 text-white">
+      <div className="mb-5 flex items-center gap-3 sm:gap-5">
+        <div className="grid size-16 shrink-0 place-items-center rounded-full border border-white/10 bg-[var(--table)]/80 text-white sm:size-20">
           {icon}
         </div>
         <div className="min-w-0">
-          <h2 className="text-2xl font-black">{title}</h2>
-          <p className="mt-1 text-sm font-semibold text-zinc-400">{meta}</p>
+          <h2 className="text-xl font-black sm:text-2xl">{title}</h2>
+          <p className="mt-1 text-xs font-semibold text-zinc-400 sm:text-sm">{meta}</p>
         </div>
       </div>
       {children}
@@ -2764,9 +2779,9 @@ function CompactTimerControl({
       <input
         className="mt-3 w-full accent-[var(--gold)]"
         type="range"
-        min="15"
+        min="10"
         max="90"
-        step="15"
+        step="5"
         value={seconds}
         disabled={disabled || !enabled}
         onChange={(event) => onSecondsChange(Number(event.target.value))}
@@ -2797,7 +2812,7 @@ function CompactBotDifficulty({
           <button
             key={option.value}
             className={cn(
-              "rounded-full px-2 py-2 text-sm font-black transition",
+              "min-w-0 rounded-full px-1 py-2 text-[0.72rem] font-black transition sm:px-2 sm:text-sm",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2838,7 +2853,7 @@ function CompactBotPace({
           <button
             key={option.value}
             className={cn(
-              "rounded-full px-2 py-2 text-sm font-black transition",
+              "min-w-0 rounded-full px-1 py-2 text-[0.72rem] font-black transition sm:px-2 sm:text-sm",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
                 : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -3500,11 +3515,11 @@ function ActiveRoomBar({
   const { copy } = useLanguage();
 
   return (
-    <header className="hud-glass flex min-w-0 flex-wrap items-start justify-between gap-3 rounded-[1.25rem] border border-white/10 px-3 py-2 backdrop-blur sm:items-center">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="hud-glass flex min-w-0 flex-nowrap items-center justify-between gap-1.5 rounded-[1rem] border border-white/10 px-2 py-2 backdrop-blur sm:gap-3 sm:rounded-[1.25rem] sm:px-3">
+      <div className="flex min-w-0 shrink items-center gap-1.5 sm:gap-3">
         <span
           className={cn(
-            "size-3 shrink-0 rounded-full",
+            "size-2 shrink-0 rounded-full sm:size-3",
             connectionStatus === "online"
               ? "bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.45)]"
               : connectionStatus === "waking"
@@ -3513,20 +3528,20 @@ function ActiveRoomBar({
           )}
         />
         <div className="min-w-0">
-          <p className="truncate text-sm font-black">
+          <p className="hidden truncate text-sm font-black sm:block">
             {room === null ? "Realtime Table" : `${formatMatchMode(room.mode)} Table`}
           </p>
-          <p className="truncate text-sm font-semibold text-zinc-300">
+          <p className="max-w-[5.5rem] truncate text-xs font-semibold text-zinc-300 sm:max-w-none sm:text-sm">
             {room === null ? message : turnStatus}
           </p>
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
-        <LanguageSelector className="w-32" />
+      <div className="table-toolbar-scroll ml-auto flex w-auto min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-visible sm:gap-2">
+        <LanguageSelector compact className="w-14 shrink-0 sm:w-32" />
         {room !== null ? (
           <button
-            className="rounded-full border border-white/10 bg-white/7 px-3 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)]"
+            className="hidden h-10 shrink-0 rounded-full border border-white/10 bg-white/7 px-2 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)] sm:block sm:h-auto sm:px-3"
             type="button"
             onClick={onCopyRoomCode}
           >
@@ -3548,13 +3563,29 @@ function ActiveRoomBar({
           label={copy.table.rules}
           onToggle={onTogglePanel}
         />
-        <Button size="sm" variant="secondary" onClick={onCopyInvite} disabled={room === null}>
+        <Button
+          className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+          size="sm"
+          variant="secondary"
+          aria-label={copy.table.invite}
+          title={copy.table.invite}
+          onClick={onCopyInvite}
+          disabled={room === null}
+        >
           <Copy className="size-4" />
-          {copy.table.invite}
+          <span className="hidden sm:inline">{copy.table.invite}</span>
         </Button>
-        <Button size="sm" variant="secondary" onClick={onLeaveRoom} disabled={room === null}>
+        <Button
+          className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+          size="sm"
+          variant="secondary"
+          aria-label={copy.table.leave}
+          title={copy.table.leave}
+          onClick={onLeaveRoom}
+          disabled={room === null}
+        >
           <DoorOpen className="size-4" />
-          {copy.table.leave}
+          <span className="hidden sm:inline">{copy.table.leave}</span>
         </Button>
       </div>
     </header>
@@ -3579,9 +3610,16 @@ function TablePanelButton({
   const active = panel === activePanel;
 
   return (
-    <Button size="sm" variant={active ? "primary" : "secondary"} onClick={() => onToggle(panel)}>
+    <Button
+      className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+      size="sm"
+      variant={active ? "primary" : "secondary"}
+      aria-label={label}
+      title={label}
+      onClick={() => onToggle(panel)}
+    >
       {icon}
-      {label}
+      <span className="hidden sm:inline">{label}</span>
       {badgeCount > 0 ? (
         <span
           className={cn(
@@ -5579,7 +5617,7 @@ function OnlineTable({
         getTableThemeClass(tableTheme)
       )}
     >
-      <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold uppercase text-zinc-200 backdrop-blur">
+      <div className="absolute left-1/2 top-4 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold uppercase text-zinc-200 backdrop-blur sm:flex">
         <CircleDot className="size-3 text-[var(--aqua)]" />
         {room === null ? "No table" : `${formatMatchMode(room.mode)} table`}
       </div>
@@ -5648,8 +5686,8 @@ function OnlineTable({
         ) : null}
       </AnimatePresence>
 
-      <div className="relative z-10 grid h-full min-h-[42rem] translate-y-14 place-items-center pb-44 text-center sm:min-h-[46rem] sm:pb-48 lg:min-h-0">
-        <div className="trick-island w-[min(32rem,86vw)] px-5 pb-6 pt-24">
+      <div className="relative z-10 grid h-full min-h-0 place-items-center pb-52 pt-20 text-center sm:min-h-[46rem] sm:translate-y-14 sm:pb-48 sm:pt-0 lg:min-h-0">
+        <div className="trick-island w-[min(18rem,76vw)] px-3 pb-4 pt-5 sm:w-[min(32rem,86vw)] sm:px-5 sm:pb-6 sm:pt-24">
           <p className="text-sm font-semibold uppercase text-zinc-300">
             {currentLeadName === null ? "Current Trick" : `Last play by ${currentLeadName}`}
           </p>
@@ -5663,7 +5701,7 @@ function OnlineTable({
               {timerLabel}
             </p>
           ) : null}
-          <div className="mt-5 flex min-h-28 flex-wrap justify-center gap-2">
+          <div className="mt-3 flex min-h-20 flex-wrap justify-center gap-2 sm:mt-5 sm:min-h-28">
             <AnimatePresence mode="sync">
               {room?.currentTrick === null || room === null ? (
                 <motion.div
@@ -6165,16 +6203,16 @@ function OnlineSeat({
       className={cn(
         "absolute z-20 flex gap-1 sm:gap-2",
         handOrientation === "top"
-          ? "flex-col items-center"
+          ? "flex-col-reverse items-center sm:flex-col"
           : handOrientation === "left"
-            ? "flex-row items-center"
-            : "flex-row-reverse items-center",
+            ? "flex-col items-center sm:flex-row"
+            : "flex-col items-center sm:flex-row-reverse",
         seatPosition
       )}
     >
       <div
         className={cn(
-          "seat-panel relative flex w-28 items-center gap-2 border px-2.5 py-2 sm:w-36",
+          "seat-panel relative flex w-24 items-center gap-1.5 border px-1.5 py-1.5 sm:w-36 sm:gap-2 sm:px-2.5 sm:py-2",
           active
             ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
             : profileBorder !== null
@@ -6199,7 +6237,7 @@ function OnlineSeat({
         </AnimatePresence>
         <div
           className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-full border text-xs font-black sm:size-9",
+            "grid size-7 shrink-0 place-items-center rounded-full border text-[11px] font-black sm:size-9 sm:text-xs",
             avatarCosmetic === null
               ? player.connected
                 ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
@@ -6227,13 +6265,15 @@ function OnlineSeat({
         </div>
         <div className="min-w-0 flex-1">
           <button
-            className="block max-w-full truncate text-left text-sm font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
+            className="block max-w-full truncate text-left text-xs font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline sm:text-sm"
             type="button"
             onClick={onOpenStats}
           >
             {player.name}
           </button>
-          <p className="text-xs font-semibold text-zinc-300">{player.cardsRemaining} cards left</p>
+          <p className="text-[10px] font-semibold text-zinc-300 sm:text-xs">
+            {player.cardsRemaining} cards left
+          </p>
           <span className="sr-only">{player.connected ? "online" : "away"}</span>
         </div>
       </div>
@@ -7198,17 +7238,17 @@ function getClockwiseSeatedPlayers(
 function getSeatPositionClass(position: number, seatCount: number): string {
   const seatLayouts: Readonly<Record<number, readonly string[]>> = {
     1: ["bottom-5 left-1/2 -translate-x-1/2"],
-    2: ["bottom-5 left-1/2 -translate-x-1/2", "left-1/2 top-14 -translate-x-1/2"],
+    2: ["bottom-5 left-1/2 -translate-x-1/2", "left-1/2 top-5 -translate-x-1/2 sm:top-14"],
     3: [
       "bottom-5 left-1/2 -translate-x-1/2",
-      "left-4 top-[44%] -translate-y-1/2 sm:left-6",
-      "right-4 top-[44%] -translate-y-1/2 sm:right-6"
+      "left-2 top-[23%] -translate-y-1/2 sm:left-6 sm:top-[44%]",
+      "right-2 top-[23%] -translate-y-1/2 sm:right-6 sm:top-[44%]"
     ],
     4: [
       "bottom-5 left-1/2 -translate-x-1/2",
-      "left-4 top-1/2 -translate-y-1/2 sm:left-6",
-      "left-1/2 top-14 -translate-x-1/2",
-      "right-4 top-1/2 -translate-y-1/2 sm:right-6"
+      "left-2 top-[23%] -translate-y-1/2 sm:left-6 sm:top-1/2",
+      "left-1/2 top-5 -translate-x-1/2 sm:top-14",
+      "right-2 top-[23%] -translate-y-1/2 sm:right-6 sm:top-1/2"
     ],
     5: [
       "bottom-5 left-1/2 -translate-x-1/2",

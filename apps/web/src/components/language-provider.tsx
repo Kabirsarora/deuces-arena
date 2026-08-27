@@ -89,11 +89,12 @@ const LANGUAGE_STORAGE_KEY = "deuces-arena-language";
 export const LANGUAGE_OPTIONS: readonly {
   readonly value: AppLanguage;
   readonly label: string;
+  readonly shortLabel: string;
 }[] = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Español" },
-  { value: "ru", label: "Русский" },
-  { value: "zh", label: "简体中文" }
+  { value: "en", label: "English", shortLabel: "EN" },
+  { value: "es", label: "Español", shortLabel: "ES" },
+  { value: "ru", label: "Русский", shortLabel: "RU" },
+  { value: "zh", label: "简体中文", shortLabel: "中文" }
 ];
 
 export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
@@ -646,7 +647,13 @@ export function useLanguage(): LanguageContextValue {
   return context;
 }
 
-export function LanguageSelector({ className }: { readonly className?: string }) {
+export function LanguageSelector({
+  className,
+  compact = false
+}: {
+  readonly className?: string;
+  readonly compact?: boolean;
+}) {
   const { copy, language, setLanguage } = useLanguage();
 
   return (
@@ -657,21 +664,34 @@ export function LanguageSelector({ className }: { readonly className?: string })
       )}
       title={copy.language}
     >
-      <Languages className="pointer-events-none absolute left-3 size-4 text-[var(--aqua)]" />
+      <Languages
+        className={cn(
+          "pointer-events-none absolute size-4 text-[var(--aqua)]",
+          compact ? "left-2" : "left-3"
+        )}
+      />
       <span className="sr-only">{copy.language}</span>
       <select
         aria-label={copy.language}
-        className="h-full w-full appearance-none truncate bg-transparent py-0 pl-9 pr-8 text-xs font-black outline-none"
+        className={cn(
+          "h-full w-full appearance-none truncate bg-transparent py-0 text-xs font-black outline-none",
+          compact ? "pl-6 pr-4" : "pl-9 pr-8"
+        )}
         value={language}
         onChange={(event) => setLanguage(event.target.value as AppLanguage)}
       >
         {LANGUAGE_OPTIONS.map((option) => (
           <option key={option.value} className="bg-zinc-950" value={option.value}>
-            {option.label}
+            {compact ? option.shortLabel : option.label}
           </option>
         ))}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-zinc-500" />
+      <ChevronDown
+        className={cn(
+          "pointer-events-none absolute size-3.5 text-zinc-500",
+          compact ? "right-1" : "right-2.5"
+        )}
+      />
     </label>
   );
 }

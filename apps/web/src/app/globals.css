@@ -934,7 +934,7 @@ textarea {
 
 .player-hand-fan {
   isolation: isolate;
-  padding-right: 2.25rem;
+  padding-right: 1.5rem;
 }
 
 .hand-card-slot {
@@ -943,7 +943,7 @@ textarea {
 }
 
 .hand-card-slot + .hand-card-slot {
-  margin-left: -2.25rem;
+  margin-left: -1.5rem;
 }
 
 .hand-card-slot:focus-visible,
