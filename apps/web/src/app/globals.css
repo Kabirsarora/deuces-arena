@@ -967,6 +967,38 @@ textarea {
   }
 }
 
+@media (max-width: 639px) {
+  .hub-mode-button {
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  .mobile-seat-name {
+    font-size: 11px;
+    line-height: 1.15;
+  }
+
+  .player-hand-fit-mobile {
+    padding-left: 0.35rem;
+    padding-right: 3.25rem;
+  }
+
+  .player-hand-fit-mobile .hand-card-slot {
+    width: 3.25rem;
+    margin-left: 0;
+  }
+
+  .player-hand-fit-mobile[data-card-count="1"],
+  .player-hand-fit-mobile[data-card-count="2"],
+  .player-hand-fit-mobile[data-card-count="3"],
+  .player-hand-fit-mobile[data-card-count="4"] {
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+    padding-right: 0.35rem;
+  }
+}
+
 @media (min-width: 1024px) {
   .player-hand-fan {
     padding-right: 1.5rem;

@@ -1543,7 +1543,7 @@ export function OnlineRoomPanel({
           onLeaveRoom={leaveRoom}
         />
 
-        <section className="table-stage relative h-[calc(100dvh-8.5rem)] min-h-[32rem] min-w-0 sm:h-auto sm:min-h-[48rem] lg:min-h-0">
+        <section className="table-stage relative h-[calc(100dvh-5rem)] min-h-[30rem] min-w-0 sm:h-auto sm:min-h-[48rem] lg:min-h-0">
           <OnlineTable
             room={room}
             timerNow={timerNow}
@@ -1581,7 +1581,7 @@ export function OnlineRoomPanel({
 
           <section
             className={cn(
-              "hand-dock-on-table absolute inset-x-1 bottom-1 z-30 min-w-0 px-1 pb-1 pt-2 sm:inset-x-8 sm:bottom-6 sm:px-3 sm:pt-3",
+              "hand-dock-on-table absolute inset-x-1 bottom-1 z-30 min-w-0 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2 sm:inset-x-8 sm:bottom-6 sm:px-3 sm:pb-3 sm:pt-3",
               room.status === "complete" && "hidden"
             )}
           >
@@ -1617,13 +1617,13 @@ export function OnlineRoomPanel({
                   )}
                 </p>
               </div>
-              <div className="table-action-scroll flex w-full flex-nowrap justify-end gap-1.5 overflow-x-auto sm:w-auto sm:overflow-visible">
-                <label className="relative flex h-11 shrink-0 items-center rounded-full border border-white/10 bg-black/24 text-zinc-300 transition focus-within:border-[var(--gold)] sm:h-9">
+              <div className="table-action-scroll grid w-full grid-cols-[minmax(72px,1fr)_64px_78px] gap-1.5 sm:flex sm:w-auto sm:flex-nowrap sm:justify-end sm:overflow-visible">
+                <label className="relative flex h-11 min-w-0 items-center rounded-full border border-white/10 bg-black/24 text-zinc-300 transition focus-within:border-[var(--gold)] sm:h-9 sm:shrink-0">
                   <ListOrdered className="pointer-events-none absolute left-3 size-3.5" />
                   <span className="sr-only">Sort hand</span>
                   <select
                     aria-label="Sort hand"
-                    className="h-full appearance-none bg-transparent py-0 pl-8 pr-8 text-xs font-black text-white outline-none"
+                    className="h-full w-full min-w-0 appearance-none truncate bg-transparent py-0 pl-8 pr-6 text-xs font-black text-white outline-none sm:w-auto sm:pr-8"
                     value={handSortMode}
                     onChange={(event) => setHandSortMode(event.target.value as HandSortMode)}
                   >
@@ -1712,7 +1712,7 @@ export function OnlineRoomPanel({
                   </div>
                 ) : null}
                 <Button
-                  className="h-11 sm:h-10"
+                  className="h-11 w-full px-1.5 sm:h-10 sm:w-auto sm:px-4"
                   variant="secondary"
                   onClick={passTurn}
                   disabled={!isYourTurn || !canPass}
@@ -1720,7 +1720,7 @@ export function OnlineRoomPanel({
                   Pass
                 </Button>
                 <Button
-                  className="h-11 sm:h-10"
+                  className="h-11 w-full px-1.5 sm:h-10 sm:w-auto sm:px-4"
                   onClick={playSelected}
                   disabled={!isYourTurn || !canAttemptSelected}
                 >
@@ -1730,8 +1730,24 @@ export function OnlineRoomPanel({
               </div>
             </div>
 
-            <div className="table-hand-scroll flex min-h-28 touch-pan-x items-end overflow-x-auto px-1 pb-1 pt-4 sm:min-h-32 sm:pt-5">
-              <div className="player-hand-fan mx-auto flex min-w-max items-end px-3 sm:px-4">
+            <div
+              className={cn(
+                "table-hand-scroll flex min-h-28 touch-pan-x items-end px-1 pb-1 pt-4 sm:min-h-32 sm:overflow-x-auto sm:pt-5",
+                displayedHand.length <= 13 ? "overflow-x-hidden" : "overflow-x-auto"
+              )}
+            >
+              <div
+                className={cn(
+                  "player-hand-fan mx-auto items-end px-3 sm:flex sm:min-w-max sm:px-4",
+                  displayedHand.length <= 13
+                    ? "player-hand-fit-mobile grid w-full min-w-0"
+                    : "flex min-w-max"
+                )}
+                data-card-count={displayedHand.length}
+                style={{
+                  gridTemplateColumns: `repeat(${Math.max(1, displayedHand.length)}, minmax(0, 1fr))`
+                }}
+              >
                 <AnimatePresence initial={false} mode="sync">
                   {(handDealtVisible ? displayedHand : []).map((card, index) => {
                     const selected = selectedCardIds.includes(getCardId(card));
@@ -1994,10 +2010,15 @@ function OnlineLobbyHub({
     onHubModeChange("bots");
   }
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => window.cancelAnimationFrame(frame);
+  }, [hubMode]);
+
   return (
     <main className="min-h-screen px-3 py-4 text-white sm:px-5 sm:py-6 lg:px-8">
       <section className="online-hub mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[92rem] flex-col overflow-hidden rounded-[1.25rem] border border-white/10 shadow-2xl sm:min-h-[calc(100vh-3rem)]">
-        <div className="flex flex-1 flex-col p-5 sm:p-7 lg:p-8">
+        <div className="flex flex-1 flex-col p-4 sm:p-7 lg:p-8">
           <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-wide text-[var(--aqua)]">
@@ -2054,7 +2075,7 @@ function OnlineLobbyHub({
             </div>
           </header>
 
-          <div className="mb-5 grid grid-cols-5 gap-1 rounded-full border border-white/10 bg-black/30 p-1.5 sm:gap-2">
+          <div className="mb-5 grid grid-cols-6 gap-1 rounded-[1rem] border border-white/10 bg-black/30 p-1.5 sm:grid-cols-5 sm:gap-2 sm:rounded-full">
             <HubModeButton
               mode="bots"
               activeMode={hubMode}
@@ -2320,7 +2341,9 @@ function HubModeButton({
     <button
       aria-label={label}
       className={cn(
-        "flex min-h-12 items-center justify-center gap-2 rounded-full text-sm font-black transition sm:min-h-14 sm:gap-3 sm:text-base",
+        "hub-mode-button col-span-2 flex min-h-[4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-[0.8rem] px-1 font-black transition sm:col-span-1 sm:min-h-14 sm:flex-row sm:gap-3 sm:rounded-full sm:px-2",
+        mode === "tournament" && "col-start-2 sm:col-start-auto",
+        mode === "cosmetics" && "col-start-4 sm:col-start-auto",
         active
           ? "bg-[var(--table)] text-white shadow-lg"
           : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2330,7 +2353,7 @@ function HubModeButton({
       onClick={() => onSelect(mode)}
     >
       {icon}
-      <span className="hidden sm:inline">{label}</span>
+      <span className="block max-w-full whitespace-normal break-words text-center">{label}</span>
     </button>
   );
 }
@@ -3565,14 +3588,14 @@ function ActiveRoomBar({
           <p className="hidden truncate text-sm font-black sm:block">
             {room === null ? "Realtime Table" : `${formatMatchMode(room.mode)} Table`}
           </p>
-          <p className="max-w-[5.5rem] truncate text-xs font-semibold text-zinc-300 sm:max-w-none sm:text-sm">
+          <p className="max-w-[8rem] truncate text-xs font-semibold text-zinc-300 sm:max-w-none sm:text-sm">
             {room === null ? message : turnStatus}
           </p>
         </div>
       </div>
 
       <div className="table-toolbar-scroll ml-auto flex w-auto min-w-0 flex-nowrap items-center justify-end gap-0.5 overflow-visible sm:gap-2">
-        <LanguageSelector compact className="w-14 shrink-0 sm:w-32" />
+        <LanguageSelector compact className="hidden w-14 shrink-0 sm:flex sm:w-32" />
         {room !== null ? (
           <button
             className="hidden h-10 shrink-0 rounded-full border border-white/10 bg-white/7 px-2 py-2 font-mono text-xs font-black text-[var(--gold)] transition hover:border-[var(--gold)] sm:block sm:h-auto sm:px-3"
@@ -3598,7 +3621,7 @@ function ActiveRoomBar({
           onToggle={onTogglePanel}
         />
         <Button
-          className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+          className="h-9 w-9 px-0 sm:w-auto sm:px-3"
           size="sm"
           variant="secondary"
           aria-label={copy.table.invite}
@@ -3610,7 +3633,7 @@ function ActiveRoomBar({
           <span className="hidden sm:inline">{copy.table.invite}</span>
         </Button>
         <Button
-          className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+          className="h-9 w-9 px-0 sm:w-auto sm:px-3"
           size="sm"
           variant="secondary"
           aria-label={copy.table.leave}
@@ -3645,7 +3668,7 @@ function TablePanelButton({
 
   return (
     <Button
-      className="h-9 w-[2.125rem] px-0 sm:w-auto sm:px-3"
+      className="h-9 w-9 px-0 sm:w-auto sm:px-3"
       size="sm"
       variant={active ? "primary" : "secondary"}
       aria-label={label}
@@ -3747,15 +3770,15 @@ function OnlineWaitingRoom({
     yourPlayer === undefined ? null : getEquippedCosmetic(yourPlayer, "TABLE_THEME");
 
   return (
-    <main className="min-h-screen px-3 py-8 text-white sm:px-5 lg:px-8">
+    <main className="min-h-screen px-3 py-3 text-white sm:px-5 sm:py-8 lg:px-8">
       <section className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[100rem] gap-5 lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
         <section
           className={cn(
-            "table-felt table-oval relative grid min-h-[42rem] place-items-center overflow-hidden px-5 py-10 text-center lg:min-h-0",
+            "table-felt table-oval relative grid min-h-[28rem] place-items-center overflow-hidden px-5 py-10 text-center sm:min-h-[42rem] lg:min-h-0",
             getTableThemeClass(tableTheme)
           )}
         >
-          <LanguageSelector className="absolute right-5 top-5 z-30 w-32" />
+          <LanguageSelector className="absolute right-5 top-5 z-30 hidden w-32 sm:flex" />
           <div className="absolute left-1/2 top-5 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur">
             <span className="flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-black uppercase text-zinc-300">
               <CircleDot className="size-4 text-[var(--aqua)]" />
@@ -3811,7 +3834,7 @@ function OnlineWaitingRoom({
           </div>
         </section>
 
-        <aside className="online-panel grid content-start gap-4 p-5 lg:max-h-full lg:overflow-y-auto">
+        <aside className="online-panel grid content-start gap-3 p-4 sm:gap-4 sm:p-5 lg:max-h-full lg:overflow-y-auto">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-black uppercase text-[var(--aqua)]">Room Setup</p>
@@ -3986,13 +4009,13 @@ function WaitingSeats({
                     ? "flex-row-reverse items-center max-sm:left-2 sm:-translate-x-6 sm:flex-col-reverse"
                     : "flex-row items-center max-sm:right-2 sm:translate-x-6 sm:flex-col-reverse",
               getSeatPositionClass(index, visibleSeats.length),
-              visibleSeats.length <= 4 && handOrientation !== "top" && "max-sm:top-[34%]"
+              visibleSeats.length <= 4 && handOrientation !== "top" && "max-sm:top-[30%]"
             )}
           >
             <div
               className={cn(
-                "seat-panel relative flex items-center gap-2.5 border px-2.5 py-2.5 text-left sm:w-40 sm:px-3 sm:py-3 xl:w-44",
-                isYourSeat ? "w-36" : "w-28",
+                "seat-panel relative flex items-center gap-1 border px-1.5 py-1.5 text-left sm:w-40 sm:gap-2.5 sm:px-3 sm:py-3 xl:w-44",
+                isYourSeat ? "w-[140px]" : "w-[96px]",
                 seat.kind === "open"
                   ? "border-dashed border-white/20 opacity-75"
                   : profileBorder === null
@@ -4002,7 +4025,7 @@ function WaitingSeats({
             >
               <div
                 className={cn(
-                  "grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border text-sm font-black sm:size-11",
+                  "grid size-6 shrink-0 place-items-center overflow-hidden rounded-full border text-xs font-black sm:size-11 sm:text-sm",
                   avatarCosmetic === null
                     ? "border-white/15 bg-black/30"
                     : getAvatarCosmeticClass(avatarCosmetic)
@@ -4029,10 +4052,10 @@ function WaitingSeats({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-base font-black">{seat.label}</p>
-                <p className="text-sm text-zinc-300">{seat.detail}</p>
+                <p className="truncate text-xs font-black sm:text-base">{seat.label}</p>
+                <p className="text-[10px] text-zinc-300 sm:text-sm">{seat.detail}</p>
               </div>
-              {seat.kind !== "open" && handOrientation !== "top" ? (
+              {seat.kind !== "open" ? (
                 <span
                   className={cn(
                     "card-back absolute -top-6 left-1/2 h-8 w-6 -translate-x-1/2 rounded border border-white/25 shadow-lg sm:hidden",
@@ -4043,7 +4066,7 @@ function WaitingSeats({
               ) : null}
             </div>
             {seat.kind === "open" ? null : (
-              <div className={cn(handOrientation !== "top" && "hidden sm:block")}>
+              <div className="hidden sm:block">
                 <OnlineOpponentHand
                   count={cardsPerPlayer}
                   cardBack={cardBack}
@@ -6252,7 +6275,7 @@ function OnlineSeat({
     >
       <div
         className={cn(
-          "seat-panel relative flex w-24 items-center gap-1.5 border px-1.5 py-1.5 sm:w-36 sm:gap-2 sm:px-2.5 sm:py-2",
+          "seat-panel relative flex w-[92px] items-center gap-1 border px-1 py-1 sm:w-36 sm:gap-2 sm:px-2.5 sm:py-2",
           active
             ? "border-[var(--gold)] bg-[rgba(242,193,78,0.13)] shadow-[0_0_36px_rgba(242,193,78,0.14)]"
             : profileBorder !== null
@@ -6277,7 +6300,7 @@ function OnlineSeat({
         </AnimatePresence>
         <div
           className={cn(
-            "grid size-7 shrink-0 place-items-center rounded-full border text-[11px] font-black sm:size-9 sm:text-xs",
+            "grid size-6 shrink-0 place-items-center rounded-full border text-[10px] font-black sm:size-9 sm:text-xs",
             avatarCosmetic === null
               ? player.connected
                 ? "border-emerald-200/35 bg-emerald-400/12 text-emerald-100"
@@ -6305,13 +6328,13 @@ function OnlineSeat({
         </div>
         <div className="min-w-0 flex-1">
           <button
-            className="block max-w-full truncate text-left text-xs font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline sm:text-sm"
+            className="mobile-seat-name block max-w-full truncate text-left font-black underline-offset-4 transition hover:text-[var(--gold)] hover:underline"
             type="button"
             onClick={onOpenStats}
           >
             {player.name}
           </button>
-          <p className="text-[10px] font-semibold text-zinc-300 sm:text-xs">
+          <p className="text-[9px] font-semibold leading-tight text-zinc-300 sm:text-xs">
             {player.cardsRemaining} cards left
           </p>
           <span className="sr-only">{player.connected ? "online" : "away"}</span>
