@@ -282,7 +282,8 @@ const FEEDBACK_KIND_OPTIONS: readonly { readonly value: FeedbackKind; readonly l
   { value: "BUG", label: "Bug" },
   { value: "IDEA", label: "Idea" },
   { value: "UI", label: "UI" },
-  { value: "BALANCE", label: "Balance" }
+  { value: "BALANCE", label: "Balance" },
+  { value: "PRAISE", label: "Praise" }
 ];
 const REPORT_REASON_OPTIONS: readonly {
   readonly value: PlayerReportReason;
@@ -2034,6 +2035,15 @@ function OnlineLobbyHub({
               >
                 <MoreHorizontal className="size-5" />
               </Button>
+              <Link
+                aria-label="Community feedback"
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
+                href="/feedback"
+                title="Community feedback"
+              >
+                <MessageCircle className="size-4" />
+                <span className="hidden lg:inline">Community</span>
+              </Link>
               <HeaderAccountControl
                 authUser={authUser}
                 profile={profile}
@@ -4525,12 +4535,18 @@ function FeedbackSummary({
     >
       <p className="flex items-center gap-2 text-sm font-bold">
         <MessageCircle className="size-4 text-[var(--aqua)]" />
-        Feedback
+        Private feedback
       </p>
       <p className="mt-2 text-xs text-zinc-400">
-        Found a bug or have an idea? Send a note without leaving the app.
+        Send a private note to the creator, or use the public community board.
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-white/10 bg-black/24 p-1">
+      <Link
+        className="mt-2 inline-flex text-xs font-black text-[var(--aqua)] transition hover:text-white"
+        href="/feedback"
+      >
+        Open Community Feedback
+      </Link>
+      <div className="mt-3 grid grid-cols-2 gap-1 rounded-[1rem] border border-white/10 bg-black/24 p-1 sm:grid-cols-5">
         {FEEDBACK_KIND_OPTIONS.map((option) => (
           <button
             key={option.value}

@@ -255,7 +255,27 @@ export type PublicTradePhaseState = {
   readonly completedTradeCount: number;
 };
 
-export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI";
+export type FeedbackKind = "BUG" | "IDEA" | "BALANCE" | "UI" | "PRAISE";
+
+export type CommunityFeedbackStatus = "OPEN" | "PLANNED" | "IN_PROGRESS" | "FIXED";
+
+export type CommunityFeedbackModerationReason =
+  | "SPAM"
+  | "HARASSMENT"
+  | "HATE_SPEECH"
+  | "PERSONAL_INFORMATION"
+  | "OTHER_POLICY_VIOLATION";
+
+export type PublicCommunityFeedback = {
+  readonly id: string;
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly authorName: string;
+  readonly status: CommunityFeedbackStatus;
+  readonly creatorReply: string | null;
+  readonly createdAt: string;
+  readonly repliedAt: string | null;
+};
 
 export type PlayerReportReason =
   | "HARASSMENT"
@@ -284,8 +304,15 @@ export type AdminFeedbackReport = {
   readonly kind: FeedbackKind;
   readonly body: string;
   readonly guestId: string | null;
+  readonly authorName: string | null;
   readonly roomCode: string | null;
   readonly contactEmail: string | null;
+  readonly isPublic: boolean;
+  readonly publicStatus: CommunityFeedbackStatus;
+  readonly creatorReply: string | null;
+  readonly repliedAt: string | null;
+  readonly hiddenAt: string | null;
+  readonly hiddenReason: CommunityFeedbackModerationReason | null;
   readonly createdAt: string;
 };
 

@@ -50,6 +50,17 @@ export default function TermsPage() {
       </section>
 
       <section>
+        <h2>Community feedback</h2>
+        <p>
+          Signed-in players may choose to publish feedback with their display name. Constructive
+          criticism is allowed and may remain visible even when it is negative. Posts may be hidden
+          for spam, harassment, hate speech, exposed personal information, unlawful content, or
+          another stated policy violation. Creator responses and progress labels are informational
+          and do not promise that a requested change will be completed.
+        </p>
+      </section>
+
+      <section>
         <h2>Rankings and game variants</h2>
         <p>
           Ratings are calculated from placement using the rules implemented by the service and may

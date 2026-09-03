@@ -3,6 +3,8 @@ import {
   type AdminFeedbackReport,
   type AdminModerationQueue,
   type AdminPlayerReport,
+  type CommunityFeedbackModerationReason,
+  type CommunityFeedbackStatus,
   type PlayerReportStatus
 } from "@deuces-arena/shared";
 import type { Metadata } from "next";
@@ -28,6 +30,19 @@ const REPORT_ACTIONS: readonly { readonly label: string; readonly status: Player
   { label: "Reviewed", status: "REVIEWED" },
   { label: "Actioned", status: "ACTIONED" },
   { label: "Dismiss", status: "DISMISSED" }
+];
+const FEEDBACK_STATUSES: readonly CommunityFeedbackStatus[] = [
+  "OPEN",
+  "PLANNED",
+  "IN_PROGRESS",
+  "FIXED"
+];
+const FEEDBACK_HIDE_REASONS: readonly CommunityFeedbackModerationReason[] = [
+  "SPAM",
+  "HARASSMENT",
+  "HATE_SPEECH",
+  "PERSONAL_INFORMATION",
+  "OTHER_POLICY_VIOLATION"
 ];
 
 type ModerationLoadResult =
@@ -212,18 +227,105 @@ function PlayerReportRow({ report }: { readonly report: AdminPlayerReport }) {
 function FeedbackRow({ report }: { readonly report: AdminFeedbackReport }) {
   return (
     <article className="rounded-lg border border-white/10 bg-white/6 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <span className="rounded-full bg-amber-300/10 px-2 py-1 text-[10px] font-black uppercase text-[var(--gold)]">
-          {report.kind}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-amber-300/10 px-2 py-1 text-[10px] font-black uppercase text-[var(--gold)]">
+            {report.kind}
+          </span>
+          <span className="rounded-full bg-white/8 px-2 py-1 text-[10px] font-black uppercase text-zinc-300">
+            {report.isPublic ? formatEnum(report.publicStatus) : "Private"}
+          </span>
+          {report.hiddenAt === null ? null : (
+            <span className="rounded-full bg-red-300/12 px-2 py-1 text-[10px] font-black uppercase text-red-200">
+              Hidden
+            </span>
+          )}
+        </div>
         <time className="text-xs text-zinc-500">{formatDate(report.createdAt)}</time>
       </div>
       <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-200">{report.body}</p>
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-white/8 pt-3 text-xs text-zinc-500">
         <span>Room: {report.roomCode ?? "none"}</span>
-        <span>Player: {shortId(report.guestId)}</span>
+        <span>Player: {report.authorName ?? shortId(report.guestId)}</span>
         <span>Contact: {report.contactEmail ?? "none"}</span>
       </div>
+
+      {report.isPublic ? (
+        <form className="mt-4 grid gap-3 border-t border-white/8 pt-4" action={updateFeedback}>
+          <input name="feedbackId" type="hidden" value={report.id} />
+          <label className="grid gap-1.5 text-xs font-black text-zinc-300">
+            Public status
+            <select
+              className="h-10 rounded-md border border-white/12 bg-[#11151b] px-3 text-sm text-white"
+              defaultValue={report.publicStatus}
+              name="status"
+            >
+              {FEEDBACK_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {formatEnum(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1.5 text-xs font-black text-zinc-300">
+            Creator response
+            <textarea
+              className="min-h-24 resize-y rounded-md border border-white/12 bg-black/24 px-3 py-2 text-sm font-medium leading-5 text-white"
+              defaultValue={report.creatorReply ?? ""}
+              maxLength={800}
+              name="creatorReply"
+              placeholder="Thank the player and explain what changed or what is planned."
+            />
+          </label>
+          <button
+            className="h-9 rounded-md bg-[var(--gold)] px-3 text-xs font-black text-black transition hover:brightness-105"
+            name="operation"
+            type="submit"
+            value="save"
+          >
+            Save public update
+          </button>
+
+          {report.hiddenAt === null ? (
+            <div className="grid gap-2 border-t border-white/8 pt-3 sm:grid-cols-[1fr_auto]">
+              <select
+                aria-label="Reason for hiding feedback"
+                className="h-9 rounded-md border border-white/12 bg-[#11151b] px-3 text-xs text-white"
+                defaultValue="SPAM"
+                name="hiddenReason"
+              >
+                {FEEDBACK_HIDE_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {formatEnum(reason)}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="h-9 rounded-md border border-red-300/20 bg-red-300/8 px-3 text-xs font-bold text-red-100 transition hover:bg-red-300/14"
+                name="operation"
+                type="submit"
+                value="hide"
+              >
+                Hide policy violation
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-3">
+              <p className="text-xs text-zinc-500">
+                Hidden for {formatEnum(report.hiddenReason ?? "OTHER_POLICY_VIOLATION")}
+              </p>
+              <button
+                className="h-9 rounded-md border border-white/12 bg-white/8 px-3 text-xs font-bold transition hover:bg-white/14"
+                name="operation"
+                type="submit"
+                value="restore"
+              >
+                Restore post
+              </button>
+            </div>
+          )}
+        </form>
+      ) : null}
     </article>
   );
 }
@@ -271,6 +373,57 @@ async function updateReportStatus(formData: FormData) {
   revalidatePath("/admin");
 }
 
+async function updateFeedback(formData: FormData) {
+  "use server";
+
+  const feedbackId = formData.get("feedbackId");
+  const status = formData.get("status");
+  const creatorReply = formData.get("creatorReply");
+  const operation = formData.get("operation");
+  const hiddenReason = formData.get("hiddenReason");
+
+  if (
+    typeof feedbackId !== "string" ||
+    !isCommunityFeedbackStatus(status) ||
+    typeof creatorReply !== "string" ||
+    (operation !== "save" && operation !== "hide" && operation !== "restore") ||
+    (operation === "hide" && !isCommunityFeedbackModerationReason(hiddenReason))
+  ) {
+    return;
+  }
+
+  const session = await auth();
+
+  if (session?.user === undefined) {
+    return;
+  }
+
+  const profileId = createAuthProfileId(session.user.email ?? session.user.name ?? "unknown");
+  const token = createAdminToken(profileId);
+
+  if (token === null) {
+    return;
+  }
+
+  await fetch(`${SERVER_URL}/admin/feedback/${encodeURIComponent(feedbackId)}`, {
+    method: "PATCH",
+    cache: "no-store",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      status,
+      creatorReply,
+      visibility: operation === "save" ? "preserve" : operation,
+      hiddenReason: operation === "hide" ? hiddenReason : null
+    })
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/feedback");
+}
+
 async function fetchModerationQueue(profileId: string): Promise<ModerationLoadResult> {
   const token = createAdminToken(profileId);
 
@@ -312,6 +465,24 @@ function createAdminToken(profileId: string): string | null {
 
 function isPlayerReportStatus(value: FormDataEntryValue | null): value is PlayerReportStatus {
   return value === "REVIEWED" || value === "ACTIONED" || value === "DISMISSED";
+}
+
+function isCommunityFeedbackStatus(
+  value: FormDataEntryValue | null
+): value is CommunityFeedbackStatus {
+  return value === "OPEN" || value === "PLANNED" || value === "IN_PROGRESS" || value === "FIXED";
+}
+
+function isCommunityFeedbackModerationReason(
+  value: FormDataEntryValue | null
+): value is CommunityFeedbackModerationReason {
+  return (
+    value === "SPAM" ||
+    value === "HARASSMENT" ||
+    value === "HATE_SPEECH" ||
+    value === "PERSONAL_INFORMATION" ||
+    value === "OTHER_POLICY_VIOLATION"
+  );
 }
 
 function formatDate(value: string): string {

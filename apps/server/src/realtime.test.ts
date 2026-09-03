@@ -165,6 +165,45 @@ describe("realtime rooms", () => {
     expect(adminResponse.status).toBe(503);
   });
 
+  it("keeps community feedback readable only when persistence is available", async () => {
+    const response = await fetch(`${serverUrl}/community-feedback`);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: "Community feedback is temporarily unavailable."
+    });
+  });
+
+  it("requires a signed account before posting community feedback", async () => {
+    const response = await fetch(`${serverUrl}/community-feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "IDEA", body: "Please add a rematch button." })
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("validates public feedback before attempting persistence", async () => {
+    const playerToken = createRealtimeAuthToken(
+      { profileId: "auth-22222222222222222222222222222222" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const response = await fetch(`${serverUrl}/community-feedback`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${playerToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ kind: "BUG", body: "bad" })
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Choose a valid type and write 6-800 characters."
+    });
+  });
+
   it("validates moderation status updates before persistence", async () => {
     const adminToken = createRealtimeAuthToken(
       { profileId: "auth-758f27d1f066779a62a65665242b8780" },
@@ -177,6 +216,28 @@ describe("realtime rooms", () => {
         "content-type": "application/json"
       },
       body: JSON.stringify({ status: "INVALID" })
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("requires a policy reason before hiding public feedback", async () => {
+    const adminToken = createRealtimeAuthToken(
+      { profileId: "auth-758f27d1f066779a62a65665242b8780" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const response = await fetch(`${serverUrl}/admin/feedback/feedback-1`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        status: "OPEN",
+        creatorReply: "",
+        visibility: "hide",
+        hiddenReason: null
+      })
     });
 
     expect(response.status).toBe(400);

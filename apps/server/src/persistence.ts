@@ -11,11 +11,14 @@ import type { Prisma } from "@deuces-arena/db";
 import type * as DbModule from "@deuces-arena/db";
 import type {
   AdminModerationQueue,
+  CommunityFeedbackModerationReason,
+  CommunityFeedbackStatus,
   FeedbackKind,
   MatchMode,
   PlayerReportReason,
   PlayerReportStatus,
   PublicCoachEvaluationRecord,
+  PublicCommunityFeedback,
   PublicCosmetic,
   PublicFeedbackReceipt,
   PublicGuestProfile,
@@ -1575,6 +1578,159 @@ export async function persistFeedbackReport(input: {
   }
 }
 
+export async function persistCommunityFeedback(input: {
+  readonly id: string;
+  readonly kind: FeedbackKind;
+  readonly body: string;
+  readonly authProfileId: string;
+  readonly userAgent: string | null;
+  readonly createdAt: Date;
+}): Promise<PublicFeedbackReceipt> {
+  const db = await getDb();
+
+  if (db === null) {
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+
+  try {
+    const user = await db.prisma.user.upsert({
+      where: { guestId: input.authProfileId },
+      create: {
+        username: `auth:${input.authProfileId.slice(5)}`,
+        guestId: input.authProfileId,
+        displayName: "Arena Player"
+      },
+      update: {},
+      select: { id: true }
+    });
+
+    await db.prisma.feedbackReport.create({
+      data: {
+        id: input.id,
+        userId: user.id,
+        guestId: input.authProfileId,
+        kind: input.kind,
+        body: input.body,
+        userAgent: input.userAgent,
+        isPublic: true,
+        createdAt: input.createdAt
+      }
+    });
+
+    return {
+      id: input.id,
+      stored: true,
+      createdAt: input.createdAt.toISOString()
+    };
+  } catch (error) {
+    console.error("Unable to persist community feedback.", error);
+    return {
+      id: input.id,
+      stored: false,
+      createdAt: input.createdAt.toISOString()
+    };
+  }
+}
+
+export async function getPersistedCommunityFeedback(
+  requestedLimit: number
+): Promise<readonly PublicCommunityFeedback[] | null> {
+  const db = await getDb();
+
+  if (db === null) {
+    return null;
+  }
+
+  const limit = Math.max(1, Math.min(requestedLimit, 100));
+
+  try {
+    const feedback = await db.prisma.feedbackReport.findMany({
+      where: {
+        isPublic: true,
+        hiddenAt: null
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        kind: true,
+        body: true,
+        publicStatus: true,
+        creatorReply: true,
+        createdAt: true,
+        repliedAt: true,
+        user: {
+          select: {
+            displayName: true
+          }
+        }
+      }
+    });
+
+    return feedback.map((report) => ({
+      id: report.id,
+      kind: normalizeStoredFeedbackKind(report.kind),
+      body: report.body,
+      authorName: report.user?.displayName?.trim() || "Arena Player",
+      status: normalizeStoredCommunityFeedbackStatus(report.publicStatus),
+      creatorReply: report.creatorReply,
+      createdAt: report.createdAt.toISOString(),
+      repliedAt: report.repliedAt?.toISOString() ?? null
+    }));
+  } catch (error) {
+    console.error("Unable to read community feedback.", error);
+    return null;
+  }
+}
+
+export async function updatePersistedCommunityFeedback(input: {
+  readonly feedbackId: string;
+  readonly status: CommunityFeedbackStatus;
+  readonly creatorReply: string | null;
+  readonly visibility: "preserve" | "hide" | "restore";
+  readonly hiddenReason: CommunityFeedbackModerationReason | null;
+}): Promise<boolean> {
+  const db = await getDb();
+
+  if (db === null) {
+    return false;
+  }
+
+  try {
+    const result = await db.prisma.feedbackReport.updateMany({
+      where: {
+        id: input.feedbackId,
+        isPublic: true
+      },
+      data: {
+        publicStatus: input.status,
+        creatorReply: input.creatorReply,
+        repliedAt: input.creatorReply === null ? null : new Date(),
+        ...(input.visibility === "preserve"
+          ? {}
+          : input.visibility === "hide"
+            ? {
+                hiddenAt: new Date(),
+                hiddenReason: input.hiddenReason
+              }
+            : {
+                hiddenAt: null,
+                hiddenReason: null
+              })
+      }
+    });
+
+    return result.count === 1;
+  } catch (error) {
+    console.error("Unable to update community feedback.", error);
+    return false;
+  }
+}
+
 export async function getPersistedBlockedGuestIds(
   blockerGuestId: string
 ): Promise<readonly string[] | null> {
@@ -1735,8 +1891,19 @@ export async function getPersistedAdminModerationQueue(
           kind: true,
           body: true,
           guestId: true,
+          user: {
+            select: {
+              displayName: true
+            }
+          },
           roomCode: true,
           contactEmail: true,
+          isPublic: true,
+          publicStatus: true,
+          creatorReply: true,
+          repliedAt: true,
+          hiddenAt: true,
+          hiddenReason: true,
           createdAt: true
         }
       }),
@@ -1760,8 +1927,19 @@ export async function getPersistedAdminModerationQueue(
 
     return {
       feedback: feedback.map((report) => ({
-        ...report,
+        id: report.id,
         kind: normalizeStoredFeedbackKind(report.kind),
+        body: report.body,
+        guestId: report.guestId,
+        authorName: report.user?.displayName ?? null,
+        roomCode: report.roomCode,
+        contactEmail: report.contactEmail,
+        isPublic: report.isPublic,
+        publicStatus: normalizeStoredCommunityFeedbackStatus(report.publicStatus),
+        creatorReply: report.creatorReply,
+        repliedAt: report.repliedAt?.toISOString() ?? null,
+        hiddenAt: report.hiddenAt?.toISOString() ?? null,
+        hiddenReason: normalizeStoredCommunityFeedbackModerationReason(report.hiddenReason),
         createdAt: report.createdAt.toISOString()
       })),
       playerReports: playerReports.map((report) => ({
@@ -2298,11 +2476,35 @@ function toProfileAvatarKey(value: string): ProfileAvatarKey {
 }
 
 function normalizeStoredFeedbackKind(value: string): FeedbackKind {
-  if (value === "IDEA" || value === "BALANCE" || value === "UI") {
+  if (value === "IDEA" || value === "BALANCE" || value === "UI" || value === "PRAISE") {
     return value;
   }
 
   return "BUG";
+}
+
+function normalizeStoredCommunityFeedbackStatus(value: string): CommunityFeedbackStatus {
+  if (value === "PLANNED" || value === "IN_PROGRESS" || value === "FIXED") {
+    return value;
+  }
+
+  return "OPEN";
+}
+
+function normalizeStoredCommunityFeedbackModerationReason(
+  value: string | null
+): CommunityFeedbackModerationReason | null {
+  if (
+    value === "SPAM" ||
+    value === "HARASSMENT" ||
+    value === "HATE_SPEECH" ||
+    value === "PERSONAL_INFORMATION" ||
+    value === "OTHER_POLICY_VIOLATION"
+  ) {
+    return value;
+  }
+
+  return null;
 }
 
 function getMoveHandType(event: GameEvent): string | null {

@@ -27,6 +27,8 @@ import {
 } from "@deuces-arena/game-engine";
 import type {
   ClientToServerEvents,
+  CommunityFeedbackModerationReason,
+  CommunityFeedbackStatus,
   FeedbackKind,
   InterServerEvents,
   MatchMode,
@@ -79,6 +81,7 @@ import {
   equipPersistedAdminCosmetic,
   equipPersistedCosmetic,
   getPersistedBlockedGuestIds,
+  getPersistedCommunityFeedback,
   getPersistedGuestProfile,
   getPersistedAdminModerationQueue,
   getPersistedLeaderboard,
@@ -86,6 +89,7 @@ import {
   getPersistedMatchHistory,
   getPersistedTournamentHistory,
   persistCoachEvaluation,
+  persistCommunityFeedback,
   persistFeedbackReport,
   persistPlayerReport,
   persistMoveEvent,
@@ -97,6 +101,7 @@ import {
   syncPersistedCosmetics,
   deletePersistedPushSubscription,
   updatePersistedGuestProfile,
+  updatePersistedCommunityFeedback,
   updatePersistedPlayerReportStatus,
   type PersistedMatch
 } from "./persistence.js";
@@ -627,6 +632,7 @@ const socketRateLimitEvents = new Map<
   string,
   Partial<Record<RateLimitBucket, readonly number[]>>
 >();
+const communityFeedbackRateLimitEvents = new Map<string, readonly number[]>();
 let rankedQueue: RankedQueuedPlayer[] = [];
 let tournamentQueue: TournamentParticipant[] = [];
 const tournaments = new Map<string, Tournament>();
@@ -675,6 +681,59 @@ app.get("/leaderboard", async (request, response) => {
 
 app.get("/cosmetics", async (_request, response) => {
   response.json(await publicCosmetics());
+});
+
+app.get("/community-feedback", async (request, response) => {
+  const requestedLimit =
+    typeof request.query.limit === "string" ? Number.parseInt(request.query.limit, 10) : 50;
+  const feedback = await getPersistedCommunityFeedback(
+    Number.isNaN(requestedLimit) ? 50 : requestedLimit
+  );
+
+  if (feedback === null) {
+    response.status(503).json({ error: "Community feedback is temporarily unavailable." });
+    return;
+  }
+
+  response.json(feedback);
+});
+
+app.post("/community-feedback", async (request, response) => {
+  const authProfileId = requireAuthenticatedRequest(request, response);
+
+  if (authProfileId === null) {
+    return;
+  }
+
+  const kind = normalizeFeedbackKind(request.body?.kind);
+  const body =
+    typeof request.body?.body === "string" ? normalizeFeedbackBody(request.body.body) : null;
+
+  if (kind === null || body === null) {
+    response.status(400).json({ error: "Choose a valid type and write 6-800 characters." });
+    return;
+  }
+
+  if (isCommunityFeedbackRateLimited(authProfileId)) {
+    response.status(429).json({ error: "Please wait before posting more community feedback." });
+    return;
+  }
+
+  const receipt = await persistCommunityFeedback({
+    id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    kind,
+    body,
+    authProfileId,
+    userAgent: normalizeUserAgent(request.get("user-agent")),
+    createdAt: new Date()
+  });
+
+  if (!receipt.stored) {
+    response.status(503).json({ error: "Community feedback could not be saved right now." });
+    return;
+  }
+
+  response.status(201).json(receipt);
 });
 
 app.post("/auth/mobile/exchange", (request, response) => {
@@ -763,6 +822,44 @@ app.patch("/admin/player-reports/:reportId", async (request, response) => {
 
   if (!(await updatePersistedPlayerReportStatus(reportId, status))) {
     response.status(404).json({ error: "Player report not found." });
+    return;
+  }
+
+  response.json({ ok: true });
+});
+
+app.patch("/admin/feedback/:feedbackId", async (request, response) => {
+  if (requireAdminRequest(request, response) === null) {
+    return;
+  }
+
+  const feedbackId = normalizeAdminRecordId(request.params.feedbackId);
+  const status = normalizeCommunityFeedbackStatus(request.body?.status);
+  const creatorReply = normalizeCreatorReply(request.body?.creatorReply);
+  const visibility = normalizeCommunityFeedbackVisibility(request.body?.visibility);
+  const hiddenReason = normalizeCommunityFeedbackModerationReason(request.body?.hiddenReason);
+
+  if (
+    feedbackId === null ||
+    status === null ||
+    creatorReply === undefined ||
+    visibility === null ||
+    (visibility === "hide" && hiddenReason === null)
+  ) {
+    response.status(400).json({ error: "Choose valid feedback moderation settings." });
+    return;
+  }
+
+  if (
+    !(await updatePersistedCommunityFeedback({
+      feedbackId,
+      status,
+      creatorReply,
+      visibility,
+      hiddenReason
+    }))
+  ) {
+    response.status(404).json({ error: "Public feedback item not found." });
     return;
   }
 
@@ -1986,7 +2083,7 @@ io.on("connection", (socket) => {
         : normalizeRoomCode(payload.roomCode).slice(0, 16);
     const receipt = await persistFeedbackReport({
       id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      kind: normalizeFeedbackKind(payload.kind),
+      kind: normalizeFeedbackKind(payload.kind) ?? "BUG",
       body,
       guestId: profileIdForSocket(payload.guestId),
       roomCode,
@@ -3275,12 +3372,12 @@ function normalizeAvatarKey(avatarKey: ProfileAvatarKey): ProfileAvatarKey {
   return "diamond";
 }
 
-function normalizeFeedbackKind(kind: FeedbackKind): FeedbackKind {
-  if (kind === "IDEA" || kind === "BALANCE" || kind === "UI") {
+function normalizeFeedbackKind(kind: unknown): FeedbackKind | null {
+  if (kind === "IDEA" || kind === "BALANCE" || kind === "UI" || kind === "PRAISE") {
     return kind;
   }
 
-  return "BUG";
+  return kind === "BUG" ? "BUG" : null;
 }
 
 function normalizeFeedbackBody(body: string): string | null {
@@ -3291,6 +3388,54 @@ function normalizeFeedbackBody(body: string): string | null {
   }
 
   return normalized;
+}
+
+function normalizeCommunityFeedbackStatus(value: unknown): CommunityFeedbackStatus | null {
+  if (value === "OPEN" || value === "PLANNED" || value === "IN_PROGRESS" || value === "FIXED") {
+    return value;
+  }
+
+  return null;
+}
+
+function normalizeCommunityFeedbackModerationReason(
+  value: unknown
+): CommunityFeedbackModerationReason | null {
+  if (
+    value === "SPAM" ||
+    value === "HARASSMENT" ||
+    value === "HATE_SPEECH" ||
+    value === "PERSONAL_INFORMATION" ||
+    value === "OTHER_POLICY_VIOLATION"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function normalizeCommunityFeedbackVisibility(
+  value: unknown
+): "preserve" | "hide" | "restore" | null {
+  if (value === "preserve" || value === "hide" || value === "restore") {
+    return value;
+  }
+
+  return null;
+}
+
+function normalizeCreatorReply(value: unknown): string | null | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  if (normalized === "") {
+    return null;
+  }
+
+  return normalized.length <= 800 ? normalized : undefined;
 }
 
 function normalizePlayerReportReason(reason: PlayerReportReason): PlayerReportReason | null {
@@ -3363,6 +3508,22 @@ function checkSocketRateLimit(socketId: string, bucket: RateLimitBucket): string
     [bucket]: [...recentEvents, now]
   });
   return null;
+}
+
+function isCommunityFeedbackRateLimited(profileId: string): boolean {
+  const now = Date.now();
+  const windowMs = 60 * 60_000;
+  const recentEvents = (communityFeedbackRateLimitEvents.get(profileId) ?? []).filter(
+    (timestamp) => now - timestamp < windowMs
+  );
+
+  if (recentEvents.length >= 3) {
+    communityFeedbackRateLimitEvents.set(profileId, recentEvents);
+    return true;
+  }
+
+  communityFeedbackRateLimitEvents.set(profileId, [...recentEvents, now]);
+  return false;
 }
 
 function clearSocketRateLimits(socketId: string): void {
@@ -3453,9 +3614,9 @@ function isAdminGuestId(guestId: string): boolean {
   return ADMIN_GUEST_IDS.includes(guestId);
 }
 
-function requireAdminRequest(request: Request, response: Response): string | null {
+function requireAuthenticatedRequest(request: Request, response: Response): string | null {
   if (REALTIME_AUTH_SECRET === null) {
-    response.status(503).json({ error: "Administrative access is not configured." });
+    response.status(503).json({ error: "Account access is not configured." });
     return null;
   }
 
@@ -3470,16 +3631,26 @@ function requireAdminRequest(request: Request, response: Response): string | nul
   const identity = verifyRealtimeAuthToken(token, REALTIME_AUTH_SECRET);
 
   if (identity === null) {
-    response.status(401).json({ error: "The administrative session is invalid or expired." });
-    return null;
-  }
-
-  if (!isAdminGuestId(identity.profileId)) {
-    response.status(403).json({ error: "Administrator access is required." });
+    response.status(401).json({ error: "The account session is invalid or expired." });
     return null;
   }
 
   return identity.profileId;
+}
+
+function requireAdminRequest(request: Request, response: Response): string | null {
+  const profileId = requireAuthenticatedRequest(request, response);
+
+  if (profileId === null) {
+    return null;
+  }
+
+  if (!isAdminGuestId(profileId)) {
+    response.status(403).json({ error: "Administrator access is required." });
+    return null;
+  }
+
+  return profileId;
 }
 
 function normalizeAdminRecordId(value: unknown): string | null {

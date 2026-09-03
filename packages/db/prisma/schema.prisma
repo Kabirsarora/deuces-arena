@@ -383,7 +383,7 @@ model UserEquippedCosmetic {
 }
 
 model FeedbackReport {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String?
   guestId      String?
   roomCode     String?
@@ -391,11 +391,18 @@ model FeedbackReport {
   body         String
   contactEmail String?
   userAgent    String?
-  createdAt    DateTime @default(now())
-  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  isPublic     Boolean   @default(false)
+  publicStatus String    @default("OPEN")
+  creatorReply String?
+  repliedAt    DateTime?
+  hiddenAt     DateTime?
+  hiddenReason String?
+  createdAt    DateTime  @default(now())
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([guestId])
   @@index([roomCode])
   @@index([kind])
+  @@index([isPublic, hiddenAt, createdAt])
 }

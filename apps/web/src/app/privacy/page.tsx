@@ -12,7 +12,7 @@ export default function PrivacyPage() {
     <PolicyPage
       title="Privacy Policy"
       summary="This policy explains what Deuces Arena collects, why it is needed, and the choices available to players. The project does not sell personal information or use gameplay data for advertising."
-      lastUpdated="August 24, 2026"
+      lastUpdated="September 3, 2026"
     >
       <section>
         <h2>Information we collect</h2>
@@ -33,7 +33,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Feedback:</strong> report text, report category, optional contact email, room
-            code, and browser user-agent information submitted with a report.
+            code, browser user-agent information, and whether you choose to publish the report on
+            the Community Feedback board.
           </li>
           <li>
             <strong>Local device data:</strong> a guest identifier, hand-sort preference, and room
@@ -77,6 +78,12 @@ export default function PrivacyPage() {
           visible to other players or on public profile pages. Email addresses are not intentionally
           displayed on public profiles. Table chat is shared with players in that room and is not
           part of the persisted match-history schema.
+        </p>
+        <p>
+          When you explicitly choose public feedback, the report text, category, Deuces Arena
+          display name, status, and any creator response are visible to anyone. Private feedback and
+          contact email addresses are not shown on the public board. Public posts may be hidden for
+          spam, harassment, hate speech, exposed personal information, or another policy violation.
         </p>
         <p>
           Service providers process data only as needed to operate the app. Current infrastructure

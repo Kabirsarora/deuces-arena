@@ -13,6 +13,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1
     },
     {
+      url: new URL("/feedback", appUrl).toString(),
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.7
+    },
+    {
       url: new URL("/privacy", appUrl).toString(),
       lastModified,
       changeFrequency: "monthly",
