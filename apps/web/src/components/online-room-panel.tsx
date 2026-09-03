@@ -30,6 +30,7 @@ import type {
   PublicGameEvent,
   PublicGuestProfile,
   PublicLeaderboardEntry,
+  PublicLobbyActivity,
   PublicLobbyState,
   PublicMatchHistoryItem,
   PublicModerationReceipt,
@@ -133,6 +134,7 @@ const BEGINNER_WELCOME_SESSION_KEY = "deuces-arena-beginner-welcome-v1";
 const MAX_CASUAL_PLAYERS_PER_ROOM = 6;
 const DEFAULT_CARDS_PER_PLAYER = 13;
 const DEFAULT_RANKED_TIMER_SECONDS = 20;
+const ONLINE_COUNT_DISPLAY_THRESHOLD = 5;
 const AVATAR_OPTIONS: readonly { readonly key: ProfileAvatarKey; readonly label: string }[] = [
   { key: "diamond", label: "Diamonds" },
   { key: "club", label: "Clubs" },
@@ -161,6 +163,28 @@ const BOT_PACE_OPTIONS: readonly {
   { value: "normal", label: "Normal" },
   { value: "quick", label: "Quick" }
 ];
+
+function formatLobbyActivity(activity: PublicLobbyActivity | null | undefined): string {
+  const summary = ["Public beta", "Bots ready instantly"];
+
+  if (activity == null) {
+    return summary.join(" · ");
+  }
+
+  if (activity.connectedUsers >= ONLINE_COUNT_DISPLAY_THRESHOLD) {
+    summary.push(`${activity.connectedUsers} online`);
+  }
+
+  if (activity.openRooms > 0) {
+    summary.push(`${activity.openRooms} open ${activity.openRooms === 1 ? "room" : "rooms"}`);
+  }
+
+  if (activity.activeRooms > 0) {
+    summary.push(`${activity.activeRooms} active ${activity.activeRooms === 1 ? "room" : "rooms"}`);
+  }
+
+  return summary.join(" · ");
+}
 type RuleExampleCard = {
   readonly rank: string;
   readonly suit: "♦" | "♣" | "♥" | "♠";
@@ -1981,7 +2005,7 @@ function OnlineLobbyHub({
               <h1 className="text-3xl font-black sm:text-4xl">{copy.hub.title}</h1>
               <p className="mt-2 text-sm font-semibold text-zinc-400">
                 {connectionStatus === "online"
-                  ? `${activity?.connectedUsers ?? 0} online · ${activity?.openRooms ?? 0} open rooms · ${activity?.activeRooms ?? 0} active rooms`
+                  ? formatLobbyActivity(activity)
                   : connectionStatus === "waking"
                     ? "Connecting to live tables..."
                     : "Live tables are temporarily unavailable"}
