@@ -83,11 +83,13 @@ gameplay deterministic, testable, and portable to future clients.
 
 - Guest play and Google account sign-in
 - Human-vs-bot, casual rooms, ranked matchmaking, and Arena Cup tournaments
+- Interactive guided practice covering opening plays, trick flow, every legal combination, passing,
+  bombs, variants, and winning without affecting account statistics
 - Configurable 2-6 player casual tables, timers, bot count, bot pace, difficulty, and house rules
 - Classic four-suit and experimental six-suit Arena 6 decks
 - Moderated table chat with blocking, muting, reporting, and rate limits
-- Public community feedback with signed-in posting, creator replies, progress statuses, and
-  policy-reason moderation
+- Public community feedback with optional anonymous display, creator replies, progress statuses,
+  profanity masking, harmful-content rejection, and policy-reason moderation
 - Optional casual-only, server-validated pregame card trading
 - Profiles, match history, leaderboards, rating tiers, and tournament history
 - Arena Coins earned through play, plus server-validated cosmetic purchases and loadouts

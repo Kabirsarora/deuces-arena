@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sanitizeChatMessage } from "./chat.js";
+import { moderateCommunityText, sanitizeChatMessage } from "./chat.js";
 
 describe("sanitizeChatMessage", () => {
   it("returns null for empty messages", () => {
@@ -32,5 +32,27 @@ describe("sanitizeChatMessage", () => {
     expect(sanitizeChatMessage("Classic table, nice move! 🎉")).toBe(
       "Classic table, nice move! 🎉"
     );
+  });
+});
+
+describe("moderateCommunityText", () => {
+  it("masks profanity in community posts", () => {
+    expect(moderateCommunityText("This part is shit but the rest is useful.")).toEqual({
+      accepted: true,
+      body: "This part is **** but the rest is useful."
+    });
+  });
+
+  it("rejects threats and targeted hateful language", () => {
+    expect(moderateCommunityText("I will hurt you")).toEqual({ accepted: false });
+    expect(moderateCommunityText("k.y.s")).toEqual({ accepted: false });
+    expect(moderateCommunityText("You are a n1gger")).toEqual({ accepted: false });
+  });
+
+  it("keeps constructive criticism", () => {
+    expect(moderateCommunityText("The turn indicator is confusing on mobile.")).toEqual({
+      accepted: true,
+      body: "The turn indicator is confusing on mobile."
+    });
   });
 });

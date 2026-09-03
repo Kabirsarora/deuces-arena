@@ -1583,6 +1583,7 @@ export async function persistCommunityFeedback(input: {
   readonly kind: FeedbackKind;
   readonly body: string;
   readonly authProfileId: string;
+  readonly isAnonymous: boolean;
   readonly userAgent: string | null;
   readonly createdAt: Date;
 }): Promise<PublicFeedbackReceipt> {
@@ -1617,6 +1618,7 @@ export async function persistCommunityFeedback(input: {
         body: input.body,
         userAgent: input.userAgent,
         isPublic: true,
+        isAnonymous: input.isAnonymous,
         createdAt: input.createdAt
       }
     });
@@ -1659,6 +1661,7 @@ export async function getPersistedCommunityFeedback(
         id: true,
         kind: true,
         body: true,
+        isAnonymous: true,
         publicStatus: true,
         creatorReply: true,
         createdAt: true,
@@ -1675,7 +1678,10 @@ export async function getPersistedCommunityFeedback(
       id: report.id,
       kind: normalizeStoredFeedbackKind(report.kind),
       body: report.body,
-      authorName: report.user?.displayName?.trim() || "Arena Player",
+      authorName: report.isAnonymous
+        ? "Anonymous player"
+        : report.user?.displayName?.trim() || "Arena Player",
+      isAnonymous: report.isAnonymous,
       status: normalizeStoredCommunityFeedbackStatus(report.publicStatus),
       creatorReply: report.creatorReply,
       createdAt: report.createdAt.toISOString(),
@@ -1899,6 +1905,7 @@ export async function getPersistedAdminModerationQueue(
           roomCode: true,
           contactEmail: true,
           isPublic: true,
+          isAnonymous: true,
           publicStatus: true,
           creatorReply: true,
           repliedAt: true,
@@ -1935,6 +1942,7 @@ export async function getPersistedAdminModerationQueue(
         roomCode: report.roomCode,
         contactEmail: report.contactEmail,
         isPublic: report.isPublic,
+        isAnonymous: report.isAnonymous,
         publicStatus: normalizeStoredCommunityFeedbackStatus(report.publicStatus),
         creatorReply: report.creatorReply,
         repliedAt: report.repliedAt?.toISOString() ?? null,

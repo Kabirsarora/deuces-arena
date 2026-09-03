@@ -204,6 +204,26 @@ describe("realtime rooms", () => {
     });
   });
 
+  it("rejects threatening community feedback before persistence", async () => {
+    const playerToken = createRealtimeAuthToken(
+      { profileId: "auth-33333333333333333333333333333333" },
+      TEST_REALTIME_AUTH_SECRET
+    );
+    const response = await fetch(`${serverUrl}/community-feedback`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${playerToken}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ kind: "IDEA", body: "I will hurt you" })
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      error: "This post includes threatening or hateful language and cannot be published."
+    });
+  });
+
   it("validates moderation status updates before persistence", async () => {
     const adminToken = createRealtimeAuthToken(
       { profileId: "auth-758f27d1f066779a62a65665242b8780" },

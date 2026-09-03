@@ -271,6 +271,7 @@ export type PublicCommunityFeedback = {
   readonly kind: FeedbackKind;
   readonly body: string;
   readonly authorName: string;
+  readonly isAnonymous: boolean;
   readonly status: CommunityFeedbackStatus;
   readonly creatorReply: string | null;
   readonly createdAt: string;
@@ -308,6 +309,7 @@ export type AdminFeedbackReport = {
   readonly roomCode: string | null;
   readonly contactEmail: string | null;
   readonly isPublic: boolean;
+  readonly isAnonymous: boolean;
   readonly publicStatus: CommunityFeedbackStatus;
   readonly creatorReply: string | null;
   readonly repliedAt: string | null;

@@ -70,7 +70,7 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { Server } from "socket.io";
 
-import { sanitizeChatMessage } from "./chat.js";
+import { moderateCommunityText, sanitizeChatMessage } from "./chat.js";
 import { createMobileAuthService } from "./mobile-auth.js";
 import { createPushNotificationService } from "./push.js";
 import {
@@ -706,11 +706,20 @@ app.post("/community-feedback", async (request, response) => {
   }
 
   const kind = normalizeFeedbackKind(request.body?.kind);
-  const body =
+  const normalizedBody =
     typeof request.body?.body === "string" ? normalizeFeedbackBody(request.body.body) : null;
 
-  if (kind === null || body === null) {
+  if (kind === null || normalizedBody === null) {
     response.status(400).json({ error: "Choose a valid type and write 6-800 characters." });
+    return;
+  }
+
+  const moderation = moderateCommunityText(normalizedBody);
+
+  if (!moderation.accepted) {
+    response.status(422).json({
+      error: "This post includes threatening or hateful language and cannot be published."
+    });
     return;
   }
 
@@ -722,7 +731,8 @@ app.post("/community-feedback", async (request, response) => {
   const receipt = await persistCommunityFeedback({
     id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     kind,
-    body,
+    body: moderation.body,
+    isAnonymous: request.body?.isAnonymous === true,
     authProfileId,
     userAgent: normalizeUserAgent(request.get("user-agent")),
     createdAt: new Date()

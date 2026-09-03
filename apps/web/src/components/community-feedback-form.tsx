@@ -60,13 +60,21 @@ export function CommunityFeedbackForm() {
       </label>
 
       <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/5 p-3 text-sm leading-5 text-zinc-300">
+        <input className="mt-1 size-4 accent-[var(--gold)]" name="isAnonymous" type="checkbox" />
+        <span>
+          <strong className="text-white">Post anonymously.</strong> Your account stays private and
+          is used only for spam prevention and moderation.
+        </span>
+      </label>
+
+      <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/5 p-3 text-sm leading-5 text-zinc-300">
         <input
           className="mt-1 size-4 accent-[var(--gold)]"
           name="publicConsent"
           required
           type="checkbox"
         />
-        <span>I understand this post and my Deuces Arena display name will be public.</span>
+        <span>I understand this post will be visible on the public community board.</span>
       </label>
 
       <Button className="w-full" disabled={pending} type="submit">

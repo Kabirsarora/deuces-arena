@@ -87,8 +87,8 @@ export default async function CommunityFeedbackPage() {
               <h2 className="text-xl font-black">Share feedback</h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Public posts require an account to reduce spam. Private reports remain available from
-              the Arena Menu inside the lobby.
+              Sign-in reduces spam, but you can hide your display name by posting anonymously.
+              Private reports remain available from the Arena Menu inside the lobby.
             </p>
 
             <div className="mt-5">
@@ -105,8 +105,9 @@ export default async function CommunityFeedbackPage() {
             </div>
 
             <p className="mt-5 border-t border-white/10 pt-4 text-xs leading-5 text-zinc-500">
-              Posts are hidden only for spam, harassment, hate speech, exposed personal information,
-              or another stated policy violation.
+              Profanity is masked automatically. Threats and hate speech are rejected; posts are
+              otherwise hidden only for spam, harassment, exposed personal information, or another
+              stated policy violation.
             </p>
           </aside>
         </div>
@@ -121,7 +122,7 @@ function CommunityFeedbackCard({ item }: { readonly item: PublicCommunityFeedbac
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/12 bg-black/25 text-sm font-black text-[var(--aqua)]">
-            {item.authorName.slice(0, 1).toUpperCase()}
+            {item.isAnonymous ? "?" : item.authorName.slice(0, 1).toUpperCase()}
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black">{item.authorName}</p>

@@ -240,6 +240,11 @@ function FeedbackRow({ report }: { readonly report: AdminFeedbackReport }) {
               Hidden
             </span>
           )}
+          {report.isAnonymous ? (
+            <span className="rounded-full bg-cyan-300/10 px-2 py-1 text-[10px] font-black uppercase text-cyan-100">
+              Publicly anonymous
+            </span>
+          ) : null}
         </div>
         <time className="text-xs text-zinc-500">{formatDate(report.createdAt)}</time>
       </div>

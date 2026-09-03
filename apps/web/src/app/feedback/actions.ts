@@ -39,6 +39,8 @@ export async function submitCommunityFeedback(
     return formError("Confirm that you understand this post will be public.");
   }
 
+  const isAnonymous = formData.get("isAnonymous") === "on";
+
   const secret = process.env.REALTIME_AUTH_SECRET?.trim();
 
   if (secret === undefined || secret.length < 32) {
@@ -56,7 +58,7 @@ export async function submitCommunityFeedback(
         authorization: `Bearer ${token}`,
         "content-type": "application/json"
       },
-      body: JSON.stringify({ kind, body: body.trim() })
+      body: JSON.stringify({ kind, body: body.trim(), isAnonymous })
     });
 
     if (!response.ok) {

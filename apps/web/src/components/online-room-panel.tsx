@@ -10,6 +10,7 @@ import {
   getRankedCoinBonus,
   getRankStrength,
   getSuitStrength,
+  validateMove,
   type Card,
   type DeckType,
   type HandType,
@@ -107,7 +108,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type OnlineHubMode = "bots" | "casual" | "ranked" | "tournament" | "cosmetics";
-type HubOverlay = "learn" | "profile" | "more" | null;
+type HubOverlay = "learn" | "practice" | "profile" | "more" | null;
 type FirstVisitStage = "welcome" | "guide" | null;
 type ActiveTablePanel = "chat" | "rules";
 type HandSortMode = "rank" | "suit" | "sets" | "manual";
@@ -2006,8 +2007,7 @@ function OnlineLobbyHub({
 
   function startPracticeGameSetup() {
     finishFirstVisit();
-    setActiveOverlay(null);
-    onHubModeChange("bots");
+    setActiveOverlay("practice");
   }
 
   useEffect(() => {
@@ -2056,15 +2056,6 @@ function OnlineLobbyHub({
               >
                 <MoreHorizontal className="size-5" />
               </Button>
-              <Link
-                aria-label="Community feedback"
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-sm font-semibold text-white transition hover:bg-white/14"
-                href="/feedback"
-                title="Community feedback"
-              >
-                <MessageCircle className="size-4" />
-                <span className="hidden lg:inline">Community</span>
-              </Link>
               <HeaderAccountControl
                 authUser={authUser}
                 profile={profile}
@@ -2075,7 +2066,7 @@ function OnlineLobbyHub({
             </div>
           </header>
 
-          <div className="mb-5 grid grid-cols-6 gap-1 rounded-[1rem] border border-white/10 bg-black/30 p-1.5 sm:grid-cols-5 sm:gap-2 sm:rounded-full">
+          <div className="mb-5 grid grid-cols-6 gap-1 rounded-[1rem] border border-white/10 bg-black/30 p-1.5 sm:gap-2 sm:rounded-full">
             <HubModeButton
               mode="bots"
               activeMode={hubMode}
@@ -2111,6 +2102,17 @@ function OnlineLobbyHub({
               label={copy.hub.cosmetics}
               onSelect={onHubModeChange}
             />
+            <Link
+              aria-label="Community"
+              className="hub-mode-button col-span-2 flex min-h-[4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-[0.8rem] px-1 font-black text-zinc-400 transition hover:bg-white/8 hover:text-white sm:col-span-1 sm:min-h-14 sm:flex-row sm:gap-3 sm:rounded-full sm:px-2"
+              href="/feedback"
+              title="Community"
+            >
+              <MessageCircle className="size-6" />
+              <span className="block max-w-full whitespace-normal break-words text-center">
+                Community
+              </span>
+            </Link>
           </div>
 
           <motion.div
@@ -2273,8 +2275,22 @@ function OnlineLobbyHub({
 
       <AnimatePresence>
         {activeOverlay === "learn" ? (
-          <HubOverlayDialog title={copy.howToPlay} onClose={() => setActiveOverlay(null)}>
+          <HubOverlayDialog
+            key="learn"
+            title={copy.howToPlay}
+            onClose={() => setActiveOverlay(null)}
+          >
             <BeginnerGuide onPractice={startPracticeGameSetup} />
+          </HubOverlayDialog>
+        ) : null}
+        {activeOverlay === "practice" ? (
+          <HubOverlayDialog
+            key="practice"
+            wide
+            title="Guided Practice"
+            onClose={() => setActiveOverlay(null)}
+          >
+            <GuidedPractice onFinish={() => setActiveOverlay(null)} />
           </HubOverlayDialog>
         ) : null}
         {activeOverlay === "profile" ? (
@@ -2342,8 +2358,6 @@ function HubModeButton({
       aria-label={label}
       className={cn(
         "hub-mode-button col-span-2 flex min-h-[4rem] min-w-0 flex-col items-center justify-center gap-1 rounded-[0.8rem] px-1 font-black transition sm:col-span-1 sm:min-h-14 sm:flex-row sm:gap-3 sm:rounded-full sm:px-2",
-        mode === "tournament" && "col-start-2 sm:col-start-auto",
-        mode === "cosmetics" && "col-start-4 sm:col-start-auto",
         active
           ? "bg-[var(--table)] text-white shadow-lg"
           : "text-zinc-400 hover:bg-white/8 hover:text-white"
@@ -2361,10 +2375,12 @@ function HubModeButton({
 function HubOverlayDialog({
   title,
   children,
+  wide = false,
   onClose
 }: {
   readonly title: string;
   readonly children: ReactNode;
+  readonly wide?: boolean;
   readonly onClose: () => void;
 }) {
   return (
@@ -2384,7 +2400,10 @@ function HubOverlayDialog({
       <motion.section
         aria-label={title}
         aria-modal="true"
-        className="online-hub relative z-10 my-auto w-full max-w-3xl overflow-hidden rounded-[1.1rem] border border-white/12 shadow-2xl"
+        className={cn(
+          "online-hub relative z-10 my-auto w-full overflow-hidden rounded-[1.1rem] border border-white/12 shadow-2xl",
+          wide ? "max-w-5xl" : "max-w-3xl"
+        )}
         role="dialog"
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -2608,6 +2627,369 @@ function BeginnerGuide({
         )}
       </div>
     </div>
+  );
+}
+
+type PracticeLessonStep = {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly body: string;
+  readonly action: "continue" | "play" | "pass" | "combinations" | "finish";
+  readonly hand?: readonly Card[];
+  readonly currentCards?: readonly Card[];
+  readonly isFirstMove?: boolean;
+  readonly success?: string;
+};
+
+const PRACTICE_LESSON_STEPS: readonly PracticeLessonStep[] = [
+  {
+    eyebrow: "Lesson 1 · The goal",
+    title: "Empty your hand first",
+    body: "A match is a sequence of tricks. Get rid of every card before anyone else. Ranks rise from 3 through Ace to 2; equal ranks use diamonds, clubs, hearts, then spades.",
+    action: "continue"
+  },
+  {
+    eyebrow: "Lesson 2 · Opening play",
+    title: "The 3♦ starts every match",
+    body: "You hold the lowest card, so you lead first. Select the 3♦ and play it. The first combination must contain that card, and you cannot pass while leading.",
+    action: "play",
+    hand: [
+      { rank: "3", suit: "diamonds" },
+      { rank: "5", suit: "clubs" },
+      { rank: "9", suit: "hearts" }
+    ],
+    isFirstMove: true,
+    success: "Correct. Your single sets this trick to singles."
+  },
+  {
+    eyebrow: "Lesson 3 · Answering",
+    title: "Match the type and play higher",
+    body: "The center holds a 6♣, so only a higher single or a bomb can answer it. Select a legal card and play.",
+    action: "play",
+    hand: [
+      { rank: "4", suit: "spades" },
+      { rank: "7", suit: "diamonds" },
+      { rank: "10", suit: "hearts" }
+    ],
+    currentCards: [{ rank: "6", suit: "clubs" }],
+    success: "That beats the 6♣. The next player must beat your card or pass."
+  },
+  {
+    eyebrow: "Lesson 4 · Doubles",
+    title: "A pair must answer a pair",
+    body: "Two 8s are in the center. Select both 9s. One 9 is only a single, and mixing different ranks is not a pair.",
+    action: "play",
+    hand: [
+      { rank: "9", suit: "diamonds" },
+      { rank: "9", suit: "clubs" },
+      { rank: "K", suit: "spades" }
+    ],
+    currentCards: [
+      { rank: "8", suit: "diamonds" },
+      { rank: "8", suit: "hearts" }
+    ],
+    success: "Exactly. The higher pair wins the exchange."
+  },
+  {
+    eyebrow: "Lesson 5 · Passing",
+    title: "Pass when you cannot or do not want to beat it",
+    body: "An A♥ is in the center and your King is lower. Pass this turn. You may play later if the trick comes back around, but you cannot pass when the center is empty.",
+    action: "pass",
+    hand: [{ rank: "K", suit: "spades" }],
+    currentCards: [{ rank: "A", suit: "hearts" }],
+    success: "Good pass. You keep the King and wait for the next opportunity."
+  },
+  {
+    eyebrow: "Lesson 6 · Winning a trick",
+    title: "Everyone else passes, then the center clears",
+    body: "The last player who placed cards wins the trick. That player leads the next trick and may choose any valid combination. Winning a trick does not give points; it gives control of the next lead.",
+    action: "continue"
+  },
+  {
+    eyebrow: "Lesson 7 · Legal combinations",
+    title: "Know every hand you can lead",
+    body: "Singles, pairs, trips, quads, full houses, straights, and bombs are supported. Normal responses must stay in the same row; straights must also keep the same length.",
+    action: "combinations"
+  },
+  {
+    eyebrow: "Lesson 8 · Bombs",
+    title: "A bomb can break the pattern",
+    body: "A bomb is four cards of one rank plus one extra card. It can beat any normal combination. Select all five cards to interrupt the pair in the center.",
+    action: "play",
+    hand: [
+      { rank: "5", suit: "diamonds" },
+      { rank: "5", suit: "clubs" },
+      { rank: "5", suit: "hearts" },
+      { rank: "5", suit: "spades" },
+      { rank: "7", suit: "clubs" }
+    ],
+    currentCards: [
+      { rank: "A", suit: "diamonds" },
+      { rank: "A", suit: "clubs" }
+    ],
+    success: "Bomb played. Unless the room ends tricks on bombs, only a stronger bomb can answer."
+  },
+  {
+    eyebrow: "Lesson 9 · Room options",
+    title: "Variants change the table, not the foundation",
+    body: "Arena 6 adds stars and crowns, but keeps the same hand rules. Casual rooms may enable one-for-one trades for the first 20 seconds; ranked never allows trades. Timers, bot speed, and whether a bomb ends the trick are chosen before a casual match.",
+    action: "continue"
+  },
+  {
+    eyebrow: "Practice complete",
+    title: "You are ready to take a seat",
+    body: "Lead with 3♦, match and beat the active hand, pass strategically, take control when a trick clears, and empty your hand to win. Practice lessons never affect your record, rating, or coins.",
+    action: "finish"
+  }
+];
+
+function GuidedPractice({ onFinish }: { readonly onFinish: () => void }) {
+  const [stepIndex, setStepIndex] = useState(0);
+  const [selectedCardIds, setSelectedCardIds] = useState<readonly string[]>([]);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [stepComplete, setStepComplete] = useState(false);
+  const step = PRACTICE_LESSON_STEPS[stepIndex] ?? PRACTICE_LESSON_STEPS[0]!;
+  const progress = ((stepIndex + 1) / PRACTICE_LESSON_STEPS.length) * 100;
+
+  function moveToStep(nextStep: number) {
+    setStepIndex(Math.max(0, Math.min(nextStep, PRACTICE_LESSON_STEPS.length - 1)));
+    setSelectedCardIds([]);
+    setFeedback(null);
+    setStepComplete(false);
+  }
+
+  function toggleCard(card: Card) {
+    const cardId = getCardId(card);
+    setSelectedCardIds((current) =>
+      current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]
+    );
+    setFeedback(null);
+  }
+
+  function attemptMove(moveType: "play" | "pass") {
+    if (step.action !== moveType) {
+      setFeedback(
+        step.action === "pass"
+          ? "This hand cannot beat the Ace. Passing is the right move."
+          : "You are leading this trick, so you must play a card."
+      );
+      return;
+    }
+
+    const currentAnalysis = step.currentCards === undefined ? null : detectHand(step.currentCards);
+    const selectedCards = (step.hand ?? []).filter((card) =>
+      selectedCardIds.includes(getCardId(card))
+    );
+    const result = validateMove(
+      moveType === "pass" ? { type: "pass" } : { type: "play", cards: selectedCards },
+      {
+        isFirstMove: step.isFirstMove === true,
+        currentTrick:
+          currentAnalysis === null || currentAnalysis.type === "invalid"
+            ? null
+            : {
+                leadingPlayerId: "practice-bot",
+                lastPlayedByPlayerId: "practice-bot",
+                hand: currentAnalysis,
+                passedPlayerIds: []
+              }
+      }
+    );
+
+    if (!result.valid) {
+      setFeedback(result.reason);
+      return;
+    }
+
+    setFeedback(step.success ?? "Correct.");
+    setStepComplete(true);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 text-xs font-black uppercase text-zinc-400">
+        <span>
+          Step {stepIndex + 1} of {PRACTICE_LESSON_STEPS.length}
+        </span>
+        <span>{Math.round(progress)}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <motion.div
+          className="h-full bg-[var(--gold)]"
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.25 }}
+        />
+      </div>
+
+      <section className="mt-5 overflow-hidden rounded-lg border border-white/12 bg-[#07382f] shadow-inner">
+        <div className="border-b border-white/10 bg-black/20 px-4 py-4 text-center sm:px-6">
+          <p className="text-[11px] font-black uppercase text-[var(--aqua)]">{step.eyebrow}</p>
+          <h3 className="mt-1 text-xl font-black sm:text-2xl">{step.title}</h3>
+          <p className="mx-auto mt-2 max-w-3xl text-sm leading-6 text-zinc-200">{step.body}</p>
+        </div>
+
+        {step.action === "combinations" ? (
+          <div className="bg-black/20 px-4 py-3 sm:px-6">
+            <HandCombinationGuide compact />
+          </div>
+        ) : step.hand === undefined ? (
+          <PracticeRuleSummary stepIndex={stepIndex} />
+        ) : (
+          <div className="relative min-h-[22rem] px-4 py-6 sm:min-h-[25rem] sm:px-8">
+            <div className="text-center">
+              <p className="text-xs font-black uppercase text-zinc-300">Practice Bot · 6 cards</p>
+              <div className="mx-auto mt-2 flex w-fit -space-x-4" aria-hidden="true">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <span
+                    key={index}
+                    className="h-12 w-8 rounded border border-cyan-100/25 bg-[#142f4a] shadow-md"
+                    style={{ transform: `rotate(${(index - 2.5) * 2}deg)` }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mx-auto mt-7 min-h-20 text-center">
+              <p className="text-[10px] font-black uppercase text-zinc-400">Current trick</p>
+              {step.currentCards === undefined ? (
+                <p className="mt-3 text-sm font-bold text-zinc-300">Open table · you lead</p>
+              ) : (
+                <div className="mt-2 flex justify-center -space-x-3">
+                  {step.currentCards.map((card) => (
+                    <PracticeCard key={getCardId(card)} card={card} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-xs font-black uppercase text-[var(--gold)]">Your hand</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {step.hand.map((card) => {
+                  const selected = selectedCardIds.includes(getCardId(card));
+                  return (
+                    <button
+                      key={getCardId(card)}
+                      aria-label={`${selected ? "Deselect" : "Select"} ${formatCardName(card)}`}
+                      aria-pressed={selected}
+                      className={cn(
+                        "rounded-md transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gold)]",
+                        selected
+                          ? "-translate-y-3 shadow-[0_0_0_3px_var(--gold)]"
+                          : "hover:-translate-y-1"
+                      )}
+                      type="button"
+                      disabled={stepComplete}
+                      onClick={() => toggleCard(card)}
+                    >
+                      <PracticeCard card={card} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="mt-4 min-h-6 text-center">
+        {feedback === null ? null : (
+          <p className="text-sm font-bold text-[var(--gold)]" role="status">
+            {feedback}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <Button
+          disabled={stepIndex === 0}
+          variant="secondary"
+          onClick={() => moveToStep(stepIndex - 1)}
+        >
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+        {stepComplete ? (
+          <Button onClick={() => moveToStep(stepIndex + 1)}>
+            Next lesson <ArrowRight className="size-4" />
+          </Button>
+        ) : step.action === "play" || step.action === "pass" ? (
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => attemptMove("pass")}>
+              Pass
+            </Button>
+            <Button onClick={() => attemptMove("play")}>
+              <Send className="size-4" /> Play
+            </Button>
+          </div>
+        ) : step.action === "finish" ? (
+          <Button onClick={onFinish}>
+            <CheckCircle2 className="size-4" /> Finish Practice
+          </Button>
+        ) : (
+          <Button onClick={() => moveToStep(stepIndex + 1)}>
+            Continue <ArrowRight className="size-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PracticeRuleSummary({ stepIndex }: { readonly stepIndex: number }) {
+  if (stepIndex === 0) {
+    return (
+      <div className="grid gap-3 bg-black/15 px-5 py-8 sm:grid-cols-2 sm:px-8">
+        <div className="border-l-2 border-[var(--gold)] pl-4">
+          <p className="text-xs font-black uppercase text-zinc-400">Ranks</p>
+          <p className="mt-2 text-lg font-black">3 4 5 6 7 8 9 10 J Q K A 2</p>
+        </div>
+        <div className="border-l-2 border-[var(--aqua)] pl-4">
+          <p className="text-xs font-black uppercase text-zinc-400">Suits · low to high</p>
+          <p className="mt-2 text-lg font-black">♦ ♣ ♥ ♠</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (stepIndex === PRACTICE_LESSON_STEPS.length - 1) {
+    return (
+      <div className="grid gap-3 bg-black/15 px-5 py-7 sm:grid-cols-3 sm:px-8">
+        {[
+          ["Lead", "3♦ opens the match"],
+          ["Respond", "Match, beat, or pass"],
+          ["Win", "Be first to play every card"]
+        ].map(([label, body]) => (
+          <div key={label} className="border-l-2 border-[var(--gold)] pl-4">
+            <p className="font-black">{label}</p>
+            <p className="mt-1 text-sm text-zinc-300">{body}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-black/15 px-5 py-8 text-center sm:px-8">
+      <p className="text-sm font-bold text-zinc-200">The trick clears back to an open table.</p>
+      <div className="mx-auto mt-4 h-px max-w-xs bg-white/15" />
+      <p className="mt-4 text-xs text-zinc-400">The trick winner chooses the next hand type.</p>
+    </div>
+  );
+}
+
+function PracticeCard({ card }: { readonly card: Card }) {
+  const red = card.suit === "diamonds" || card.suit === "hearts";
+
+  return (
+    <span
+      className={cn(
+        "grid h-20 w-14 shrink-0 place-content-center rounded-md border border-zinc-300 bg-zinc-50 text-center shadow-lg sm:h-24 sm:w-16",
+        red ? "text-red-600" : "text-zinc-950"
+      )}
+    >
+      <span className="text-xl font-black sm:text-2xl">{card.rank}</span>
+      <span className="text-2xl leading-none sm:text-3xl">{suitSymbol(card.suit)}</span>
+    </span>
   );
 }
 
@@ -2872,7 +3254,7 @@ function CompactBotDifficulty({
               "min-w-0 rounded-full px-1 py-2 text-[0.72rem] font-black transition sm:px-2 sm:text-sm",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
-                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+                : "bg-white/[0.035] text-zinc-400 hover:bg-white/8 hover:text-white"
             )}
             type="button"
             disabled={disabled}
@@ -2913,7 +3295,7 @@ function CompactBotPace({
               "min-w-0 rounded-full px-1 py-2 text-[0.72rem] font-black transition sm:px-2 sm:text-sm",
               value === option.value
                 ? "bg-[var(--gold)] text-black"
-                : "text-zinc-400 hover:bg-white/8 hover:text-white"
+                : "bg-white/[0.035] text-zinc-400 hover:bg-white/8 hover:text-white"
             )}
             type="button"
             disabled={disabled}

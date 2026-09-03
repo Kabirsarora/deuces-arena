@@ -392,6 +392,7 @@ model FeedbackReport {
   contactEmail String?
   userAgent    String?
   isPublic     Boolean   @default(false)
+  isAnonymous  Boolean   @default(false)
   publicStatus String    @default("OPEN")
   creatorReply String?
   repliedAt    DateTime?

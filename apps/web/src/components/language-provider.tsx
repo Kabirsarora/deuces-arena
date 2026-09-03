@@ -148,7 +148,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         },
         {
           title: "Play higher or pass",
-          body: "Passing is always allowed. If another player continues the trick, your turn may come around again."
+          body: "When answering a play, you may pass. If another player continues the trick, your turn may come around again. You cannot pass when leading."
         },
         {
           title: "Win the trick, then the match",
@@ -160,7 +160,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       combinationsBody:
         "You may lead with any hand below. Everyone must then use that same row until the trick ends, except when a bomb is played.",
       completeRules: "Complete turn rules",
-      practice: "Set Up a Practice Game",
+      practice: "Start Guided Practice",
       enterLobby: "Enter Lobby"
     },
     rules: {
@@ -281,7 +281,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         },
         {
           title: "Juega más alto o pasa",
-          body: "Siempre puedes pasar. Si otra persona continúa la baza, puede volver a tocarte."
+          body: "Al responder puedes pasar. Si la baza continúa, puede volver a tocarte. No puedes pasar cuando te toca iniciar."
         },
         {
           title: "Gana la baza y luego la partida",
@@ -293,7 +293,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       combinationsBody:
         "Puedes iniciar con cualquier mano de abajo. Después todos deben usar ese mismo tipo, excepto con una bomba.",
       completeRules: "Reglas completas del turno",
-      practice: "Preparar una partida de práctica",
+      practice: "Iniciar práctica guiada",
       enterLobby: "Entrar al lobby"
     },
     rules: {
@@ -415,7 +415,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         },
         {
           title: "Перебейте или пасуйте",
-          body: "Пасовать можно всегда. Если взятка продолжается, ход может снова вернуться к вам."
+          body: "Отвечая на ход, можно спасовать. Ход может снова вернуться к вам. Нельзя пасовать, когда вы начинаете взятку."
         },
         {
           title: "Выиграйте взятку, затем игру",
@@ -427,7 +427,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       combinationsBody:
         "Начать можно с любой комбинации ниже. Затем все играют тот же тип до конца взятки, кроме бомбы.",
       completeRules: "Полные правила хода",
-      practice: "Настроить тренировочную игру",
+      practice: "Начать обучение",
       enterLobby: "Войти в лобби"
     },
     rules: {
@@ -543,7 +543,10 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
           title: "领出决定牌型",
           body: "单张只能用更大的单张压，对子只能用更大的对子压，其他普通牌型同理。"
         },
-        { title: "压过或跳过", body: "你随时可以跳过。如果本轮继续，之后还可能再次轮到你。" },
+        {
+          title: "压过或跳过",
+          body: "回应出牌时可以跳过；本轮继续后还可能再次轮到你。领出时不能跳过。"
+        },
         {
           title: "先赢本轮，再赢比赛",
           body: "其他人都跳过后，最后出牌者开启新一轮。最先打光手牌者获胜。"
@@ -553,7 +556,7 @@ export const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       combinationsTitle: "可以出的牌型",
       combinationsBody: "你可以用下列任意牌型领出。之后本轮必须保持相同牌型，炸弹除外。",
       completeRules: "完整回合规则",
-      practice: "设置练习赛",
+      practice: "开始引导练习",
       enterLobby: "进入大厅"
     },
     rules: {
